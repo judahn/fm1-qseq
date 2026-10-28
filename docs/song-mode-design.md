@@ -386,6 +386,46 @@ part of the song and can be repeated, edited and undone.
 **Responsibly:** a limiter on the master output catches level spikes, every glitch can be undone, and the
 buffer effects stop as soon as the button is released.
 
+## 8f. Pattern mode and the chord track (phase 7 proposal, for Judah's review)
+
+**Patterns.** A pattern is a looping clip, 1 to 8 bars in any time signature, with 8 tracks (one per sound
+slot). It uses the same event format as song tracks, so step entry, loop recording, glitch, automation and the
+edit jobs all work inside a pattern unchanged.
+- **Pattern mode:** a pattern view that looks like the song view with the loop set to the pattern. While
+  playing, the lower white keys queue the next pattern, which starts when the current one ends (the QY70's
+  section keys, and how most grooveboxes switch).
+- **Where patterns live:** inside the song, up to 16 per song, numbered and optionally named. The browser
+  editor can copy patterns between songs, so a library builds up without a separate on-device style store.
+- **In the song:** a pattern lane, like the QY70's pattern track, says which pattern plays from each bar.
+  Pattern tracks and free-form tracks share the 8 sound slots and both play, so you can lay a free-form
+  melody over a pattern groove. Recording while switching patterns live writes the pattern lane. An "expand
+  patterns" job turns the lane into ordinary notes for detailed editing (the QY70's Expand Backing).
+
+**Chord track.** A song-level lane, alongside the conductor lane: at most one chord per beat, with an
+optional 8th or 16th anticipation and a slash bass, using the QY70's 25 chord types plus root-only.
+- **Entry:** the lower 12 keys pick the root, and the upper 12 keys pick the type, with a second press for
+  the key's second type, as on the QY70. SHIFT plus a key sets the slash bass, and a knob sets anticipation.
+  Entering a chord can play it on a chosen track, and the key LEDs light its notes.
+- **Following chords:** each pattern track has a phrase type and the pattern has a source chord (C major by
+  default). Bypass is for drums and never changes. Parallel moves everything by the root difference. Chord 1
+  maps each note from its role in the source chord (root, third, fifth, seventh, or a scale step between) to
+  the same role in the new chord. Chord 2 does the same but picks the inversion closest to the previous
+  voicing, for smooth changes. Bass works like Chord 1, but the first note after a change is the root, or the
+  slash note. Low and high limits per track fold notes by octaves to stay in range. The QY70 manual only
+  describes these in prose, so the exact tables are ours, tuned by ear.
+- **Free-form tracks** ignore the chord track by default. A per-track "follow chords" switch could come later.
+
+**Cost:** about 15 to 25 KB more on the device, so it depends on the flash decision like everything since
+phase 1.
+
+**Questions for Judah:**
+1. Patterns inside each song (proposed), or a global library like the QY70's styles?
+2. Numbered patterns 1 to 16 with optional names (proposed), or QY-style named sections (Intro, Main A,
+   Main B, Fill, Ending)?
+3. Pattern tracks and free-form tracks both playing on the shared sound slots (proposed), or a pattern
+   silencing the song's own notes on its tracks while it plays?
+4. Free-form tracks following the chord track: later and off by default (proposed), or part of phase 7?
+
 ## 9. Undo
 
 Several levels, stored as what each edit added and removed rather than as whole copies of the song, so it
