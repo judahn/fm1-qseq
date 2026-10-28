@@ -89,6 +89,14 @@ int song_marker_step(const struct song *s, uint32_t clock, int direction)
     return -1;
 }
 
+uint32_t song_swing(const struct song *s, unsigned track, uint32_t clock)
+{
+    if (!s->swing || track >= SONG_TRACKS || !(s->swing_tracks >> track & 1U)) return 0;
+    uint32_t grid = s->swing_grid ? SONG_PPQ / 4 : SONG_PPQ / 2, start;
+    song_bar_at(s, clock, &start, NULL);
+    return (clock - start) % (2U * grid) == grid ? (grid * s->swing + 50U) / 100U : 0;
+}
+
 unsigned song_tempo_at(const struct song *s, uint32_t clock)
 {
     unsigned k = 0;

@@ -3,10 +3,11 @@
  * band painter, text, knob footer and draw caches. As on every stock page,
  * the marking pass records damage and the band pass repaints from a frame
  * snapshot. Phase 1: transport, snap and zoom, markers and the loop.
- * Input lives in song_panel.inc. */
+ * Step entry is in song_step.inc, settings in song_setup.inc and input in
+ * song_panel.inc. */
 #include "song_port.h"
 
-enum { SONG = STARTUP + 1 };
+enum { SONG = STARTUP + 1, SONG_STEP, SONG_SETUP }; /* song view, step entry, settings */
 enum {
     SONG_X = 22, SONG_W = 214, SONG_RULER = 32, SONG_ROWS = 48, SONG_ROW = 18,
     SONG_BOTTOM = SONG_ROWS + 8 * SONG_ROW - 2,
@@ -22,6 +23,7 @@ static struct {
     uint8_t playing, jumping, shift;
 } song_now; /* taken by the marking pass, used by every band */
 static void select_track(int delta);
+static void song_start(uint32_t now);
 
 static uint32_t song_span(void) { return (16U >> song_zoom) * (uint32_t)SONG_WHOLE; }
 static unsigned song_x(uint32_t clock)
@@ -218,7 +220,7 @@ static void song_draw(void)
     knob(3, "ZOOM", song_spans[song_zoom], colors[3]);
     if (notice && (int32_t)(frame_time - notice_until) >= 0) notice = NULL;
     const char *hint = notice ? notice : song_now.jumping ? "JUMP WAITS FOR THE NEXT BAR"
-        : song_now.shift ? "SHIFT + F4..G5: MARKERS 1-9" : "FX SHIFT  ENV LOOP  SEQ STEPS";
+        : song_now.shift ? "SHIFT + F4..G5: MARKERS 1-9" : "FX SHIFT  ENV LOOP  REC STEP  GLO SET";
     uint32_t sig = signature(0, hint, (unsigned)strlen(hint));
     if (sig == cache->hint_cache) return;
     cache->hint_cache = sig;
@@ -226,4 +228,12 @@ static void song_draw(void)
     text(6, 231, hint, 1, DIM, BACK);
 }
 
+#include "song_step.inc"
+#include "song_setup.inc"
+static void song_page_draw(unsigned visible)
+{
+    if (visible == SONG_STEP) song_step_draw();
+    else if (visible == SONG_SETUP) song_setup_draw();
+    else song_draw();
+}
 #include "song_panel.inc"

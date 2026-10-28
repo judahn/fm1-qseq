@@ -2,7 +2,9 @@
 // Headless check of the browser preview (build/preview/index.html). Plays the
 // test song through the simulator's exported panel controls, then checks
 // every note the player sent against exact timing worked out here in BigInt
-// arithmetic, independent of the C player. Saves docs/phase1-song-view.png.
+// arithmetic, independent of the C player. Phase 2: step-enters a phrase,
+// plays it back the same way, and drives the settings page. Saves
+// docs/phase1-song-view.png, docs/phase2-step-view.png and docs/phase2-settings.png.
 // Needs Playwright with a cached Chromium:
 //   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright node tests/preview_check.mjs
 import { createRequire } from 'node:module';
@@ -185,7 +187,131 @@ const result = await page.evaluate(() => {
   controls.seqOk = pages.join() === '19,1,19,12';
   return { whole, loop, controls, png: canvas.toDataURL('image/png').split(',')[1] };
 });
+// Phase 2: step entry and the settings page, on a fresh simulator.
+const phase2 = await page.evaluate(() => {
+  const wasm = Uint8Array.from(atob(FM1_SIMULATOR.data), ch => ch.charCodeAt(0));
+  const c = new FM1SimulatorCore(wasm, null, null).c;
+  const B = { FX: 2, ENV: 4, LFO: 5, GLO: 7, HOME: 8, SEQ: 11, PLAY: 12, REC: 13 };
+  const tap = b => { c.sim_control(0, b, 1); c.sim_control(0, b, 0); };
+  const key = k => { c.sim_control(1, k, 1); c.sim_control(1, k, 0); };
+  const shiftKey = k => { c.sim_control(0, B.FX, 1); key(k); c.sim_control(0, B.FX, 0); };
+  const turn = (encoder, delta) => c.sim_control(2, encoder, delta);
+  const render = n => { for (let i = 0; i < n; i++) c.sim_render(); };
+  const info = (what, track = 0, index = 0) => c.sim_song_info(what, track, index) >>> 0;
+  const state = () => new Uint8Array(c.memory.buffer, c.sim_state(), 225);
+  const png = () => {
+    const pixels = new Uint16Array(c.memory.buffer, c.sim_pixels(), 240 * 240);
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 480;
+    const image = canvas.getContext('2d').createImageData(480, 480);
+    for (let y = 0; y < 480; y++)
+      for (let x = 0; x < 480; x++) {
+        const v = pixels[(y >> 1) * 240 + (x >> 1)], at = (y * 480 + x) * 4;
+        image.data[at] = (v >> 11) * 255 / 31; image.data[at + 1] = ((v >> 5) & 63) * 255 / 63;
+        image.data[at + 2] = (v & 31) * 255 / 31; image.data[at + 3] = 255;
+      }
+    canvas.getContext('2d').putImageData(image, 0, 0);
+    return canvas.toDataURL('image/png').split(',')[1];
+  };
+  const out = {};
+  render(32);
+  tap(B.SEQ);
+  turn(2, 12);                                   // K1: to the song end, bar 13
+  const p0 = info(8);
+  tap(B.REC);                                    // step entry on track 1
+  out.stepPage = state()[1];
+  out.pointerAtStart = info(17) === p0;
+  // One bar: an 8th, three 8th triplets, a dotted 8th, a 16th tied to an
+  // 8th (the length changes before the tie), an 8th rest, and a chord built
+  // key by key.
+  shiftKey(6); key(7);                           // 8th, C4
+  shiftKey(1); key(9); key(11); key(12);         // 8th triplets D4 E4 F4
+  shiftKey(1); shiftKey(3); key(14);             // dotted 8th G4
+  shiftKey(3); shiftKey(3); shiftKey(4); key(16); // plain 16th A4
+  shiftKey(6); key(26);                          // an 8th, then tie
+  key(24);                                       // 8th rest
+  const beforeChord = info(0, 0);
+  c.sim_control(1, 7, 1); c.sim_control(1, 11, 1); c.sim_control(1, 14, 1);
+  const whileHeld = info(0, 0);
+  c.sim_control(1, 7, 0); c.sim_control(1, 11, 0); c.sim_control(1, 14, 0);
+  out.chordWaitedForRelease = whileHeld === beforeChord && info(0, 0) === beforeChord + 3;
+  const want = [[0, 60, 216], [240, 62, 144], [400, 64, 144], [560, 65, 144], [720, 67, 324], [1080, 69, 336],
+    [1680, 60, 216], [1680, 64, 216], [1680, 67, 216]].map(([at, pitch, length]) => ({ clock: p0 + at, pitch, length }));
+  const stored = [];
+  for (let i = 0; i < info(0, 0); i++) if (info(1, 0, i) >= p0) stored.push({ clock: info(1, 0, i), pitch: info(2, 0, i), length: info(3, 0, i) });
+  out.stored = stored;
+  out.storedOk = JSON.stringify(stored) === JSON.stringify(want);
+  out.pointerAfter = info(17) - p0;
+  // Back onto the chord: K4 by an 8th. The pointer selects and previews it.
+  c.sim_song_capture(1);
+  turn(5, -1);
+  out.previewedChord = (() => { const n = c.sim_song_heard_count(), b = new Uint8Array(c.memory.buffer, c.sim_song_heard(), n * 8);
+    return Array.from({ length: n }, (_, i) => b[i * 8 + 5]).sort().join(); })();
+  render(4);
+  out.stepPng = png();
+  render(200);                                   // the preview times out
+  // REC leaves at the pointer. Back to the bar line and play the phrase.
+  tap(B.REC);
+  out.backInSong = state()[1];
+  turn(2, -1);
+  out.playheadAtPhrase = info(8) === p0;
+  c.sim_song_capture(1);
+  tap(B.PLAY);
+  render(1600);
+  const start = info(9), n = c.sim_song_heard_count(), at = c.sim_song_heard();
+  const bytes = new Uint8Array(c.memory.buffer, at, n * 8), words = new Uint32Array(c.memory.buffer, at, n * 2);
+  const heard = Array.from({ length: n }, (_, i) => ({ block: words[i * 2], track: bytes[i * 8 + 4], pitch: bytes[i * 8 + 5], velocity: bytes[i * 8 + 6] }));
+  const tempos = Array.from({ length: info(4) }, (_, k) => ({ clock: info(5, 0, k), bpm100: BigInt(info(6, 0, k)) }));
+  const den = tempos.reduce((d, t) => { let a = d, b = t.bpm100; while (b) [a, b] = [b, a % b]; return d / a * t.bpm100; }, 1n);
+  const frameNum = clock => { let num = 0n; tempos.forEach((t, k) => {
+    const to = Math.min(clock, k + 1 < tempos.length ? tempos[k + 1].clock : clock);
+    if (to > t.clock) num += BigInt(to - t.clock) * 551250n * (den / t.bpm100); }); return num; };
+  const block = clock => start + Number((frameNum(clock) - frameNum(p0)) / (den * 128n));
+  const expected = [];
+  for (const w of want) { expected.push(block(w.clock) + ':' + w.pitch + ':on'); expected.push(block(w.clock + w.length) + ':' + w.pitch + ':off'); }
+  const got = heard.filter(h => h.track === 0).map(h => h.block + ':' + h.pitch + ':' + (h.velocity ? 'on' : 'off'));
+  out.playback = { expected: expected.length, got: got.length, ok: JSON.stringify([...expected].sort()) === JSON.stringify([...got].sort()),
+    first: got.slice(0, 4), stoppedAtEnd: info(7) === 0 };
+  // Settings: GLO tap opens them. Key A minor on page 2, then swing 25% on
+  // page 1 with track 2 left straight.
+  tap(B.GLO);
+  out.settingsPage = state()[1];
+  turn(1, 1); turn(2, 9); turn(3, 2); turn(1, -1);
+  turn(4, 25); key(2);
+  out.swing = info(19) & 255; out.swingTracks = info(19) >>> 16; out.key = info(20);
+  const leds = () => Array.from(state().subarray(168 + 14, 168 + 41));
+  const whites = [0, 2, 4, 6, 7, 9, 11, 12];
+  out.swingLeds = leds().every((on, k) => !!on === (whites.includes(k) && whites.indexOf(k) !== 1));
+  render(4);
+  out.settingsPng = png();
+  tap(B.GLO);
+  out.backFromSettings = state()[1];
+  // The key lights show A minor on a pitched track: the white keys here.
+  const major = [0, 2, 4, 5, 7, 9, 11];
+  out.scaleLeds = leds().every((on, k) => !!on === major.includes((53 + k) % 12));
+  // In step entry an out-of-scale key snaps up: C#4 enters D4. At the song
+  // end, where the track is empty.
+  turn(2, 20);
+  tap(B.REC);
+  const p1 = info(17), count = info(0, 0);
+  key(8);
+  out.snapped = info(0, 0) === count + 1 && info(1, 0, count) === p1 && info(2, 0, count) === 62;
+  tap(B.ENV);                                    // back-delete removes it again
+  out.backDeleted = info(0, 0) === count && info(17) === p1;
+  tap(B.REC);
+  c.sim_control(0, B.FX, 1); tap(B.GLO); c.sim_control(0, B.FX, 0);
+  out.shiftGlo = state()[1];
+  return out;
+});
 await browser.close();
+fs.writeFileSync(path.join(root, 'docs/phase2-step-view.png'), Buffer.from(phase2.stepPng, 'base64'));
+fs.writeFileSync(path.join(root, 'docs/phase2-settings.png'), Buffer.from(phase2.settingsPng, 'base64'));
+delete phase2.stepPng; delete phase2.settingsPng;
+result.phase2 = phase2;
+const p2 = phase2.stepPage === 20 && phase2.pointerAtStart && phase2.chordWaitedForRelease && phase2.storedOk &&
+  phase2.previewedChord === '60,64,67' && phase2.backInSong === 19 && phase2.playheadAtPhrase && phase2.playback.ok &&
+  phase2.playback.stoppedAtEnd && phase2.settingsPage === 21 && phase2.swing === 25 && phase2.swingTracks === 0xfd &&
+  phase2.key === (9 | 2 << 8) && phase2.swingLeds && phase2.backFromSettings === 19 && phase2.scaleLeds &&
+  phase2.snapped && phase2.backDeleted && phase2.shiftGlo === 7;
 fs.writeFileSync(path.join(root, 'docs/phase1-song-view.png'), Buffer.from(result.png, 'base64'));
 delete result.png;
 console.log(JSON.stringify(result, null, 1));
@@ -193,6 +319,6 @@ const k = result.controls;
 const ok = result.whole.notes.ok && result.whole.balanced && result.whole.stoppedAtEnd && result.whole.songPage === 19 &&
   result.loop.notes.ok && result.loop.balancedAfterStop && result.whole.rms > 0.001 && result.loop.rmsAfterStop < 1e-4 &&
   k.rewindToLoopStart && k.loopOff && k.k1MovesBySnap && k.shiftK1NextMarker && k.loopEdgesOk &&
-  k.pendingAfterRequest && k.jumpLandsOnBarLine && k.afterJump.ok && k.balancedAfterStop && k.seqOk;
+  k.pendingAfterRequest && k.jumpLandsOnBarLine && k.afterJump.ok && k.balancedAfterStop && k.seqOk && p2;
 console.log(ok ? 'preview_check: passed' : 'preview_check: FAILED');
 process.exit(ok ? 0 : 1);

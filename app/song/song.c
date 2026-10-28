@@ -13,6 +13,7 @@ void song_clear(struct song *s, unsigned bars, unsigned bpm100)
     s->meter[0] = (struct song_meter){0, 4, 4};
     s->meters = 1;
     s->loop_end = song_bar_clock(s, s->bars < 4 ? s->bars : 4);
+    s->swing_tracks = 0xff;
     song_tempo_refresh(s);
 }
 
@@ -50,6 +51,18 @@ int song_add_note(struct song *s, unsigned track, uint32_t clock, unsigned pitch
     ++s->count[track];
     ++s->events;
     for (unsigned t = track + 1; t < SONG_TRACKS; ++t) ++s->first[t];
+    ++s->revision;
+    return 0;
+}
+
+int song_remove(struct song *s, unsigned track, unsigned index)
+{
+    if (track >= SONG_TRACKS || index >= s->count[track]) return -1;
+    unsigned at = s->first[track] + index;
+    memmove(&s->event[at], &s->event[at + 1], (s->events - at - 1U) * sizeof s->event[0]);
+    --s->count[track];
+    --s->events;
+    for (unsigned t = track + 1; t < SONG_TRACKS; ++t) --s->first[t];
     ++s->revision;
     return 0;
 }

@@ -9,6 +9,7 @@ _Static_assert(SONG_TRACKS == GROOVE_TRACKS, "song tracks");
 
 static struct song song;
 static struct song_player player;
+static struct song_step step;
 static uint64_t next_frame;           /* first frame of the next block to render */
 static uint8_t ready;
 #ifdef FM1_OPEN_WEB
@@ -37,10 +38,12 @@ static void ensure(void)
     static const struct song_output output = {deliver, NULL};
     song_build_test(&song);
     song_player_init(&player, &song, &output);
+    step_init(&step, &song, &output);
     ready = 1;
 }
 struct song *song_port_song(void) { ensure(); return &song; }
 struct song_player *song_port_player(void) { ensure(); return &player; }
+struct song_step *song_port_step(void) { ensure(); return &step; }
 
 /* DEVICE STUB (song-mode). The engine has no timestamped input: whatever is
  * posted plays at the start of the next block it renders. The plan is to
@@ -130,6 +133,11 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     case 14: return song.loop_start;
     case 15: return song.loop_end;
     case 16: return song.loop_on | (uint32_t)player.jumping << 1;
+    case 17: return step.pointer;
+    case 18: return index < count ? e[index].b : 0;
+    case 19: return song.swing | (uint32_t)song.swing_grid << 8 | (uint32_t)song.swing_tracks << 16;
+    case 20: return song.key_root | (uint32_t)song.key_scale << 8;
+    case 21: return song.tempo[0].bpm100 | (uint32_t)song.meter[0].beats << 16 | (uint32_t)song.meter[0].unit << 24;
     default: return 0;
     }
 }

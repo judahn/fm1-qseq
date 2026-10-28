@@ -51,6 +51,10 @@ struct song {
     uint32_t loop_start, loop_end, revision;
     uint16_t bars, events;
     uint8_t tempos, meters, markers, loop_on;
+    /* Song settings. Swing delays off-beats by swing% (0..50) of the grid
+     * step, 8th or 16th, on the tracks in swing_tracks. Key: root 0..11
+     * (C = 0) and scale 0..12, 0 being chromatic. */
+    uint8_t swing, swing_grid, swing_tracks, key_root, key_scale;
 };
 
 /* Editing (song.c). Calls return 0, or -1 when invalid or full. */
@@ -63,6 +67,7 @@ int song_add_marker(struct song *s, uint32_t clock, const char *name);
 int song_set_loop(struct song *s, uint32_t start, uint32_t end);
 const struct song_event *song_track(const struct song *s, unsigned track, unsigned *count);
 unsigned song_find(const struct song *s, unsigned track, uint32_t clock); /* first start >= clock */
+int song_remove(struct song *s, unsigned track, unsigned index);
 
 /* Bars, beats and snapping (song_time.c). Bars are 0-based here and 1-based
  * on screen. Zoom 0..3 snaps to a bar, half bar, beat or 8th. */
@@ -74,6 +79,9 @@ uint32_t song_end(const struct song *s);
 void song_bbc(const struct song *s, uint32_t clock, unsigned out[3]); /* bar, beat, clock */
 uint32_t song_snap_move(const struct song *s, uint32_t clock, unsigned zoom, int steps);
 int song_marker_step(const struct song *s, uint32_t clock, int direction); /* index or -1 */
+/* Swing delay in clocks for a note on this track starting at clock. Only
+ * notes exactly on an off-beat of the grid move. Applied at playback. */
+uint32_t song_swing(const struct song *s, unsigned track, uint32_t clock);
 
 /* Tempo segments (song_time.c). Segment k starts at tempo[k].clock, at song
  * time tempo_units[k] in that segment's units. */
@@ -81,6 +89,14 @@ void song_tempo_refresh(struct song *s);
 unsigned song_tempo_at(const struct song *s, uint32_t clock);
 uint64_t song_units(const struct song *s, unsigned segment, uint32_t clock);
 uint64_t song_rescale(uint64_t value, uint32_t to, uint32_t from); /* ceil(value * to / from) */
+
+/* Key and scale (song_key.c). Chromatic means no snapping. */
+enum { SONG_SCALES = 13 };
+extern const char *const song_scale_names[SONG_SCALES];
+extern const char *const song_key_names[12];
+unsigned song_scale_mask(const struct song *s); /* pitch classes in the key, bit 0 = C */
+unsigned song_scale_snap(const struct song *s, unsigned pitch); /* up to the next scale note */
+unsigned song_scale_step(const struct song *s, unsigned pitch, int steps);
 
 /* The built-in phase 1 test song (test_song.c). */
 void song_build_test(struct song *s);

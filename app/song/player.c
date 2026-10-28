@@ -25,7 +25,7 @@ static void all_off(struct song_player *p)
     for (unsigned t = 0; t < SONG_TRACKS; ++t)
         while (p->held_count[t]) release(p, t, p->held_count[t] - 1U);
 }
-static void note_on(struct song_player *p, unsigned t, const struct song_event *e)
+static void note_on(struct song_player *p, unsigned t, const struct song_event *e, uint32_t at)
 {
     /* A pitch that is still sounding ends first, so ons and offs pair up. */
     for (unsigned i = 0; i < p->held_count[t]; ++i)
@@ -36,24 +36,44 @@ static void note_on(struct song_player *p, unsigned t, const struct song_event *
             if (p->held[t][i].end < p->held[t][first].end) first = i;
         release(p, t, first);
     }
-    p->held[t][p->held_count[t]++] = (struct song_held){song_event_start(e) + e->length, e->a};
+    p->held[t][p->held_count[t]++] = (struct song_held){at + e->length, e->a};
     send(p, t, e->a, e->b);
 }
-/* Everything before clock `end`, in clock order per track. A note-off goes
- * before a note-on on the same clock. */
+static uint32_t onset(const struct song_player *p, unsigned t, const struct song_event *e)
+{
+    return song_event_start(e) + song_swing(p->song, t, song_event_start(e));
+}
+/* Everything that starts before clock `end` once swing is applied, in clock
+ * order per track. A note-off goes before a note-on on the same clock. A
+ * swung off-beat due after `end` waits as a group (all at one clock), so the
+ * notes between it and its swung time are not held back. */
 static void emit(struct song_player *p, uint32_t end)
 {
     for (unsigned t = 0; t < SONG_TRACKS; ++t) {
         unsigned count;
         const struct song_event *e = song_track(p->song, t, &count);
         for (;;) {
+            uint32_t late = p->late_count[t] ? onset(p, t, &e[p->late_first[t]]) : NEVER;
+            while (late >= end && p->cursor[t] < count && song_event_start(&e[p->cursor[t]]) < end &&
+                   onset(p, t, &e[p->cursor[t]]) >= end &&
+                   (!p->late_count[t] || p->late_first[t] + p->late_count[t] == p->cursor[t])) {
+                if (!p->late_count[t]) p->late_first[t] = p->cursor[t];
+                ++p->late_count[t];
+                ++p->cursor[t];
+                late = onset(p, t, &e[p->late_first[t]]);
+            }
             uint32_t on = p->cursor[t] < count ? song_event_start(&e[p->cursor[t]]) : NEVER, off = NEVER;
+            if (on < end) on = onset(p, t, &e[p->cursor[t]]);
             unsigned first = 0;
             for (unsigned i = 0; i < p->held_count[t]; ++i)
                 if (p->held[t][i].end < off) { off = p->held[t][i].end; first = i; }
-            if (off <= on && off < end) release(p, t, first);
-            else if (on < end) {
-                if (song_event_kind(&e[p->cursor[t]]) == SONG_NOTE) note_on(p, t, &e[p->cursor[t]]);
+            if (off <= on && off <= late && off < end) release(p, t, first);
+            else if (late <= on && late < end) {
+                if (song_event_kind(&e[p->late_first[t]]) == SONG_NOTE) note_on(p, t, &e[p->late_first[t]], late);
+                ++p->late_first[t];
+                --p->late_count[t];
+            } else if (on < end) {
+                if (song_event_kind(&e[p->cursor[t]]) == SONG_NOTE) note_on(p, t, &e[p->cursor[t]], on);
                 ++p->cursor[t];
             } else break;
         }
@@ -66,7 +86,9 @@ static void relocate(struct song_player *p, uint32_t clock, uint64_t over, uint3
     const struct song *s = p->song;
     unsigned k = song_tempo_at(s, clock);
     for (unsigned t = 0; t < SONG_TRACKS; ++t) p->cursor[t] = (uint16_t)song_find(s, t, clock);
+    memset(p->late_count, 0, sizeof p->late_count); /* swung past an edge: dropped */
     p->next = clock;
+    p->revision = s->revision;
     p->segment = (uint8_t)k;
     p->pos = song_units(s, k, clock) + (over ? song_rescale(over, song_rate(s->tempo[k].bpm100), rate) : 0);
 }
@@ -115,6 +137,18 @@ uint32_t song_player_clock(const struct song_player *p)
     unsigned k = p->segment;
     return s->tempo[k].clock + (uint32_t)((p->pos - s->tempo_units[k]) / SONG_UNITS_PER_CLOCK);
 }
+int song_player_set_tempo(struct song_player *p, uint32_t clock, unsigned bpm100)
+{
+    struct song *s = p->song;
+    if (!p->playing) return song_set_tempo(s, clock, bpm100);
+    /* Keep the current clock and the time already spent inside it. */
+    uint32_t at = song_player_clock(p), rate = song_rate(s->tempo[p->segment].bpm100);
+    uint64_t inside = p->pos - song_units(s, p->segment, at);
+    if (song_set_tempo(s, clock, bpm100)) return -1;
+    p->segment = (uint8_t)song_tempo_at(s, at);
+    p->pos = song_units(s, p->segment, at) + song_rescale(inside, song_rate(s->tempo[p->segment].bpm100), rate);
+    return 0;
+}
 uint32_t song_player_target(const struct song_player *p)
 {
     if (!p->playing) return p->playhead;
@@ -125,6 +159,12 @@ void song_player_advance(struct song_player *p, uint64_t frame)
 {
     /* Runs once more at frame == p->frame: an edge in the last frame leaves
      * events already due at the new position, and they belong to this block. */
+    if (p->playing && p->revision != p->song->revision) {
+        /* The notes changed under playback: find our place again. */
+        for (unsigned t = 0; t < SONG_TRACKS; ++t) p->cursor[t] = (uint16_t)song_find(p->song, t, p->next);
+        memset(p->late_count, 0, sizeof p->late_count);
+        p->revision = p->song->revision;
+    }
     while (p->playing && p->frame <= frame) {
         const struct song *s = p->song;
         unsigned k = p->segment, kind = EDGE_END;

@@ -1217,6 +1217,7 @@ static void leds(const struct groove_view *v, unsigned visible)
         bits &= ~((1U << edit_keys[8]) | (1U << edit_keys[9]));
         bits |= 1U << edit_keys[v->mono ? 8 : 9];
     }
+    bits = song_key_leds(bits, visible); /* song-mode */
     uint32_t changed = bits ^ led_cache;
     for (unsigned key = 0; key < 27; ++key)
         if (changed & (1U << key))
@@ -1373,7 +1374,7 @@ static void draw_page_body(const struct fm1_ble_status *ble)
     if (visible == STARTUP) { boot_draw(); return; }
     const struct groove_view *views = frame_views, *v = &views[track];
     if (!paint_rendering) leds(v, visible);
-    if (visible == SONG) { song_draw(); return; } /* song-mode */
+    if (visible >= SONG) { song_page_draw(visible); return; } /* song-mode */
     if (visible == PRESET_BROWSER) {
         preset_draw();
         return;
@@ -2544,6 +2545,7 @@ controls_done:
     }
     for (unsigned key = 0; key < 27; ++key) {
         unsigned note = groove_key_note(track, key, octave);
+        note = song_key_note(note); /* song-mode: scale */
         if (key_note[key] != 0xff &&
             (mode || !(keys & (1U << key)) ||
              (key_note[key] != note && !(project_keys & (1U << key))) || key_track[key] != track)) {

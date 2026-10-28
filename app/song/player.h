@@ -21,9 +21,11 @@ struct song_player {
     uint32_t next;              /* clocks below this have been emitted */
     uint32_t playhead;          /* position while stopped */
     uint32_t jump, jump_at;     /* pending jump and the bar line it waits for */
+    uint32_t revision;          /* song revision the cursors belong to */
     uint8_t playing, jumping, segment;
     uint8_t held_count[SONG_TRACKS];
     uint16_t cursor[SONG_TRACKS];
+    uint16_t late_first[SONG_TRACKS], late_count[SONG_TRACKS]; /* swung notes not yet due */
     struct song_held held[SONG_TRACKS][SONG_HELD];
 };
 void song_player_init(struct song_player *p, struct song *s, const struct song_output *out);
@@ -35,6 +37,8 @@ void song_player_advance(struct song_player *p, uint64_t frame);
 /* Stopped: move at once. Playing: wait for the next bar line. */
 void song_player_jump(struct song_player *p, uint32_t clock);
 uint32_t song_player_clock(const struct song_player *p);
+/* Change the tempo at a clock, keeping playback in time from where it is. */
+int song_player_set_tempo(struct song_player *p, uint32_t clock, unsigned bpm100);
 /* Where a jump requested now would leave from (the next bar line), or the
  * pending target. Stopped: the playhead. */
 uint32_t song_player_target(const struct song_player *p);

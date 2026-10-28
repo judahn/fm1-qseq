@@ -305,8 +305,11 @@ is a few seconds for a large song.
   finished stereo mix. Master-bus effects are possible in our own output stage (`app/audio_output.c`): a
   filter, EQ, compressor or lo-fi, automatable. That's a later option, once CPU headroom is measured on the
   device.
-- **Tempo and sound changes mid-song.** Tempo and program (sound) changes are lanes in the automation view,
-  entered like any other automation.
+- **Tempo, time signature and sound changes mid-song** (agreed 10/27). A conductor lane in the automation view
+  holds tempo and time-signature changes, much like the QY70's tempo track plus its per-measure meter. Move
+  the playhead to a bar, then add, edit or delete a change there. Time signatures follow the QY70's range
+  (1/16 to 16/16, 1/8 to 16/8, 1/4 to 8/4), up to 32 changes per song, each starting on a bar. Program
+  (sound) changes are a lane on each track.
 - **External MIDI keyboard.** Recording takes notes from an external keyboard with real velocity, which also
   covers the FM-1's keys probably not sensing it. MIDI clock out stays available so other gear can follow.
 - **Memory gauge.** Song memory used is always visible, like the QY70's Used Memory display.
@@ -361,7 +364,8 @@ costs little memory. HOME plus SAVE stays undo, as in the stock firmware.
 2. **Step entry,** with the full control map.
 3. **Real-time recording and arranging:** modes, count-in, input quantize, undo, and selecting, copying,
    pasting and duplicating bars.
-4. **Automation:** knob recording and playback.
+4. **Automation:** knob recording and playback, the conductor lane (tempo and time signature) and program
+   changes.
 4b. **Glitch, sequencer side:** rolls and ratchets on any track, probability, stutter, mangle jobs, the FX lane.
    The master-bus effects follow once free memory is measured on the device.
 5. **Saving and transfer:** songs saved to and loaded from flash, the song list, and export and import through
