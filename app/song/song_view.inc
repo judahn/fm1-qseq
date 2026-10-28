@@ -28,6 +28,20 @@ static struct {
 static void select_track(int delta);
 static void song_start(uint32_t now);
 #if SONG_UI
+/* The bottom line of a song page, drawn only when it changes, and the
+ * notice there, which runs out on its own. */
+static void song_hint(const char *hint)
+{
+    uint32_t sig = signature(0, hint, (unsigned)strlen(hint));
+    if (sig == cache->hint_cache) return;
+    cache->hint_cache = sig;
+    paint_fill(6, 231, 228, 7, BACK);
+    text(6, 231, hint, 1, DIM, BACK);
+}
+static void song_notice_expire(void)
+{
+    if (notice && (int32_t)(frame_time - notice_until) >= 0) notice = NULL;
+}
 #include "song_select.inc"
 #include "song_glitch.inc"
 #include "lanes.h"
@@ -158,7 +172,7 @@ static void song_draw(void)
     song_playhead_line();
     if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
     song_footer(s, "MARKER");
-    if (notice && (int32_t)(frame_time - notice_until) >= 0) notice = NULL;
+    song_notice_expire();
     char selection[40], part[12];
     if (song_now.recording) {
         strcpy(selection, "REC ");
@@ -180,11 +194,7 @@ static void song_draw(void)
         : song_now.jumping ? "JUMP WAITS FOR THE NEXT BAR"
         : song_now.shift ? "F3-E4 EDIT  F#-A# MANGLE  EDIT JOBS"
         : (previous_buttons & BUTTON(LFO)) ? "LFO + F3-F4 TRACKS  G4 ALL" : selection;
-    uint32_t sig = signature(0, hint, (unsigned)strlen(hint));
-    if (sig == cache->hint_cache) return;
-    cache->hint_cache = sig;
-    paint_fill(6, 231, 228, 7, BACK);
-    text(6, 231, hint, 1, DIM, BACK);
+    song_hint(hint);
 }
 
 #include "song_step.inc"

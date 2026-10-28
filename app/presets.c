@@ -5,7 +5,7 @@
 #include "sampledrum.h"
 #include <string.h>
 #include "song/song_config.h" /* song-mode */
-#if !SONG_TRIM /* song-mode: left out of the hardware test build */
+#if !SONG_TRIM && !SONG_DROP_DEMOS /* song-mode: left out of the hardware test build and SONG_DEVICE_FULL */
 
 /* FM1 arrangements. Small musical recipes expand into the normal
  * editable project format, avoiding sixteen 4 KiB images in program Flash.

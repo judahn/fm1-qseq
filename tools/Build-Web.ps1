@@ -95,7 +95,8 @@ function Build-Simulator {
     }
     [pscustomobject]@{file=$wasm; source_sha256=$sourceHash; cache_hit=$false}
 }
-$output = Join-Path $root $(if ($PackageJson) { 'build/official-web/FM1-Official-Open-Source.html' } else { 'build/preview/index.html' })
+$output = Join-Path $root $(if ($PackageJson -and $env:FM1_SONG_DEVICE_FULL -eq '1') { 'build/official-web-songfull/FM1-Official-Open-Source.html' } # song-mode
+    elseif ($PackageJson) { 'build/official-web/FM1-Official-Open-Source.html' } else { 'build/preview/index.html' })
 # Invalidate old output before source URL validation can stop this build.
 foreach ($file in @($output, (Join-Path (Split-Path $output) 'SHA256SUMS.txt'))) {
     if ([IO.File]::Exists($file)) { [IO.File]::Delete($file) }

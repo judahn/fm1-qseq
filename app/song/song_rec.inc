@@ -58,11 +58,7 @@ static void song_rec_draw(void)
     knob(1, "COUNT IN", count, colors[1]);
     knob(2, "QUANTIZE", quantize, colors[2]);
     knob(3, "STRENGTH", strength, colors[3]);
-    if (cache->hint_cache != 0x7ecU) {
-        cache->hint_cache = 0x7ecU;
-        paint_fill(6, 231, 228, 7, BACK);
-        text(6, 231, "REC OR PLAY TO GO  HOME TO LEAVE", 1, DIM, BACK);
-    }
+    song_hint("REC OR PLAY TO GO  HOME TO LEAVE");
 }
 static int song_rec_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
 {

@@ -12,6 +12,37 @@
  * already uses 453,576, so the device build leaves these pages out until
  * that is settled. SEQ then opens the diagnostics page. The browser preview
  * has no such limit and keeps them. */
+/* SONG_DEVICE_FULL (FM1_SONG_DEVICE_FULL=1 ./build.sh, never the default):
+ * full song mode on the device, for a hardware test with Judah's OK. Left
+ * out (option 1): (a) the stock step and pattern pages, the MIDI and sync
+ * pages under SEQ staying, (b) the stock project pages, (c) the demo
+ * projects and (d) the FM factory voices, which the V15 restore puts in the
+ * DX7 library. The stock project area goes to code: the user partition
+ * starts at logical sector 15 (the settings, then the staging sector at 16),
+ * and the pool is sectors 17 to 125. Stock offsets stay logical, song_flash.h
+ * moves them. */
+#ifndef SONG_DEVICE_FULL
+#define SONG_DEVICE_FULL 0
+#endif
+#if SONG_DEVICE_FULL && !defined(FM1_OPEN_WEB)
+#define SONG_UI 1
+#define SONG_TRIM 0
+#define SONG_DROP_STEPS 1
+#define SONG_DROP_PROJECTS 1
+#define SONG_DROP_DEMOS 1
+#define SONG_DROP_FM_FACTORY 1
+#define SONG_USER_BASE (15U * 4096U)
+#define SONG_POOL_FIRST 17
+#define SONG_POOL_END 126
+#define SONG_POOL_SKIP_FIRST 17
+#define SONG_POOL_SKIP_END 17
+#else
+#define SONG_DROP_STEPS 0
+#define SONG_DROP_PROJECTS 0
+#define SONG_DROP_DEMOS 0
+#define SONG_DROP_FM_FACTORY 0
+#define SONG_USER_BASE 0U
+#endif
 /* Room for the hardware test on the device: the stock factory projects
  * (presets.c) and workbench project, sample and voice transfers
  * (transfer.c) are left out of this build. Firmware updates and the V15

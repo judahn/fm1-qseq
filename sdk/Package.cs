@@ -10,7 +10,7 @@ using System.Text;
 namespace FM1 {
 public static class Package {
     const int Area = 0x4000, EntryPoint = 0x02000120, AppData = 0x120;
-    const int FlashLimit = 0xff000, UserSize = 536576, BtSize = 4096, MinimumVm = 32768;
+    const int FlashLimit = 0xff000, MaxUserSize = 536576, BtSize = 4096, MinimumVm = 32768; // song-mode: the user size comes from the variant
     const ushort PublicCode = 0x980f;
     static readonly ushort[] CrcTable = MakeCrcTable();
     static ushort[] MakeCrcTable() {
@@ -102,7 +102,7 @@ public static class Package {
         image.Record(Area+160,"BTIF",65535,(uint)vmEnd,BtSize,0x8192,1,0x4f545541);
         image.Record(Area,"app_area_head",Crc(image.Bytes,Area+32,payloadSize-32),EntryPoint,(uint)payloadSize,0xff83,0,null);
         int reserved = Area+payloadSize;
-        image.Record(reserved+32,"USER",65535,FlashLimit-UserSize,UserSize,0x8192,1,0x4f545541);
+        image.Record(reserved+32,"USER",65535,(uint)(vmEnd+BtSize),(uint)(FlashLimit-vmEnd-BtSize),0x8192,1,0x4f545541); // song-mode: the user area follows BTIF
         image.Record(reserved,"EXT_RESERVED",Crc(image.Bytes,reserved+32,32),32,64,0xff93,1,null);
         for (int p = 0; p < payloadSize+64; p += 32)
             Cipher(image.Bytes,Area+p,Math.Min(32,payloadSize+64-p),PublicCode^(p>>2));
@@ -138,7 +138,9 @@ public static class Package {
     public static Dictionary<string,object> Create(byte[] app, string resources, string output, int userBytes, string product) {
         if (product == null || !System.Text.RegularExpressions.Regex.IsMatch(product,"\\AFM-1_8[0-9]{6}\\z"))
             throw new InvalidDataException("Invalid FM1 update identity.");
-        if (app == null || app.Length == 0 || app.Length > FlashLimit-UserSize-BtSize-MinimumVm-Area-AppData-383-64 || userBytes != UserSize)
+        int UserSize = userBytes; // song-mode: smaller when code takes part of the user partition
+        if (UserSize < 65536 || UserSize > MaxUserSize || UserSize % 4096 != 0) throw new InvalidDataException("Invalid FM1 user size.");
+        if (app == null || app.Length == 0 || app.Length > FlashLimit-UserSize-BtSize-MinimumVm-Area-AppData-383-64)
             throw new InvalidDataException("Application does not fit the FM1 layout.");
         int imageSize = RoundUp(Area+AppData+app.Length+383+64,4096),userAt = FlashLimit-UserSize,vmEnd = userAt-BtSize;
         if (imageSize > vmEnd-MinimumVm) throw new InvalidDataException("Insufficient FM1 settings space.");

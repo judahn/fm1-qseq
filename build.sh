@@ -35,7 +35,7 @@ fi
 
 run() {
     docker run --rm --platform linux/amd64 -u "$(id -u):$(id -g)" -e HOME=/tmp \
-        -e FM1_SOURCE_URL -e FM1_WASI_SDK -e FM1_PI32_TOOLCHAIN=/opt/jieli \
+        -e FM1_SOURCE_URL -e FM1_WASI_SDK -e FM1_SONG_DEVICE_FULL -e FM1_PI32_TOOLCHAIN=/opt/jieli \
         -v "$ROOT":/src -v "$JIELI":/opt/jieli:ro -w /src "$IMAGE" "$@"
 }
 

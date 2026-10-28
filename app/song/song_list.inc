@@ -72,14 +72,10 @@ static void song_list_draw(void)
     knob(1, song_list_naming ? "LETTER" : "NEW FROM", song_list_naming ? "A-Z" : from, colors[1]);
     knob(2, "KIT", kit, colors[2]);
     knob(3, "-", "", colors[3]);
-    if (notice && (int32_t)(frame_time - notice_until) >= 0) notice = NULL;
+    song_notice_expire();
     const char *hint = notice ? notice : song_list_naming ? "K1 K2 NAME  C4 OR SAVE DONE"
         : (previous_buttons & BUTTON(FX)) ? "C4 RENAME  D4 DUPLICATE  E4 DELETE" : "F3 LOAD G3 SAVE A3 AS B3 NEW C4 NAME";
-    uint32_t h = signature(0, hint, (unsigned)strlen(hint));
-    if (h == cache->hint_cache) return;
-    cache->hint_cache = h;
-    paint_fill(6, 231, 228, 7, BACK);
-    text(6, 231, hint, 1, DIM, BACK);
+    song_hint(hint);
 }
 
 static void song_list_open(void)

@@ -13,46 +13,52 @@ enum { JOB_QUANTIZE, JOB_VELOCITY, JOB_CRESCENDO, JOB_GATE, JOB_TRANSPOSE, JOB_F
        SONG_JOBS };
 enum { V_NUM, V_SIGNED, V_PCT, V_GRID, V_OFFON, V_RANGE, V_VMODE, V_GMODE, V_STEPS, V_NOTE, V_ORDER, V_TYPE, V_TRACK,
        V_LANE, V_SPACE, V_WHAT };
+/* Settings are kept once and jobs list them by number. */
 struct song_job_param { char name[9]; uint8_t kind; int16_t low, high, init; };
-struct song_job_def { char name[14]; uint8_t count; char about[36]; struct song_job_param p[6]; };
-#define RANGE_P {"RANGE", V_RANGE, 0, 1, 0}
+enum { P_RANGE, P_GRID, P_STRENGTH, P_SWING, P_GATE, P_VMODE, P_VVALUE, P_VOFFSET, P_SWELL, P_GMODE, P_GVALUE, P_GOFFSET,
+       P_SEMIS, P_BY, P_LOWEST, P_HIGHEST, P_CLOCKS, P_ORDER, P_STRUM, P_TIMES, P_TRANSPOSE, P_ERASE, P_EXTRACT, P_TO,
+       P_LANE, P_START, P_END, P_EVERY, P_CURVE, P_RATE, P_FROM, P_TO2, P_COPY, P_FROM2, P_INTO };
+static const struct song_job_param song_job_params[] = {
+    {"RANGE", V_RANGE, 0, 1, 0}, {"GRID", V_GRID, 1, 14, 5}, {"STRENGTH", V_PCT, 0, 100, 100}, {"SWING", V_PCT, 50, 83, 50},
+    {"GATE", V_OFFON, 0, 1, 0}, {"MODE", V_VMODE, 0, 1, 1}, {"VALUE", V_NUM, 0, 200, 100}, {"OFFSET", V_SIGNED, -99, 99, 0},
+    {"AMOUNT", V_SIGNED, -99, 99, 30}, {"MODE", V_GMODE, 0, 2, 1}, {"VALUE", V_NUM, 0, 1920, 100},
+    {"OFFSET", V_SIGNED, -999, 999, 0}, {"AMOUNT", V_SIGNED, -99, 99, 12}, {"BY", V_STEPS, 0, 1, 0},
+    {"LOWEST", V_NOTE, 0, 127, 0}, {"HIGHEST", V_NOTE, 0, 127, 127}, {"CLOCKS", V_SIGNED, -9999, 9999, 0},
+    {"ORDER", V_ORDER, 0, 1, 0}, {"CLOCKS", V_NUM, 1, 999, 20}, {"TIMES", V_NUM, 1, 99, 2},
+    {"TRANSPOSE", V_SIGNED, -24, 24, 0}, {"EVENTS", V_TYPE, 0, 3, 3}, {"EVENTS", V_TYPE, 0, 2, 1}, {"TO", V_TRACK, 0, 7, 7},
+    {"LANE", V_LANE, 0, 9, 0}, {"START", V_NUM, 0, 300, 0}, {"END", V_NUM, 0, 300, 127}, {"EVERY", V_SPACE, 0, 6, 2},
+    {"CURVE", V_SIGNED, -16, 16, 0}, {"RATE", V_PCT, 50, 200, 200}, {"FROM", V_TRACK, 0, 7, 0}, {"TO", V_TRACK, 0, 7, 1},
+    {"COPY", V_WHAT, 0, 2, 0}, {"FROM", V_TRACK, 0, 7, 1}, {"INTO", V_TRACK, 0, 7, 0}};
+struct song_job_def { const char *name, *about; uint8_t count, p[6]; };
 static const struct song_job_def song_jobs[SONG_JOBS] = {
-    {"QUANTIZE", 5, "NOTES TOWARD THE GRID, WITH SWING", {RANGE_P, {"GRID", V_GRID, 1, 14, 5},
-        {"STRENGTH", V_PCT, 0, 100, 100}, {"SWING", V_PCT, 50, 83, 50}, {"GATE", V_OFFON, 0, 1, 0}}},
-    {"VELOCITY", 4, "SET OR SCALE HOW HARD NOTES PLAY", {RANGE_P, {"MODE", V_VMODE, 0, 1, 1},
-        {"VALUE", V_NUM, 0, 200, 100}, {"OFFSET", V_SIGNED, -99, 99, 0}}},
-    {"CRESCENDO", 2, "VELOCITY RAMPS ACROSS THE RANGE", {RANGE_P, {"AMOUNT", V_SIGNED, -99, 99, 30}}},
-    {"GATE TIME", 4, "NOTE LENGTHS, OR LEGATO", {RANGE_P, {"MODE", V_GMODE, 0, 2, 1},
-        {"VALUE", V_NUM, 0, 1920, 100}, {"OFFSET", V_SIGNED, -999, 999, 0}}},
-    {"TRANSPOSE", 5, "NOTES UP OR DOWN, DRUMS STAY", {RANGE_P, {"AMOUNT", V_SIGNED, -99, 99, 12},
-        {"BY", V_STEPS, 0, 1, 0}, {"LOWEST", V_NOTE, 0, 127, 0}, {"HIGHEST", V_NOTE, 0, 127, 127}}},
-    {"FIT TO SCALE", 1, "NOTES UP INTO THE SONG'S KEY", {RANGE_P}},
-    {"SHIFT CLOCK", 2, "EVENTS LATER OR EARLIER, IN RANGE", {RANGE_P, {"CLOCKS", V_SIGNED, -9999, 9999, 0}}},
-    {"CHORD SORT", 2, "A CHORD'S NOTES BY PITCH", {RANGE_P, {"ORDER", V_ORDER, 0, 1, 0}}},
-    {"STRUM", 3, "SPREADS EACH CHORD, ENDS STAY", {RANGE_P, {"CLOCKS", V_NUM, 1, 999, 20},
-        {"ORDER", V_ORDER, 0, 1, 0}}},
-    {"PASTE N TIMES", 2, "CLIPBOARD AT THE PLAYHEAD, OVER", {{"TIMES", V_NUM, 1, 99, 2},
-        {"TRANSPOSE", V_SIGNED, -24, 24, 0}}},
-    {"ERASE", 2, "ONE KIND OF EVENT GOES", {RANGE_P, {"EVENTS", V_TYPE, 0, 3, 3}}},
-    {"EXTRACT", 3, "ONE KIND MOVES TO ANOTHER TRACK", {RANGE_P, {"EVENTS", V_TYPE, 0, 2, 1},
-        {"TO", V_TRACK, 0, 7, 7}}},
-    {"RAMP", 6, "A CONTROLLER OR TEMPO SWEEP", {RANGE_P, {"LANE", V_LANE, 0, 9, 0}, {"START", V_NUM, 0, 300, 0},
-        {"END", V_NUM, 0, 300, 127}, {"EVERY", V_SPACE, 0, 6, 2}, {"CURVE", V_SIGNED, -16, 16, 0}}},
-    {"THIN OUT", 2, "EVERY OTHER CHANGE IN A LANE GOES", {RANGE_P, {"LANE", V_LANE, 0, 9, 0}}},
-    {"TIME STRETCH", 2, "LONGER OR SHORTER, LATER BARS MOVE", {RANGE_P, {"RATE", V_PCT, 50, 200, 200}}},
-    {"COPY TRACK", 3, "EVENTS, SOUND OR BOTH, REPLACING", {{"FROM", V_TRACK, 0, 7, 0}, {"TO", V_TRACK, 0, 7, 1},
-        {"COPY", V_WHAT, 0, 2, 0}}},
-    {"MERGE TRACKS", 2, "ONE TRACK INTO ANOTHER", {{"FROM", V_TRACK, 0, 7, 1}, {"INTO", V_TRACK, 0, 7, 0}}},
-    {"CLEAR TRACK", 0, "EVERY EVENT OF THE TRACKS GOES", {{"", 0, 0, 0, 0}}},
-    {"NORMALIZE", 0, "SWING, HUMANIZE, GLITCH INTO NOTES", {{"", 0, 0, 0, 0}}},
+    {"QUANTIZE", "NOTES TOWARD THE GRID, WITH SWING", 5, {P_RANGE, P_GRID, P_STRENGTH, P_SWING, P_GATE}},
+    {"VELOCITY", "SET OR SCALE HOW HARD NOTES PLAY", 4, {P_RANGE, P_VMODE, P_VVALUE, P_VOFFSET}},
+    {"CRESCENDO", "VELOCITY RAMPS ACROSS THE RANGE", 2, {P_RANGE, P_SWELL}},
+    {"GATE TIME", "NOTE LENGTHS, OR LEGATO", 4, {P_RANGE, P_GMODE, P_GVALUE, P_GOFFSET}},
+    {"TRANSPOSE", "NOTES UP OR DOWN, DRUMS STAY", 5, {P_RANGE, P_SEMIS, P_BY, P_LOWEST, P_HIGHEST}},
+    {"FIT TO SCALE", "NOTES UP INTO THE SONG'S KEY", 1, {P_RANGE}},
+    {"SHIFT CLOCK", "EVENTS LATER OR EARLIER, IN RANGE", 2, {P_RANGE, P_CLOCKS}},
+    {"CHORD SORT", "A CHORD'S NOTES BY PITCH", 2, {P_RANGE, P_ORDER}},
+    {"STRUM", "SPREADS EACH CHORD, ENDS STAY", 3, {P_RANGE, P_STRUM, P_ORDER}},
+    {"PASTE N TIMES", "CLIPBOARD AT THE PLAYHEAD, OVER", 2, {P_TIMES, P_TRANSPOSE}},
+    {"ERASE", "ONE KIND OF EVENT GOES", 2, {P_RANGE, P_ERASE}},
+    {"EXTRACT", "ONE KIND MOVES TO ANOTHER TRACK", 3, {P_RANGE, P_EXTRACT, P_TO}},
+    {"RAMP", "A CONTROLLER OR TEMPO SWEEP", 6, {P_RANGE, P_LANE, P_START, P_END, P_EVERY, P_CURVE}},
+    {"THIN OUT", "EVERY OTHER CHANGE IN A LANE GOES", 2, {P_RANGE, P_LANE}},
+    {"TIME STRETCH", "LONGER OR SHORTER, LATER BARS MOVE", 2, {P_RANGE, P_RATE}},
+    {"COPY TRACK", "EVENTS, SOUND OR BOTH, REPLACING", 3, {P_FROM, P_TO2, P_COPY}},
+    {"MERGE TRACKS", "ONE TRACK INTO ANOTHER", 2, {P_FROM2, P_INTO}},
+    {"CLEAR TRACK", "EVERY EVENT OF THE TRACKS GOES", 0, {0}},
+    {"NORMALIZE", "SWING, HUMANIZE, GLITCH INTO NOTES", 0, {0}},
 };
+static const struct song_job_param *song_job_param(unsigned job, unsigned p) { return &song_job_params[song_jobs[job].p[p]]; }
 static unsigned song_job, song_job_page, song_job_ready;
 static uint32_t song_job_armed;
 static int16_t song_job_value[SONG_JOBS][6];
 static const char *const song_job_grids[14] = {"1/64", "1/64T", "1/32", "1/32T", "1/16", "1/16T", "1/8", "1/8T",
                                                "1/4", "1/4T", "1/2", "1/2T", "1/1", "1/1T"};
 static unsigned song_job_grid(int v) { static const uint16_t base[7] = {30, 60, 120, 240, 480, 960, 1920}; return v & 1 ? base[(v - 1) / 2] : base[(v - 1) / 2] * 2U / 3U; }
-static int song_job_ranged(void) { return song_jobs[song_job].count && song_jobs[song_job].p[0].kind == V_RANGE; }
+static int song_job_ranged(void) { return song_jobs[song_job].count && song_jobs[song_job].p[0] == P_RANGE; }
 static unsigned song_drums(void)
 {
     unsigned m = 0;
@@ -85,7 +91,7 @@ static struct song_range song_job_range(void)
 }
 static void song_job_text(unsigned p, char out[16])
 {
-    const struct song_job_param *d = &song_jobs[song_job].p[p];
+    const struct song_job_param *d = song_job_param(song_job, p);
     int v = song_job_value[song_job][p];
     static const char *const words[][4] = {{"OFF", "ON"}, {"SELECTION", "WHOLE SONG"}, {"SET", "RATE"}, {"SET", "RATE", "LEGATO"},
         {"SEMITONES", "SCALE STEPS"}, {"LOW-HIGH", "HIGH-LOW"}, {"NOTES", "CCS", "PROGRAMS", "ALL"}, {"EVENTS", "SOUND", "BOTH"}};

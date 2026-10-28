@@ -49,11 +49,7 @@ static void song_humanize_draw(void)
     knob(1, "VELOCITY", velocity, colors[1]);
     knob(2, "-", "--", colors[2]);
     knob(3, "-", "--", colors[3]);
-    if (cache->hint_cache != 4U) {
-        cache->hint_cache = 4U;
-        paint_fill(6, 231, 228, 7, BACK);
-        text(6, 231, "SELECT TRACK  ALGO PAGE  GLO BACK", 1, DIM, BACK);
-    }
+    song_hint("SELECT TRACK  ALGO PAGE  GLO BACK");
 }
 /* Page 3: the recording knobs of the current track. */
 static void song_knobs_draw(void)
@@ -85,11 +81,7 @@ static void song_knobs_draw(void)
         decimal(name + 1, (int)k + 1, 1);
         knob(k, name, p ? p->name : "-", colors[k]);
     }
-    if (cache->hint_cache != 3U) {
-        cache->hint_cache = 3U;
-        paint_fill(6, 231, 228, 7, BACK);
-        text(6, 231, "SELECT TRACK  K1-K4 PARAMETER", 1, DIM, BACK);
-    }
+    song_hint("SELECT TRACK  K1-K4 PARAMETER");
 }
 static void song_setup_draw(void)
 {
@@ -145,11 +137,7 @@ static void song_setup_draw(void)
     }
     for (unsigned col = 0; col < 4; ++col) knob(col, labels[page2][col], values[col], colors[col]);
     const char *hint = page2 ? "ALGO PAGE  GLO BACK" : "KEYS 1-8 SWING TRACKS  ALGO PAGE";
-    if (cache->hint_cache != page2 + 1U) {
-        cache->hint_cache = page2 + 1U;
-        paint_fill(6, 231, 228, 7, BACK);
-        text(6, 231, hint, 1, DIM, BACK);
-    }
+    song_hint(hint);
 }
 
 static int song_setup_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)

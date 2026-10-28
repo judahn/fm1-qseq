@@ -150,17 +150,13 @@ static void song_step_draw(void)
         knob(2, "GATE", gate, colors[2]);
     }
     knob(3, shift ? "NOTE JUMP" : "MOVE", "< >", colors[3]);
-    if (notice && (int32_t)(frame_time - notice_until) >= 0) notice = NULL;
+    song_notice_expire();
     char page_hint[40] = "GLITCH 1/3  ALGO PAGE  ARP BACK";
     page_hint[7] = (char)('0' + song_glitch_layer);
     if (song_glitch_layer == 1) strcpy(page_hint, "GLITCH 1/3  SHIFT+K2 SCALE  ARP BACK");
     const char *hint = notice ? notice : song_glitch_layer ? page_hint : shift ? "SHIFT: F3-E4 LENGTH F#3 TRIP G#3 DOT"
         : (previous_buttons & BUTTON(LFO)) ? "HOLD LFO, PRESS KEYS TO PICK NOTES" : "REC OR PLAY TO LEAVE  PRESETS PITCH";
-    uint32_t sig = signature(0, hint, (unsigned)strlen(hint));
-    if (sig == cache->hint_cache) return;
-    cache->hint_cache = sig;
-    paint_fill(6, 231, 228, 7, BACK);
-    text(6, 231, hint, 1, DIM, BACK);
+    song_hint(hint);
 }
 
 /* Step entry input. Keys F3 to E5 enter notes, and a chord goes in when

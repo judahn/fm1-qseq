@@ -3,6 +3,7 @@
 #include "jobs.h"
 #include "player.h"
 #include "song_config.h"
+#include <stdlib.h>
 #include <string.h>
 #if SONG_UI
 
@@ -73,10 +74,9 @@ SONG_SMALL int song_job_stretch(struct song *s, const struct song_range *r, unsi
 }
 
 /* Normalize: the capture replaces the tracks' notes. Automation and the FX
- * lane stay. */
-static struct song_event baked[SONG_EVENTS];
-static uint8_t baked_track[SONG_EVENTS];
-SONG_SMALL int song_job_normalize(struct song *s, unsigned tracks, const struct song_player *live)
+ * lane stay. Its 36 KB come from the heap only while it runs. */
+SONG_SMALL static int normalize(struct song *s, unsigned tracks, const struct song_player *live, struct song_event *baked,
+                                uint8_t *baked_track)
 {
     unsigned notes = 0;
     for (unsigned t = 0; t < SONG_TRACKS; ++t)
@@ -92,6 +92,15 @@ SONG_SMALL int song_job_normalize(struct song *s, unsigned tracks, const struct 
             s->humanize_time[t] = s->humanize_velocity[t] = 0;
         }
     for (int i = 0; i < n; ++i) (void)song_add_event(s, baked_track[i], &baked[i]);
+    return n;
+}
+SONG_SMALL int song_job_normalize(struct song *s, unsigned tracks, const struct song_player *live)
+{
+    struct song_event *baked = malloc(SONG_EVENTS * sizeof *baked);
+    uint8_t *baked_track = malloc(SONG_EVENTS);
+    int n = baked && baked_track ? normalize(s, tracks, live, baked, baked_track) : -1;
+    free(baked);
+    free(baked_track);
     return n;
 }
 #endif

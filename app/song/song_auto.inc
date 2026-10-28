@@ -125,7 +125,7 @@ static void song_auto_draw(void)
     if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
     char hint[40], part[24];
     song_footer(s, "CHANGE");
-    if (notice && (int32_t)(frame_time - notice_until) >= 0) notice = NULL;
+    song_notice_expire();
     if (song_now.glitching) song_stutter_hint(hint);
     else if (song_auto_conductor && song_auto_mode == 2) strcpy(hint, "FX STUTTERS  SCL DEL  SHIFT+SCL CLEAR");
     else if (song_auto_conductor && !song_auto_mode) {
@@ -146,11 +146,7 @@ static void song_auto_draw(void)
         strcat(hint, "  PRESETS LANE");
     }
     const char *shown = notice ? notice : hint;
-    uint32_t sig = signature(0, shown, (unsigned)strlen(shown));
-    if (sig == cache->hint_cache) return;
-    cache->hint_cache = sig;
-    paint_fill(6, 231, 228, 7, BACK);
-    text(6, 231, shown, 1, DIM, BACK);
+    song_hint(shown);
 }
 
 #include "song_auto_edit.inc"

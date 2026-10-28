@@ -8,11 +8,13 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 if ($FirmwareOnly -and $Package) { throw 'Choose -FirmwareOnly for local hardware tests or -Package for distribution, not both.' }
-$Profile = 'dx7'
+# song-mode: FM1_SONG_DEVICE_FULL=1 builds full song mode for a device test, apart from the default build.
+$deviceFull = $env:FM1_SONG_DEVICE_FULL -eq '1'
+$Profile = if ($deviceFull) { 'dx7-songfull' } else { 'dx7' } # song-mode
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $sdk = $PSScriptRoot
 $build = Join-Path $root "build/$Profile"
-$official = Join-Path $root 'build/official-web'
+$official = Join-Path $root $(if ($deviceFull) { 'build/official-web-songfull' } else { 'build/official-web' }) # song-mode
 $utf8 = New-Object Text.UTF8Encoding $false
 function Write-Text($file, $text) { [IO.File]::WriteAllText($file, $text, $utf8) }
 function Run($program, [string[]]$arguments) {
@@ -263,10 +265,10 @@ function Package-Firmware {
 Write-Text (Join-Path $build 'firmware-report.json') '{"passed":false}'
 Write-Text (Join-Path $build 'package-report.json') '{"board_access":false,"fits":false}'
 Write-Text (Join-Path $build 'web-package-report.json') '{"integrated":false,"board_access":false}'
-foreach ($name in @('build/dx7/update.html','build/site/index.html','build/site/.nojekyll',
-        'build/dx7/sdk.elf','build/dx7/sdk.map','build/dx7/build-identity.json',
-        'build/dx7/compile_commands.json','build/dx7/link-arguments.json',
-        'build/official-web/SHA256SUMS.txt')) {
+foreach ($name in @("build/$Profile/update.html",'build/site/index.html','build/site/.nojekyll', # song-mode: this profile's outputs
+        "build/$Profile/sdk.elf","build/$Profile/sdk.map","build/$Profile/build-identity.json",
+        "build/$Profile/compile_commands.json","build/$Profile/link-arguments.json",
+        (Join-Path ($official.Substring($root.Length + 1)) 'SHA256SUMS.txt'))) {
     $oldWeb = Join-Path $root $name
     if ([IO.File]::Exists($oldWeb)) { [IO.File]::Delete($oldWeb) }
 }
@@ -367,6 +369,7 @@ foreach ($file in Get-ChildItem -LiteralPath $sdk -Recurse -Force -File) {
 }
 $variantName = 'release'
 $variant = [pscustomobject]@{user_bytes=536576; frozen='sdk/lib/libfm1_engine.a'; update_family=7}
+if ($deviceFull) { $variant.user_bytes = 536576 - 15 * 4096 } # song-mode: the stock project slots go to code
 $include = @('sdk/include','sdk/include/libc','app/synth','sdk/config','app','app/board')
 $sources = @(Get-ChildItem -LiteralPath (Join-Path $root 'app') -Recurse -File |
     Where-Object { $_.Extension -in @('.c','.S') -and !$_.FullName.StartsWith(([IO.Path]::GetFullPath((Join-Path $root 'app/synth'))+[IO.Path]::DirectorySeparatorChar),[StringComparison]::OrdinalIgnoreCase) } | Sort-Object FullName | ForEach-Object { $_.FullName.Substring($root.Length+1).Replace('\','/') })
@@ -383,6 +386,7 @@ $flags = @('-target','pi32v2','-integrated-as','-mcpu=r3','-mfprev1','-Wuninitia
     '-femulated-tls','-Wno-shift-negative-value','-Wframe-larger-than=2560','-fms-extensions',
     '-fno-unwind-tables','-ffunction-sections','-fdata-sections','-fmessage-length=0',
     '-cl-single-precision-constant','-mllvm','-pi32v2-large-program=true','-D__GCC_PI32V2__','-O2')
+if ($deviceFull) { $flags += '-DSONG_DEVICE_FULL=1' } # song-mode
 foreach ($dir in $include) { $flags += '-I' + (Join-Path $root $dir) }
 $objects = @()
 $commands = @()
@@ -404,6 +408,7 @@ try {
         # Storage and screen run only from control; keep audio DSP on O2.
         if ($source -in @('app/project.c','app/transfer.c','app/samples.c','app/screen.c','app/presets.c','app/midi_router.c','app/fm_factory.c','app/fm_library.c')) { $options += '-Oz' }
         if ($source -eq 'app/screen.c') { $options += '-fno-inline-functions' }
+        if ($deviceFull -and $source.StartsWith('app/song/')) { $options += '-Oz' } # song-mode: control-task code, built for size
         $arguments = @($options) + @('-MMD','-MF',($output + '.d'),'-c',$inputFile,'-o',$output)
         Write-Host "Compile $source"
         Run $clang $arguments

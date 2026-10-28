@@ -6,7 +6,7 @@ static void song_job_open(void)
 {
     if (!song_job_ready) {
         for (unsigned j = 0; j < SONG_JOBS; ++j)
-            for (unsigned p = 0; p < 6; ++p) song_job_value[j][p] = song_jobs[j].p[p].init;
+            for (unsigned p = 0; p < song_jobs[j].count; ++p) song_job_value[j][p] = song_job_param(j, p)->init;
         song_job_value[JOB_COPY][0] = (int16_t)track;
         song_job_ready = 1;
     }
@@ -35,7 +35,7 @@ static void song_job_draw(void)
                 char label[12] = "K";
                 decimal(label + 1, (int)(p % 3U) + 2, 1);
                 if (live) text(8, y + 3, label, 1, colors[p % 3U + 1U], BACK);
-                text(24, y + 3, d->p[p].name, 1, live ? TEXT : DIM, BACK);
+                text(24, y + 3, song_job_param(song_job, p)->name, 1, live ? TEXT : DIM, BACK);
                 song_job_text(p, value);
                 text(96, y, value, 2, live ? TEXT : DIM, BACK);
             }
@@ -47,17 +47,13 @@ static void song_job_draw(void)
     knob(0, "JOB", d->name, colors[0]);
     for (unsigned k = 0; k < 3; ++k) {
         unsigned p = song_job_page * 3U + k;
-        if (p < d->count) { song_job_text(p, value); knob(k + 1U, d->p[p].name, value, colors[k + 1U]); }
+        if (p < d->count) { song_job_text(p, value); knob(k + 1U, song_job_param(song_job, p)->name, value, colors[k + 1U]); }
         else knob(k + 1U, "-", "", colors[k + 1U]);
     }
-    if (notice && (int32_t)(frame_time - notice_until) >= 0) notice = NULL;
+    song_notice_expire();
     const char *hint = notice ? notice : (previous_buttons & BUTTON(LFO)) ? "LFO + F3-F4 TRACKS  G4 ALL"
         : d->count > 3 ? "ALGO MORE  SAVE RUNS  HOME BACK" : "SAVE RUNS  HOME BACK  LFO TRACKS";
-    uint32_t h = signature(0, hint, (unsigned)strlen(hint));
-    if (h == cache->hint_cache) return;
-    cache->hint_cache = h;
-    paint_fill(6, 231, 228, 7, BACK);
-    text(6, 231, hint, 1, DIM, BACK);
+    song_hint(hint);
 }
 
 /* The job, with its settings, on the range. Below -1: a reason of its own. */
@@ -163,10 +159,11 @@ static int song_job_input(const struct fm1_controls *c, uint32_t *pressed, uint3
     for (unsigned k = 0; k < 3; ++k) {
         unsigned p = song_job_page * 3U + k;
         if (p >= d->count || !c->encoders[3 + k]) continue;
-        int high = d->p[p].high;
-        if (d->p[p].kind == V_LANE) { const uint8_t *index; high = (int)song_job_lanes(&index) - 1; }
+        const struct song_job_param *q = song_job_param(song_job, p);
+        int high = q->high;
+        if (q->kind == V_LANE) { const uint8_t *index; high = (int)song_job_lanes(&index) - 1; }
         song_job_value[song_job][p] = (int16_t)clamp(song_job_value[song_job][p] + c->encoders[3 + k] * (shift ? 10 : 1),
-                                                     d->p[p].low, high);
+                                                     q->low, high);
     }
     if (song_job != before || c->encoders[1] || c->encoders[3] || c->encoders[4] || c->encoders[5]) song_job_armed = 0;
     if (c->buttons & BUTTON(LFO)) { song_pick_tracks(key_down & ~blocked_keys); blocked_keys |= key_down; }

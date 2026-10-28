@@ -549,7 +549,7 @@ static __attribute__((noinline)) void overview(const struct groove_view v[8])
                  1, DIM, BACK);
             number(214, y + 1, v[t].volume, 3, 1, t == track ? TEXT : DIM, BACK);
         }
-        for (unsigned i = 0; i < 16; ++i) {
+        for (unsigned i = 0; !SONG_DROP_STEPS && i < 16; ++i) { /* song-mode */
             unsigned step = first + i;
             unsigned enabled = step < v[t].sequence_length;
             unsigned on = enabled && (unsigned)((v[t].active_steps >> step) & 1U);
@@ -1183,7 +1183,7 @@ static void leds(const struct groove_view *v, unsigned visible)
 {
     uint32_t bits = 0;
     unsigned first = step_first(v), blink = (frame_time / 250U) & 1U;
-    if (visible == STEPS && !writing) {
+    if (!SONG_DROP_STEPS && visible == STEPS && !writing) { /* song-mode */
         uint64_t lane =
             groove_pad_count(track) != 0 ? groove_drum_steps(track, drum) : v->active_steps;
         for (unsigned i = 0; i < 16; ++i)
@@ -1191,7 +1191,7 @@ static void leds(const struct groove_view *v, unsigned visible)
                 bits |= 1U << white_keys[i];
         if (v->playing && (v->play_step & ~15U) == first)
             bits ^= 1U << white_keys[v->play_step & 15U];
-    } else if (visible == PRESET_BROWSER) {
+    } else if (!SONG_DROP_PROJECTS && visible == PRESET_BROWSER) { /* song-mode */
         bits = 1U << white_keys[preset_slot];
     } else if (visible == MIX) {
         for (unsigned t = 0; t < 8; ++t) {
@@ -1249,9 +1249,9 @@ static __attribute__((noinline)) void edit_page_draw(unsigned visible)
         sig = sig * 33U + cursor;
         sig = sig * 33U + source_preview;
         sig = sig * 33U + (unsigned)source_result;
-        for (unsigned i = 0; i < 7; ++i) sig = sig * 33U + groove_step_setting(track, cursor, i);
-        for (unsigned i = 0; i < 3; ++i) sig = sig * 33U + groove_sequence_setting(i);
-        sig = sig * 33U + groove_sequence_count_in();
+        for (unsigned i = 0; !SONG_DROP_STEPS && i < 7; ++i) sig = sig * 33U + groove_step_setting(track, cursor, i); /* song-mode */
+        for (unsigned i = 0; !SONG_DROP_STEPS && i < 3; ++i) sig = sig * 33U + groove_sequence_setting(i); /* song-mode */
+        if (!SONG_DROP_STEPS) sig = sig * 33U + groove_sequence_count_in(); /* song-mode */
         sig = sig * 33U + frame_views[track].volume;
         if (notice) sig = signature(sig, notice, (unsigned)strlen(notice));
         if (visible == FM_QUICK) {
@@ -1276,7 +1276,7 @@ static __attribute__((noinline)) void edit_page_draw(unsigned visible)
         text(8, 165, "DRUM / PITCH CHANGE CLEARS STEPS", 1, AMBER, BACK);
         text(8, 196, source_result ? "NOT ENOUGH MEMORY - RETRY" : "UNDO IN HOLD SEQ MENU", 1, source_result ? AMBER : DIM, BACK);
         text(8, 231, "ALGO / K2 CHOOSE  SAVE APPLY", 1, DIM, BACK);
-    } else if (visible == ACTIONS) {
+    } else if (!SONG_DROP_STEPS && visible == ACTIONS) { /* song-mode */
         if (action_confirm) text(8, 38, "REPLACE PATTERN DATA?", 1, AMBER, BACK);
         else {
             text(8, 38, "T", 1, DIM, BACK); number(16, 38, track + 1, 1, 1, TEXT, BACK);
@@ -1368,18 +1368,18 @@ static void draw_page_body(const struct fm1_ble_status *ble)
         memset(cache->cell_cache, 0xff, sizeof cache->cell_cache);
         memset(cache->tile_cache, 0xff, sizeof cache->tile_cache);
         memset(cache->meter_cache, 0xff, sizeof cache->meter_cache);
-        if (visible == PROJECT || visible == PRESET_BROWSER)
+        if (!SONG_DROP_PROJECTS && (visible == PROJECT || visible == PRESET_BROWSER)) /* song-mode */
             text(8, 8, visible == PROJECT ? "SAVE PROJECT" : "PRESETS", 2, ACCENT, BACK);
     }
     if (visible == STARTUP) { boot_draw(); return; }
     const struct groove_view *views = frame_views, *v = &views[track];
     if (!paint_rendering) leds(v, visible);
     if (visible >= SONG) { song_page_draw(visible); return; } /* song-mode */
-    if (visible == PRESET_BROWSER) {
+    if (!SONG_DROP_PROJECTS && visible == PRESET_BROWSER) { /* song-mode */
         preset_draw();
         return;
     }
-    if (visible == PROJECT) {
+    if (!SONG_DROP_PROJECTS && visible == PROJECT) { /* song-mode */
         project_draw();
         return;
     }
@@ -1412,8 +1412,7 @@ static void draw_page_body(const struct fm1_ble_status *ble)
     const struct groove_fm_controls controls = frame_controls;
     if (visible == OVERVIEW)
         overview(views);
-    else if (visible == STEPS)
-        steps(v);
+    else if (visible == STEPS) { if (!SONG_DROP_STEPS) steps(v); } /* song-mode */
     else if (visible == MIX)
         mix_draw(views);
     else if (visible == TONE_EDIT || (visible == FM_ENV && v->type != GROOVE_DX7)) {
@@ -1424,7 +1423,7 @@ static void draw_page_body(const struct fm1_ble_status *ble)
     /* Lower controls cannot intersect an upper LCD band. Avoid formatting
      * their labels and querying the engine once for every unrelated band. */
     if (paint_rendering && paint_top + PAINT_ROWS <= 184) return;
-    if (visible == STEPS) {
+    if (!SONG_DROP_STEPS && visible == STEPS) { /* song-mode */
         unsigned parameter = seq_page == 3 ? groove_step_setting(track, cursor, 5) : 0;
         uint32_t strip = parameter | (seq_page << 10) | ((unsigned)v->type << 13);
         if (cache->seq_cache != strip) {
@@ -1438,9 +1437,9 @@ static void draw_page_body(const struct fm1_ble_status *ble)
         char value[12];
         const char *label;
         uint16_t color = colors[col];
-        if (visible == STEPS && (seq_page == 1 || seq_page == 3)) {
+        if (!SONG_DROP_STEPS && visible == STEPS && (seq_page == 1 || seq_page == 3)) { /* song-mode */
             step_knob(col, seq_page == 3); continue;
-        } else if (visible == STEPS && seq_page == 2) {
+        } else if (!SONG_DROP_STEPS && visible == STEPS && seq_page == 2) { /* song-mode */
             static const char *const labels[] = {"SWING", "CLICK", "COUNT IN", "LENGTH"};
             static const char *const clicks[] = {"OFF", "REC", "ON"};
             label = labels[col];
@@ -1873,11 +1872,11 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
     if (pressed & BUTTON(REC)) rec_before_press = writing;
     /* HOME defers REC until release so REC+SELECT never starts a take.
      * A held gesture preserves the previous recording state. */
-    if ((pressed & BUTTON(REC)) && page == OVERVIEW && !glo_down &&
+    if (!SONG_DROP_STEPS && (pressed & BUTTON(REC)) && page == OVERVIEW && !glo_down && /* song-mode */
         !(controls->buttons & ~BUTTON(REC))) {
         rec_down = 1; rec_used = 0; rec_ms = now;
     }
-    if (rec_down) {
+    if (!SONG_DROP_STEPS && rec_down) { /* song-mode */
         if (page != OVERVIEW || (pressed & ~BUTTON(REC))) rec_down = 0;
         else if (!(controls->buttons & BUTTON(REC))) {
             if (!rec_used && now - rec_ms < 600U) writing ^= 1U;
@@ -1945,14 +1944,14 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
         page = SOURCE; source_result = 0;
         goto controls_done;
     }
-    if ((controls->buttons & (BUTTON(SEQ) | BUTTON(EDIT))) == (BUTTON(SEQ) | BUTTON(EDIT)) &&
+    if (!SONG_DROP_STEPS && (controls->buttons & (BUTTON(SEQ) | BUTTON(EDIT))) == (BUTTON(SEQ) | BUTTON(EDIT)) && /* song-mode */
         (pressed & (BUTTON(SEQ) | BUTTON(EDIT)))) {
         if (!release_keys()) return 0;
         blocked_keys |= controls->keys;
         page = ACTIONS; action_confirm = 0; edit_down = seq_down = 0;
         goto controls_done;
     }
-    if (seq_down && page == STEPS && now - seq_ms >= 600U) {
+    if (!SONG_DROP_STEPS && seq_down && page == STEPS && now - seq_ms >= 600U) { /* song-mode */
         page = ACTIONS; action_confirm = 0; seq_down = edit_down = 0;
         goto controls_done;
     }
@@ -1982,7 +1981,7 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
         if (pressed & BUTTON(HOME)) {
             if (page == ACTIONS && action_confirm) action_confirm = 0;
             else if (page == BLE && ble_forget == 1) ble_forget = 0;
-            else if (page == OVERVIEW) {
+            else if (!SONG_DROP_PROJECTS && page == OVERVIEW) { /* song-mode */
                 preset_refresh(); project_result = 0; page = PRESET_BROWSER;
             } else page = OVERVIEW;
         } else if (pressed & BUTTON(SEQ)) {
@@ -2026,7 +2025,7 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
         notice = groove_arp_enabled(track) ? "ARP ON / HOLD ARP FOR SETTINGS" : "ARP OFF / LIVE KEYS";
         notice_until = now + 2000U;
     }
-    if (pressed & BUTTON(REC)) {
+    if (!SONG_DROP_STEPS && (pressed & BUTTON(REC))) { /* song-mode */
         writing ^= 1U;
         glo_down = 0;
         if (writing && (page == BLE || page == PROJECT || page == PRESET_BROWSER ||
@@ -2038,7 +2037,7 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
     }
     if (page != STEPS && page != ACTIONS)
         octave = clamp(octave + !!(pressed & BUTTON(OCT_UP)) - !!(pressed & BUTTON(OCT_DOWN)), -2, 2);
-    if ((pressed & BUTTON(SAVE)) && page != PROJECT && page != BLE &&
+    if (!SONG_DROP_PROJECTS && (pressed & BUTTON(SAVE)) && page != PROJECT && page != BLE && /* song-mode */
         page != SOURCE && page != ACTIONS) {
         project_return = page; page = PROJECT; project_result = 0;
         project_reload = project_operation = 0;
@@ -2061,7 +2060,7 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
                 groove_mix_toggle(i & 7U, i >= 8);
         goto controls_done;
     }
-    if (page == OVERVIEW && !glo_down && controls->encoders[6]) {
+    if (!SONG_DROP_PROJECTS && page == OVERVIEW && !glo_down && controls->encoders[6]) { /* song-mode */
         int current = preset_loaded ? (int)preset_current_slot : controls->encoders[6] > 0 ? -1 : GROOVE_PROJECT_SLOTS;
         unsigned slot = (unsigned)clamp(current + controls->encoders[6],
                                         0, GROOVE_PROJECT_SLOTS - 1);
@@ -2072,7 +2071,7 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
         }
         goto controls_done;
     }
-    if (page == PRESET_BROWSER) {
+    if (!SONG_DROP_PROJECTS && page == PRESET_BROWSER) { /* song-mode */
         play_handled = 1;
         int delta = controls->encoders[0] + controls->encoders[6];
         unsigned bank = (unsigned)clamp((int)preset_bank + controls->encoders[2], 0, 1);
@@ -2110,7 +2109,7 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
         }
         goto controls_done;
     }
-    if (page == ACTIONS) {
+    if (!SONG_DROP_STEPS && page == ACTIONS) { /* song-mode */
         int move = controls->encoders[6] + controls->encoders[3];
         int paging = !!(pressed & BUTTON(OCT_UP)) - !!(pressed & BUTTON(OCT_DOWN));
         if (move || paging) {
@@ -2168,7 +2167,7 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
         }
         goto controls_done;
     }
-    if (page == PROJECT) {
+    if (!SONG_DROP_PROJECTS && page == PROJECT) { /* song-mode */
         if (old_page == PROJECT) {
             if (controls->encoders[0] || controls->encoders[6]) {
                 project_slot = (unsigned)clamp((int)project_slot + controls->encoders[0] + controls->encoders[6], 0, GROOVE_PROJECT_SLOTS - 1);
@@ -2278,23 +2277,23 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
                 }
                 int oct_delta = (int)((pressed >> OCT_UP) & 1U) - (int)((pressed >> OCT_DOWN) & 1U);
                 if (page == STEPS) {
-                    unsigned next = (unsigned)clamp((int)seq_page + controls->encoders[1], 0, 7);
+                    unsigned next = (unsigned)clamp((int)seq_page + controls->encoders[1], SONG_DROP_STEPS ? 4 : 0, 7); /* song-mode */
                     struct groove_view v = {0}; groove_get_view(track, cursor, &v);
                     int move = controls->encoders[6] + (!next ? controls->encoders[3] : 0);
-                    if (next != seq_page || move || oct_delta) {
+                    if (!SONG_DROP_STEPS && (next != seq_page || move || oct_delta)) { /* song-mode */
                         move_step(&v, move, oct_delta);
                         if (move) writing = 0;
                     }
                     if (next != seq_page) { seq_page = next; cache->shown_page = ~0U; }
-                    if (seq_page == 1 || seq_page == 3) step_adjust(seq_page == 3, controls->encoders, now);
-                    else if (seq_page == 2) {
+                    if (!SONG_DROP_STEPS && (seq_page == 1 || seq_page == 3)) step_adjust(seq_page == 3, controls->encoders, now); /* song-mode */
+                    else if (!SONG_DROP_STEPS && seq_page == 2) { /* song-mode */
                         for (unsigned i = 0; i < 3; ++i) groove_sequence_setting_edit(i, controls->encoders[2 + i]);
                         sequence_length_adjust(controls->encoders[5]);
                     } else if (seq_page == 4) {
                         if (controls->encoders[2]) groove_settings_clock(controls->encoders[2] > 0
                             ? GROOVE_CLOCK_MIDI : GROOVE_CLOCK_INTERNAL);
                         groove_tempo_edit(controls->encoders[3]);
-                        sequence_length_adjust(controls->encoders[4]);
+                        if (!SONG_DROP_STEPS) sequence_length_adjust(controls->encoders[4]); /* song-mode */
                         groove_settings_midi(track,6,controls->encoders[5]);
                         if (controls->encoders[3] && groove_clock_mode()) {
                             notice = "EXT CLOCK - CHANGE BPM AT SOURCE"; notice_until = now + 2000U;
@@ -2441,7 +2440,7 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
                         }
                 } else if (page != STEPS || !seq_page) {
                     if (page == OVERVIEW) {
-                        if (controls->encoders[4]) {
+                        if (!SONG_DROP_STEPS && controls->encoders[4]) { /* song-mode */
                             struct groove_view view = {0};
                             groove_get_view(track, cursor, &view);
                             move_step(&view, controls->encoders[4], 0);
@@ -2451,7 +2450,7 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
                         drum = (unsigned)clamp((int)drum + controls->encoders[4], 0,
                                                (int)groove_pad_count(track) - 1);
                         selected_note = groove_pad_note(track, drum);
-                    } else if (page == STEPS) {
+                    } else if (!SONG_DROP_STEPS && page == STEPS) { /* song-mode */
                         struct groove_view selected = {0};
                         groove_get_view(track, cursor, &selected);
                         if (controls->encoders[4] && step_follow && selected.playing) {
@@ -2506,7 +2505,7 @@ controls_done:
     /* Manual selection must not be overwritten by the recording cursor on
      * the next poll. Entering sequence editing finishes the recording take. */
     if (page == ACTIONS || page == STEP_EDIT || (page == STEPS && (seq_page == 1 || seq_page == 3))) writing = 0;
-    groove_edit_record(writing, track, cursor);
+    if (!SONG_DROP_STEPS) groove_edit_record(writing, track, cursor); /* song-mode */
     if ((pressed & BUTTON(PLAY)) && !play_handled) {
         struct groove_view view = {0};
         groove_get_view(track, cursor, &view);
@@ -2536,7 +2535,7 @@ controls_done:
             keys &= ~(1U << edit_keys[i]);
     if (page == TONE_EDIT && groove_source_type(track) == GROOVE_303)
         keys &= ~((1U << edit_keys[8]) | (1U << edit_keys[9]));
-    if (page == STEPS && !writing && !glo_down) {
+    if (!SONG_DROP_STEPS && page == STEPS && !writing && !glo_down) { /* song-mode */
         struct groove_view view = {0};
         groove_get_view(track, cursor, &view);
         unsigned first = step_first(&view);

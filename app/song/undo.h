@@ -2,6 +2,7 @@
 #ifndef FM1_SONG_UNDO_H
 #define FM1_SONG_UNDO_H
 #include "song.h"
+#include "song_config.h"
 
 /* Multi-level undo as diffs (design section 9). An edit is a transaction of
  * records: notes added or removed, a time shift, and when the small maps
@@ -10,7 +11,13 @@
  * preferences, not edits.
  * Undo applies the inverses backwards and redo replays them. The oldest
  * transactions go when the buffer is full. */
-enum { SONG_UNDO_BYTES = 32768, SONG_UNDO_LEVELS = 64 }; /* 32 KB since phase 6: a job can touch ~1,300 events */
+/* 32 KB since phase 6, so a job can touch about 1,300 events. 16 KB on the
+ * device, where RAM is shorter: about 650. */
+#if SONG_DEVICE_FULL && !defined(FM1_OPEN_WEB)
+enum { SONG_UNDO_BYTES = 16384, SONG_UNDO_LEVELS = 64 };
+#else
+enum { SONG_UNDO_BYTES = 32768, SONG_UNDO_LEVELS = 64 };
+#endif
 enum { SONG_UNDO_ADD = 1, SONG_UNDO_DEL, SONG_UNDO_SHIFT, SONG_UNDO_MAPS, SONG_UNDO_SOUND };
 enum { SONG_SOUND_BYTES = 223 }; /* a track's sound setup, opaque here (phase 6, Copy Track) */
 struct song_maps {

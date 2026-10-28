@@ -147,7 +147,7 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
         else
 #endif
         if (page != SONG_HOME) { page = music_page = SONG_HOME; writing = 0; }
-        else { page = music_page = STEPS; seq_page = 0; step_follow = 1; }
+        else { page = music_page = STEPS; seq_page = SONG_DROP_STEPS ? 4 : 0; step_follow = 1; } /* sync and MIDI pages only, without (a) */
         cache->shown_page = ~0U;
 #if SONG_UI
         static uint8_t offered; /* a recovery copy from before: the list offers it, once */

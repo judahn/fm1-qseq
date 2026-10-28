@@ -371,4 +371,5 @@ FM1_DSP_CODE void groove_midi_note(unsigned track, unsigned note, unsigned veloc
 FM1_DSP_CODE void groove_midi_track_reset(unsigned track);
 FM1_DSP_CODE void groove_midi_transport(unsigned owner, uint8_t status);
 FM1_DSP_CODE void groove_midi_clock(unsigned owner, unsigned tempo);
+#include "song/song_flash.h" /* song-mode: SONG_DEVICE_FULL's moved user partition */
 #endif
