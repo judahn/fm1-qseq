@@ -13,6 +13,7 @@ static struct fm1_audio_stats statistics;
 static uint32_t block_ticks, previous_tick;
 static uint8_t initialized, previous_valid;
 static volatile unsigned mute_depth;
+static volatile uint32_t render_count; /* song-mode: blocks whose MIDI the engine consumed */
 
 static inline __attribute__((always_inline)) uint32_t elapsed(uint32_t start, uint32_t end)
 {
@@ -44,6 +45,7 @@ FM1_AUDIO_CODE __attribute__((interrupt(""))) void fm1_audio_irq(void)
         ++statistics.overruns;
         return;
     }
+    ++render_count; /* song-mode */
     fm1_output_mix(rendered);
     uint32_t flags = fm1_audio_irq_save();
     if (fm1_audio_half_owned(half) &&
@@ -110,6 +112,8 @@ int fm1_audio_start(void)
     initialized = 1;
     return 0;
 }
+/* song-mode: read on the control task by the song player's device stub. */
+uint32_t fm1_audio_render_count(void) { return render_count; }
 void fm1_audio_stats_read(struct fm1_audio_stats *out)
 {
     if (!out) return;

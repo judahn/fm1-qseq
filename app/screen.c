@@ -1178,6 +1178,7 @@ static __attribute__((noinline)) void effects_draw(void)
         knob(i, label, display, colors[i]);
     }
 }
+#include "song/song_view.inc" /* song-mode */
 static void leds(const struct groove_view *v, unsigned visible)
 {
     uint32_t bits = 0;
@@ -1233,6 +1234,7 @@ static void leds(const struct groove_view *v, unsigned visible)
         | ((visible == FM_EDIT || visible == TONE_EDIT || visible == FM_QUICK || visible == STEP_EDIT) << EDIT)
         | ((visible == FM_ENV) << ENV) | ((visible == FM_LFO) << LFO)
         | ((visible == PROJECT || visible == SOURCE || (visible == ACTIONS && action_confirm)) << SAVE);
+    bits = song_leds(bits, visible); /* song-mode */
     changed = bits ^ button_led_cache;
     for (unsigned key = 0; key < 14; ++key)
         if (changed & (1U << key)) fm1_led_set(key, (bits >> key) & 1U);
@@ -1371,6 +1373,7 @@ static void draw_page_body(const struct fm1_ble_status *ble)
     if (visible == STARTUP) { boot_draw(); return; }
     const struct groove_view *views = frame_views, *v = &views[track];
     if (!paint_rendering) leds(v, visible);
+    if (visible == SONG) { song_draw(); return; } /* song-mode */
     if (visible == PRESET_BROWSER) {
         preset_draw();
         return;
@@ -1896,6 +1899,7 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
     if ((controls->buttons & (BUTTON(HOME) | BUTTON(PLAY))) ==
             (BUTTON(HOME) | BUTTON(PLAY)) && (pressed & (BUTTON(HOME) | BUTTON(PLAY)))) {
         blocked_keys |= controls->keys;
+        song_port_stop(); /* song-mode */
         if (!post(0xff, 0, 0, 1)) return 0;
         memset(key_note, 0xff, sizeof key_note); project_keys = 0;
         page = music_page = OVERVIEW;
@@ -1967,6 +1971,7 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
         page = NAME; name_cursor = 0;
         goto controls_done;
     }
+    if (song_input(controls, &pressed, key_down, now)) goto controls_done; /* song-mode */
     if (pressed & (BUTTON(HOME) | BUTTON(SEQ) | BUTTON(FX) | BUTTON(SCL) |
                    BUTTON(EDIT) | BUTTON(ENV) | BUTTON(LFO))) {
         glo_down = glo_used = 0;
@@ -2143,6 +2148,7 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
                 else r = -1;
             } else if (action == 18) { page = BLE; ble_view = ble_forget = ble_action = 0; ble_result = 0; }
             else {
+                song_port_stop(); /* song-mode */
                 if (!post(0xff, 0, 0, 1)) return 0;
                 memset(key_note, 0xff, sizeof key_note); project_keys = 0; writing = 0; page = OVERVIEW;
             }
@@ -2626,6 +2632,7 @@ void groove_screen_control(void)
     if (error && !notice) { notice = error == 1 ? "RECORD STOPPED - MIDI QUEUE FULL" : "CHORD LIMIT - LAST NOTES KEPT"; notice_until = now + 2000U; }
     struct groove_view transport = {0};
     groove_get_view(track, cursor, &transport);
+    song_poll(&transport); /* song-mode */
     cursor %= transport.sequence_length;
     if (transport.playing && !transport_seen && !(page == STEPS && seq_page) && page != STEP_EDIT && page != ACTIONS) step_follow = 1;
     if (!transport.playing && transport_seen && step_follow && !writing)

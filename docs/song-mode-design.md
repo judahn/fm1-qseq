@@ -213,6 +213,20 @@ slice each. A reversed copy of a sound needs its own pad and memory, since the d
 **In our sequencer (per note, cheap):** accent, flam, rolls (repeat a hit 2, 3 or 4 times inside a step),
 probability, humanize (small random timing and velocity) and per-pad swing.
 
+**Kits** (Judah, 10/27: one kit per song, saved independently of songs, switchable).
+- **A kit** is 8 samples plus their names and pad settings (level, tune, trim, choke). It's saved on its own,
+  separate from any song.
+- **Kit library on the device.** The engine plays 8 pads, but which audio each pad plays is decided by our
+  own code (`app/samples.c` points each pad at its data in flash). So the sample memory, about 19 seconds,
+  can hold several kits instead of one bank. With short one-shots that's several kits (8 hits of about 0.4 s
+  each is about 3 s per kit). Kits that share a sample store it once.
+- **In a song.** Each song names its kit. Switching a song's kit from the song settings is instant, because
+  it only re-points the pads. Nothing is written to flash. Switching at a marker partway through a song
+  looks possible for the same reason, and gets tested for clicks before it's offered.
+- **On the computer.** The browser editor exports and imports kits as files, for a library of any size, and
+  loads them into the device's library. This replaces the stock single-bank format with a multi-kit one.
+- **Also possible:** the 808 kit (11 synthesized drums) on another track alongside the sampler kit.
+
 **Time-stretching is out of scope** (Judah, 10/27). Samples are short one-shots, and the bank is small.
 
 ## 8a. Settings, swing and scales
@@ -271,12 +285,26 @@ is a few seconds for a large song.
 - **Saving.** SAVE writes the song to flash. A recovery copy is also written automatically whenever playback
   stops, since it's a battery device and power-off would lose unsaved work. Flash writes briefly mute audio,
   so nothing is ever written during playback.
+- **Several songs on the device.** The user flash is about 524 KB: 68 KB of stock project slots, about 436 KB
+  of sample memory, and 20 KB for the DX7 voice banks and settings. Our song mode doesn't use the stock
+  pattern projects, so songs and kits share one pool of about 504 KB, with the gauge showing how it's split.
+  A song is roughly 2 KB of sounds and settings plus about 8 bytes per note, so a 1,000-note song is about
+  10 KB. Fewer sample seconds means room for more songs, and the reverse. The song list has new, save,
+  rename, duplicate and delete. The browser editor keeps an unlimited library on the computer.
+- **New songs from factory sound sets.** The stock firmware's 16 factory projects (Acid Alley, Night Drive, Dub
+  Harbour and so on) are 8-track sound setups. A new song can start from one of them, or from blank.
 - **Sound editing.** EDIT enters sound editing. While there, FX, SCL, ENV and LFO go back to their stock jobs
   (effects, FM scaling, envelopes, LFO). Leaving restores the song-mode functions.
 - **Mixer.** The stock overview page on HOME stays: volume per track on K1 to K4 (four tracks per page), mute
   and solo on the white keys, per-track reverb and delay sends, the shared reverb and delay, and the master
   knob. Pan gets added. The engine supports it, but the stock screens only use pan as an LFO target. The mix
   saves with the song, and volume, pan and sends can be automated.
+- **Effects.** Stock: a shared reverb and a shared delay, a send to each per track, and each engine's own sound
+  shaping (303 filter and drive, FM operators, PSG and pluck tone, sampler pad controls). Per-track insert
+  effects aren't possible, because the closed engine mixes the tracks internally and our code only sees the
+  finished stereo mix. Master-bus effects are possible in our own output stage (`app/audio_output.c`): a
+  filter, EQ, compressor or lo-fi, automatable. That's a later option, once CPU headroom is measured on the
+  device.
 - **Tempo and sound changes mid-song.** Tempo and program (sound) changes are lanes in the automation view,
   entered like any other automation.
 - **External MIDI keyboard.** Recording takes notes from an external keyboard with real velocity, which also
@@ -292,6 +320,35 @@ is a few seconds for a large song.
 - Before the first flash, the stock firmware and any projects are backed up.
 - The firmware is GPL. If it's ever shared, its source goes with it.
 
+## 8e. Glitch (agreed 10/27)
+
+**Per note, on any track (synths as well as drums):** rolls and ratchets (repeat a note 2, 3, 4, 6 or 8 times
+inside its length, with optional pitch drift and velocity fade across the repeats), probability, random octave
+jumps, and random pad swaps on drum tracks.
+
+**Sequencer glitches (no audio memory).** The player schedules every note, so it can mangle the music itself:
+- **Stutter:** while held, the player loops the last 1/4 to 1/64 of the song on every track. The synths really
+  retrigger, which sounds different from audio stutter. A knob drifts each repeat's pitch up or down.
+- **Mangle jobs on a selection:** scramble the 16ths, reverse the note order, shuffle notes between tracks.
+  Destructive but undoable.
+
+**Sound glitches through automation:** fast-stepped automation (303 cutoff, pitch-bend jumps, pan flicks) and
+the sampler's variation setting.
+
+**Master-bus effects** in our output stage (`app/audio_output.c`):
+- Cheap, no buffer: bitcrush, sample-rate reduction, a tempo-synced gate or chop, and filter sweeps.
+- Needs a short audio buffer: audio beat repeat, reverse of the last slice, tape stop. An 8th note at 120 BPM
+  is about 22 KB in mono, so short slices fit and bar-long scrambles don't. Sized after measuring free memory
+  on the device.
+
+**Playing it.** Hold GLITCH (ARP in song view, tentatively). The lower keys pick a repeat length (1/4 down to
+1/64, with triplets), the upper keys pick an effect (reverse, tape stop, crush, gate, filter), and K1 to K4
+set pitch drift, decay, crush amount and filter. While recording, glitches go to an FX lane, so they become
+part of the song and can be repeated, edited and undone.
+
+**Responsibly:** a limiter on the master output catches level spikes, every glitch can be undone, and the
+buffer effects stop as soon as the button is released.
+
 ## 9. Undo
 
 Several levels, stored as what each edit added and removed rather than as whole copies of the song, so it
@@ -305,6 +362,8 @@ costs little memory. HOME plus SAVE stays undo, as in the stock firmware.
 3. **Real-time recording and arranging:** modes, count-in, input quantize, undo, and selecting, copying,
    pasting and duplicating bars.
 4. **Automation:** knob recording and playback.
+4b. **Glitch, sequencer side:** rolls and ratchets on any track, probability, stutter, mangle jobs, the FX lane.
+   The master-bus effects follow once free memory is measured on the device.
 5. **Saving and transfer:** songs saved to and loaded from flash, the song list, and export and import through
    the browser workbench (song files and MIDI files).
 6. **Edit jobs:** quantize, transpose, copy, insert and delete bars, velocity and gate changes.

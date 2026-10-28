@@ -7,6 +7,7 @@
 #include "fm1_engine_control.h"
 #include "audio_output.h"
 #include "fm1_audio_io.h"
+#include "song/song_port.h" /* song-mode */
 #include <string.h>
 #include <stdlib.h>
 
@@ -354,6 +355,7 @@ EXPORT("sim_render") const float *sim_render(void)
 {
     /* Preserve one block of output latency. */
     for (unsigned i = 0; i < FM1_BLOCK_WORDS; ++i) output[i] = (float)previous[i] * (1.0f / 8388608.0f);
+    song_port_render(frames); /* song-mode: queue this block's song notes before the drain */
     if (midi_reset) { const uint8_t reset = 255; send(&reset, 1); midi_reset = 0; }
     while (midi_read != midi_write) {
         send(midi[midi_read].data, midi[midi_read].count); midi_read = (midi_read + 1) % MIDI_QUEUE;
