@@ -29,7 +29,9 @@ unsigned kit_refs(const struct song_pool *p, unsigned ref); /* how many kits use
 /* Deletes a kit, and the samples no other kit uses. */
 int kit_delete(struct song_pool *p, unsigned id);
 /* After a scan: a stock bank no kit uses becomes a kit named `name`, and
- * samples no kit uses (an import cut short) go. Returns that kit or 0. */
+ * samples no kit uses (an import cut short) go. Returns that kit or 0. When
+ * the kit table is damaged (its CRC is checked), or samples have no table,
+ * nothing is made or deleted. */
 unsigned kit_tidy(struct song_pool *p, const char *name);
 
 /* A stock-format bank streamed in by the transfer path, turned into

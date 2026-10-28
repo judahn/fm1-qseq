@@ -40,14 +40,18 @@ SONG_SMALL int kit_sample(const struct song_pool *p, unsigned ref, struct kit_sa
 struct kit_entry { uint16_t id; char name[16]; struct kit kit; };
 _Static_assert(sizeof(struct kit_entry) == 84, "kit table entry");
 static struct kit_entry table[KIT_MAX];
-SONG_SMALL static unsigned load(const struct song_pool *p)
+/* The table's kit count, 0 when there is none, or -1 when it is there but
+ * damaged: its CRC, or a count that doesn't match its length. */
+SONG_SMALL static int load_table(const struct song_pool *p)
 {
     const struct pool_extent *e = pool_find(p, POOL_KIT, 1);
     uint8_t n = 0;
-    if (!e || p->flash->read(pool_address(e), &n, 1) || n > KIT_MAX || e->length != 1U + n * sizeof table[0] ||
-        p->flash->read(pool_address(e) + 1U, table, n * sizeof table[0])) return 0;
+    if (!e) return 0;
+    if (pool_check(p, e) || p->flash->read(pool_address(e), &n, 1) || n > KIT_MAX || e->length != 1U + n * sizeof table[0] ||
+        p->flash->read(pool_address(e) + 1U, table, n * sizeof table[0])) return -1;
     return n;
 }
+SONG_SMALL static unsigned load(const struct song_pool *p) { int n = load_table(p); return n > 0 ? (unsigned)n : 0U; }
 SONG_SMALL static int store(struct song_pool *p, unsigned n)
 {
     struct pool_writer w;
@@ -126,6 +130,12 @@ SONG_SMALL int kit_delete(struct song_pool *p, unsigned id)
 }
 SONG_SMALL unsigned kit_tidy(struct song_pool *p, const char *name)
 {
+    /* A damaged table, or samples with no table at all: the library doesn't
+     * read whole, so nothing here can be sure a sample is unused. Leave it. */
+    int kits = load_table(p);
+    for (unsigned i = 0; !kits && i < p->count; ++i)
+        if (p->extent[i].type == POOL_SAMPLE) kits = -1;
+    if (kits < 0) return 0;
     unsigned made = 0;
     const uint8_t *base;
     const struct bank_header *h = legacy(p, &base);

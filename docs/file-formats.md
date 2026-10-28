@@ -7,7 +7,8 @@ start `0xFFFFFFFF`, final inversion), the same as the device's `pool_crc` and th
 
 Code: `app/song/song_file.c` (the payload on the device), `app/song/song_transfer.c` (the commands),
 `web/workbench/` (the codecs, MIDI and the workbench sections), with tests in `tests/workbench_test.mjs`,
-`tests/test_clips.c`, `tests/preview_5b.mjs` and `tests/preview_7.mjs`.
+`tests/test_clips.c`, `tests/test_corrupt.c` (damaged songs and pool), `tests/preview_5b.mjs` and
+`tests/preview_7.mjs`.
 
 ## Song file (`.fm1song`)
 

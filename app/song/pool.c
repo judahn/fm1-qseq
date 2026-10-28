@@ -76,7 +76,9 @@ SONG_SMALL unsigned pool_scan(struct song_pool *p, const struct song_flash *flas
     for (unsigned s = first; s < p->end;) {
         struct pool_header h;
         if (skipped(p, s) || flash->read(s * POOL_SECTOR, &h, sizeof h)) { ++s; continue; }
-        unsigned n = pool_sectors(h.length);
+        /* A length past the pool counts no sectors, so it never fits: near
+         * 4 GB the sector count would wrap and look small. */
+        unsigned n = h.length < POOL_MAX_SECTORS * POOL_SECTOR ? pool_sectors(h.length) : 0;
         if (h.magic == POOL_MAGIC && h.version == POOL_VERSION && !h.commit && h.header_crc == pool_header_crc(&h) &&
             h.type >= POOL_SONG && h.type < POOL_LEGACY && fits(p, s, n)) {
             const struct pool_extent e = {(uint16_t)s, (uint16_t)n, h.id, h.type, h.generation, h.length};
