@@ -4,6 +4,7 @@
 # build scripts inside a linux/amd64 container with the JieLi Linux toolchain.
 #   ./build.sh              Build firmware
 #   ./build.sh --web        Build browser preview
+#   ./build.sh --preview    Build a local browser preview (no source URL needed)
 #   ./build.sh --package    Build firmware and complete workbench
 #   ./build.sh --firmware   Build firmware and an installable .fwsc package
 # Requires Docker (running), the JieLi Linux toolchain (default ~/.jieli/toolchain,
@@ -15,7 +16,7 @@ JIELI="${FM1_LINUX_TOOLCHAIN:-$HOME/.jieli/toolchain}"
 
 case "${1:-}" in
 --help)
-    sed -n '4,9p' "$0"
+    sed -n '4,10p' "$0"
     exit 0
     ;;
 esac
@@ -41,10 +42,11 @@ run() {
 case "${1:-}" in
 "") run pwsh -NoProfile -File /src/sdk/Build.ps1 ;;
 --web) run pwsh -NoProfile -File /src/tools/Build-Web.ps1 ;;
+--preview) run pwsh -NoProfile -File /src/tools/Build-Web.ps1 -LocalPreview ;;
 --package) run pwsh -NoProfile -File /src/sdk/Build.ps1 -Package ;;
 --firmware) run pwsh -NoProfile -File /src/sdk/Build.ps1 -FirmwareOnly ;;
 *)
-    echo "Use build.sh, build.sh --web, build.sh --firmware or build.sh --package."
+    echo "Use build.sh, build.sh --web, build.sh --preview, build.sh --firmware or build.sh --package."
     exit 2
     ;;
 esac
