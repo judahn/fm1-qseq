@@ -17,11 +17,41 @@ enum { EDGE_TEMPO, EDGE_END, EDGE_LOOP, EDGE_JUMP, CLICK = 37 /* rim */ };
 #define QUIET(p, t, e) ((t) == (p)->mute_track && !((e)->at & SONG_FRESH) && \
     song_event_start(e) >= (p)->mute_from && song_event_start(e) < (p)->mute_to)
 #define PLAY(p, t, e, at) play(p, t, e, at)
-/* A track plays the song unless it is on a clip or stopped, and while a
- * clip is open in the editor only its track plays, the clip being in its part. */
+/* A track plays the song unless it is on a clip or stopped. The clip open
+ * in the editor plays on its track, in its part, while the song plays on. */
 SONG_SMALL static int on_song(const struct song_player *p, unsigned t)
 {
-    return t == song_editing(p->song) || (p->from[t] == SONG_FROM_SONG && !p->song->open);
+    return t != song_editing(p->song) && p->from[t] == SONG_FROM_SONG;
+}
+/* The song's clock, playing or stopped. */
+SONG_SMALL static uint32_t timeline(const struct song_player *p)
+{
+    const struct song *s = p->song;
+    if (!p->playing) return s->open ? p->song_at : p->playhead;
+    unsigned k = p->segment;
+    return s->tempo[k].clock + (uint32_t)((p->pos - s->tempo_units[k]) / SONG_UNITS_PER_CLOCK);
+}
+/* A song clock as the editor sees it: inside the open clip, its pass. */
+SONG_SMALL static uint32_t view(const struct song_player *p, uint32_t clock)
+{
+    const struct song *s = p->song;
+    if (!s->open) return clock;
+    uint32_t length = s->clip_length[s->open - SONG_TRACKS], at = clock + p->shift - p->edit_base;
+    return length && (int32_t)at > 0 ? at % length : 0;
+}
+/* The song's end and loop, whatever the editor shows (the open clip's loop
+ * waits in loop_*, the song's in kept_*). A performance take runs on past
+ * both. */
+SONG_SMALL static uint32_t timeline_end(const struct song_player *p)
+{
+    return p->perf == 2 ? NEVER : song_bar_clock(p->song, p->song->bars);
+}
+SONG_SMALL static unsigned song_loop(const struct song_player *p, uint32_t *start, uint32_t *end)
+{
+    const struct song *s = p->song;
+    *start = s->open ? s->kept_start : s->loop_start;
+    *end = s->open ? s->kept_end : s->loop_end;
+    return p->perf != 2 && (s->open ? s->kept_on : s->loop_on) && *start < *end;
 }
 #else
 #define PLAY(p, t, e, at) do { if (song_event_kind(e) == SONG_NOTE) note_on(p, t, e, at); } while (0)
@@ -127,7 +157,7 @@ SONG_SMALL static void relocate(struct song_player *p, uint32_t clock, uint64_t 
     unsigned k = song_tempo_at(s, clock);
 #if SONG_UI
     for (unsigned t = 0; t < SONG_TRACKS; ++t) /* swung past an edge: dropped. Clips play on */
-        if (on_song(p, t)) { p->cursor[t] = (uint16_t)song_find(s, t, clock); p->late_count[t] = p->hits[t] = 0; }
+        if (on_song(p, t)) { song_place(p, t, clock); p->hits[t] = 0; }
 #else
     for (unsigned t = 0; t < SONG_TRACKS; ++t) p->cursor[t] = (uint16_t)song_find(s, t, clock);
     memset(p->late_count, 0, sizeof p->late_count); /* swung past an edge: dropped */
@@ -148,7 +178,7 @@ SONG_SMALL static void relocate(struct song_player *p, uint32_t clock, uint64_t 
 #if SONG_UI
     click_off(p);
     p->click_next = next_beat(s, clock);
-    song_player_chase(p, clock);
+    for (unsigned t = 0; t < SONG_TRACKS; ++t) chase_track(p, t, clock);
 #endif
 }
 SONG_SMALL static uint32_t bar_after(const struct song *s, uint32_t clock)
@@ -172,29 +202,51 @@ SONG_SMALL void song_player_init(struct song_player *p, struct song *s, const st
     p->stut_at = NEVER;
     memset(p->from, SONG_FROM_SONG, sizeof p->from);
     memset(p->waiting, SONG_FROM_NONE, sizeof p->waiting);
+    memset(p->blk, SONG_FROM_NONE, sizeof p->blk);
 #endif
 }
+#if SONG_UI
+/* From the song's place. With a clip open the playhead is in the clip, and
+ * its pass starts so the clip is there as the song starts. */
+SONG_SMALL void song_player_start(struct song_player *p, uint64_t frame)
+{
+    const struct song *s = p->song;
+    if (p->playing) return;
+    uint32_t from = timeline(p), length = s->open ? s->clip_length[s->open - SONG_TRACKS] : 0;
+    if (from >= song_bar_clock(s, s->bars)) from = 0;
+    if (p->playhead >= (s->open ? length : song_end(s))) p->playhead = s->open ? 0 : from;
+    p->stut_at = NEVER;
+    p->next = from; /* the transport starts at the song's place */
+    p->shift = s->open ? p->playhead : 0;
+    p->edit_base = from;
+    p->jumping = 0;
+    if (p->perf) p->perf = 2; /* PLAY starts an armed performance take */
+    relocate(p, from, 0, 0);
+    if (s->open) refind(p, song_editing(s), from + p->shift);
+    p->frame = frame;
+    p->playing = 1;
+    p->pre_left = 0;
+}
+#else
 SONG_SMALL void song_player_start(struct song_player *p, uint64_t frame)
 {
     if (p->playing) return;
     if (p->playhead >= song_end(p->song)) p->playhead = 0;
-#if SONG_UI
-    p->stut_at = NEVER;
-    p->next = p->playhead; /* the transport starts at the playhead */
-    p->shift = 0;
-#endif
     relocate(p, p->playhead, 0, 0);
     p->frame = frame;
     p->playing = 1;
     p->jumping = 0;
-#if SONG_UI
-    p->pre_left = 0;
-#endif
 }
+#endif
 SONG_SMALL void song_player_stop(struct song_player *p)
 {
     if (!p->playing) return;
+#if SONG_UI
+    p->song_at = timeline(p);
+    p->playhead = view(p, p->song_at);
+#else
     p->playhead = song_player_clock(p);
+#endif
     all_off(p);
     p->playing = p->jumping = 0;
 #if SONG_UI
@@ -214,6 +266,9 @@ SONG_SMALL void song_player_jump(struct song_player *p, uint32_t clock)
     p->jumping = 1;
     p->jump_at = bar_after(p->song, p->next);
 }
+#if SONG_UI
+SONG_SMALL uint32_t song_player_clock(const struct song_player *p) { return p->playing ? view(p, timeline(p)) : p->playhead; }
+#else
 SONG_SMALL uint32_t song_player_clock(const struct song_player *p)
 {
     if (!p->playing) return p->playhead;
@@ -221,12 +276,17 @@ SONG_SMALL uint32_t song_player_clock(const struct song_player *p)
     unsigned k = p->segment;
     return s->tempo[k].clock + (uint32_t)((p->pos - s->tempo_units[k]) / SONG_UNITS_PER_CLOCK);
 }
+#endif
 SONG_SMALL int song_player_set_tempo(struct song_player *p, uint32_t clock, unsigned bpm100)
 {
     struct song *s = p->song;
     if (!p->playing) return song_set_tempo(s, clock, bpm100);
     /* Keep the current clock and the time already spent inside it. */
+#if SONG_UI
+    uint32_t at = timeline(p), rate = song_rate(s->tempo[p->segment].bpm100);
+#else
     uint32_t at = song_player_clock(p), rate = song_rate(s->tempo[p->segment].bpm100);
+#endif
     uint64_t inside = p->pos - song_units(s, p->segment, at);
     if (song_set_tempo(s, clock, bpm100)) return -1;
     p->segment = (uint8_t)song_tempo_at(s, at);
@@ -236,7 +296,11 @@ SONG_SMALL int song_player_set_tempo(struct song_player *p, uint32_t clock, unsi
 SONG_SMALL uint32_t song_player_target(const struct song_player *p)
 {
     if (!p->playing) return p->playhead;
+#if SONG_UI
+    return p->jumping ? p->jump : view(p, bar_after(p->song, p->next));
+#else
     return p->jumping ? p->jump : bar_after(p->song, p->next);
+#endif
 }
 
 SONG_SMALL void song_player_advance(struct song_player *p, uint64_t frame)
@@ -259,6 +323,14 @@ SONG_SMALL void song_player_advance(struct song_player *p, uint64_t frame)
     while (p->playing && p->frame <= frame) {
         const struct song *s = p->song;
         unsigned k = p->segment, kind = EDGE_END;
+#if SONG_UI
+        uint32_t rate = song_rate(s->tempo[k].bpm100), edge = NEVER, end = timeline_end(p), loop_start, loop_end;
+        uint64_t target = p->pos + (frame - p->frame) * rate;
+        if (k + 1U < s->tempos) { edge = s->tempo[k + 1].clock; kind = EDGE_TEMPO; }
+        if (end <= edge) { edge = end; kind = EDGE_END; }
+        if (song_loop(p, &loop_start, &loop_end) && p->next <= loop_end && loop_end <= edge) { edge = loop_end; kind = EDGE_LOOP; }
+        if (p->jumping && !s->open && p->jump_at <= edge) { edge = p->jump_at; kind = EDGE_JUMP; } /* the open clip's own */
+#else
         uint32_t rate = song_rate(s->tempo[k].bpm100), edge = NEVER, end = song_end(s);
         uint64_t target = p->pos + (frame - p->frame) * rate;
         /* The nearest edge ahead. On a tie the later kind wins. */
@@ -269,6 +341,7 @@ SONG_SMALL void song_player_advance(struct song_player *p, uint64_t frame)
             kind = EDGE_LOOP;
         }
         if (p->jumping && p->jump_at <= edge) { edge = p->jump_at; kind = EDGE_JUMP; }
+#endif
         uint64_t at = edge > s->tempo[k].clock ? song_units(s, k, edge) : s->tempo_units[k];
         if (target <= at) {
             /* No edge yet: emit every clock that starts before target. */
@@ -294,7 +367,7 @@ SONG_SMALL void song_player_advance(struct song_player *p, uint64_t frame)
             return;
         }
         for (unsigned t = 0; t < SONG_TRACKS; ++t) if (on_song(p, t)) song_player_cut(p, t);
-        relocate(p, kind == EDGE_JUMP ? p->jump : kind == EDGE_END ? 0 : s->loop_start, now - at, rate);
+        relocate(p, kind == EDGE_JUMP ? p->jump : kind == EDGE_END ? 0 : loop_start, now - at, rate);
 #else
         all_off(p);
         if (kind == EDGE_END) {

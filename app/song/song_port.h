@@ -57,6 +57,21 @@ void song_port_resume(const struct song_place *place, uint32_t state);
 void song_port_launch(unsigned track, unsigned to);
 int song_port_clip_open(unsigned cell);
 void song_port_clip_close(void);
+/* REC while playing in an open clip: loop recording into it from its next
+ * pass, the rest playing on. Armed until then. Ending it with keep_playing
+ * leaves playback going. */
+int song_port_record_clip(void);
+unsigned song_port_clip_armed(void);
+void song_port_record_end(unsigned keep_playing);
+/* Recording a performance in the grid (song_perf.c): REC arms it, and the
+ * take starts with the next launch or PLAY. Each launch writes its track a
+ * block from its launch point to the track's next launch, stop or return
+ * to the song. Stopping playback, or REC again, ends the take, one undo
+ * step. State: 0 off, 1 armed, 2 taking. */
+int song_perf_arm(void);
+void song_perf_end(void);
+void song_perf_poll(void);
+unsigned song_perf_state(void);
 /* K1 to K4 while recording (song_knobs.c): each drives a lane on the take
  * track, chosen per track (lanes.h), recorded in touch style. */
 unsigned song_port_engine(unsigned track);

@@ -10,7 +10,7 @@
 
 enum { JOB_QUANTIZE, JOB_VELOCITY, JOB_CRESCENDO, JOB_GATE, JOB_TRANSPOSE, JOB_FIT, JOB_SHIFT, JOB_SORT, JOB_STRUM,
        JOB_PASTE, JOB_ERASE, JOB_EXTRACT, JOB_RAMP, JOB_THIN, JOB_STRETCH, JOB_COPY, JOB_MERGE, JOB_CLEAR, JOB_NORMALIZE,
-       SONG_JOBS };
+       JOB_EXPAND, SONG_JOBS };
 enum { V_NUM, V_SIGNED, V_PCT, V_GRID, V_OFFON, V_RANGE, V_VMODE, V_GMODE, V_STEPS, V_NOTE, V_ORDER, V_TYPE, V_TRACK,
        V_LANE, V_SPACE, V_WHAT };
 /* Settings are kept once and jobs list them by number. */
@@ -50,6 +50,7 @@ static const struct song_job_def song_jobs[SONG_JOBS] = {
     {"MERGE TRACKS", "ONE TRACK INTO ANOTHER", 2, {P_FROM2, P_INTO}},
     {"CLEAR TRACK", "EVERY EVENT OF THE TRACKS GOES", 0, {0}},
     {"NORMALIZE", "SWING, HUMANIZE, GLITCH INTO NOTES", 0, {0}},
+    {"EXPAND CLIPS", "CLIP BLOCKS INTO PLAIN NOTES", 1, {P_RANGE}},
 };
 static const struct song_job_param *song_job_param(unsigned job, unsigned p) { return &song_job_params[song_jobs[job].p[p]]; }
 static unsigned song_job, song_job_page, song_job_ready;

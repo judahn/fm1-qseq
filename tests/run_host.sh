@@ -9,7 +9,7 @@ OUT="$ROOT/build/host-tests"
 CC="${CC:-cc}"
 mkdir -p "$OUT"
 # The model and player. The glue, delivery and diagnostics need the instrument.
-SOURCES=$(ls "$ROOT"/app/song/*.c | grep -vE '/(song_port|song_deliver|song_knobs|song_store|song_transfer|diag)\.c$')
+SOURCES=$(ls "$ROOT"/app/song/*.c | grep -vE '/(song_port|song_deliver|song_knobs|song_store|song_transfer|song_perf|diag)\.c$')
 FLAGS="-DSONG_UI=1 -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fwrapv -fsanitize=address,undefined -fno-sanitize-recover=all"
 status=0
 for test in "$ROOT"/tests/test_*.c; do

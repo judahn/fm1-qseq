@@ -15,7 +15,9 @@
 static struct song_undo undo;
 static struct song_clip clip;
 static struct song_recorder recorder;
-static uint8_t loop_before;
+static uint8_t loop_before, clip_armed, clip_live; /* REC in an open clip: waiting for its next pass, taking while playing */
+static uint32_t clip_last;
+SONG_SMALL static void clip_take(void);
 static uint64_t first_frame; /* the take's first beat, after any count-in */
 #endif
 
@@ -122,6 +124,8 @@ SONG_SMALL void song_port_poll(void)
     song_diag_poll(song_port_ticks(), fm1_millis(), song_port_blocks());
     song_deliver_poll();
 #if SONG_UI
+    clip_take();
+    song_perf_poll();
     if (recorder.active && !player.playing) song_port_record_stop(); /* the song ended */
     else if (recorder.active && live_clock() >= 0) {
         uint32_t clock = (uint32_t)live_clock();
@@ -159,11 +163,9 @@ struct song_undo *song_port_undo(void) { ensure(); return &undo; }
 struct song_clip *song_port_clip(void) { return &clip; }
 struct song_recorder *song_port_recorder(void) { ensure(); return &recorder; }
 
-/* Clips. Opening one while playing: it plays at once, in step with the bar
- * the song is in. Closing picks the song up at the bar it left, in step
- * with the clip's bar, or stopped, at its playhead. The track and the
- * tracks on the song stop sounding first. */
-static uint32_t left_at, kept_playhead;
+/* Clips. Opening one while playing: it plays at once on its track, in step
+ * with the bar the song is in, and the song plays on. Closing gives the
+ * track back to what it played. */
 SONG_SMALL void song_port_launch(unsigned track, unsigned to)
 {
     uint32_t state = song_port_lock();
@@ -172,17 +174,11 @@ SONG_SMALL void song_port_launch(unsigned track, unsigned to)
 }
 SONG_SMALL int song_port_clip_open(unsigned cell)
 {
-    uint32_t state = song_port_lock(), at = player.playing ? player.next : player.playhead, start;
-    unsigned edit = cell / SONG_GRID_ROWS;
-    song_bar_at(&song, at, &start, NULL);
+    uint32_t state = song_port_lock();
     int r = song_clip_open(&song, cell);
     if (!r) {
-        for (unsigned t = 0; t < SONG_TRACKS; ++t)
-            if (player.from[t] == SONG_FROM_SONG || t == edit) song_player_cut(&player, t);
-        player.waiting[edit] = SONG_FROM_NONE;
-        left_at = start;
-        kept_playhead = player.playhead;
-        song_player_seek(&player, player.playing ? (at - start) % song.clip_length[cell] : 0);
+        player.waiting[cell / SONG_GRID_ROWS] = SONG_FROM_NONE;
+        song_player_edit(&player, cell / SONG_GRID_ROWS, 1);
     }
     song_port_unlock(state);
     return r;
@@ -190,17 +186,41 @@ SONG_SMALL int song_port_clip_open(unsigned cell)
 SONG_SMALL void song_port_clip_close(void)
 {
     if (!song.open) return;
-    uint32_t state = song_port_lock(), at = player.next, start;
-    song_bar_at(&song, at, &start, NULL);
-    song_player_cut(&player, song_editing(&song));
+    uint32_t state = song_port_lock();
+    unsigned t = song_editing(&song);
+    clip_armed = 0;
     song_clip_close(&song);
-    song_player_seek(&player, player.playing ? left_at + at - start : kept_playhead);
+    song_player_edit(&player, t, 0);
     song_port_unlock(state);
 }
+/* REC while playing with a clip open: loop recording into it from its next
+ * pass, while everything else plays on. Armed until the clip goes round. */
+SONG_SMALL int song_port_record_clip(void)
+{
+    if (!song.open || !player.playing || recorder.active) return -1;
+    clip_armed = 1;
+    clip_last = song_player_clock(&player);
+    return 0;
+}
+SONG_SMALL static void clip_take(void)
+{
+    if (!clip_armed) return;
+    uint32_t now = song_player_clock(&player);
+    if (!song.open || !player.playing) { clip_armed = 0; return; }
+    if (now >= clip_last) { clip_last = now; return; }
+    clip_armed = 0;
+    song_undo_begin(&undo, &song);
+    loop_before = song.loop_on;
+    song_rec_start(&recorder, &song, song_editing(&song), SONG_REC_LOOP, 0);
+    first_frame = 0; /* keys count from here */
+    clip_live = 1;
+}
+unsigned song_port_clip_armed(void) { return clip_armed; }
 
 /* Live keys on the take track, at the clock playing now. */
 SONG_SMALL void song_port_key(const uint8_t *m, size_t bytes)
 {
+    clip_take(); /* a key at the top of the clip's next pass starts its take */
     int64_t clock = live_clock();
     if (!recorder.active || bytes != 3 || (m[0] & 0xe0U) != 0x80U || clock < 0 ||
         (m[0] & 15U) != groove_midi_input_channel(recorder.track)) return;
@@ -229,14 +249,17 @@ SONG_SMALL int song_port_record(unsigned mode, unsigned track)
     first_frame = song.count_in ? player.frame : now; /* in the count-in the player waits at the first beat */
     return 0;
 }
-SONG_SMALL void song_port_record_stop(void)
+SONG_SMALL void song_port_record_stop(void) { song_port_record_end(0); }
+SONG_SMALL void song_port_record_end(unsigned keep_playing)
 {
-    if (!recorder.active) return;
+    clip_armed = 0;
+    if (!recorder.active) { if (!keep_playing) song_port_stop(); return; }
     song_stutter_release(); /* a stutter still held goes on the FX lane */
     int64_t now = live_clock();
     uint32_t clock = player.playing && now >= 0 ? (uint32_t)now : recorder.last;
     song_knobs_release(clock); /* before the chase on stop */
-    song_port_stop();
+    if (!keep_playing || !clip_live) song_port_stop();
+    clip_live = 0;
     song_rec_stop(&recorder, clock);
     player.mute_track = 0xff;
     player.click = song.metronome == 1;

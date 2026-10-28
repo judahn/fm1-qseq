@@ -62,6 +62,20 @@ static inline unsigned song_event_kind(const struct song_event *e) { return e->a
 static inline unsigned song_event_glitch(const struct song_event *e) { return e->at >> SONG_GLITCH_SHIFT & 31U; }
 static inline int song_is_note(const struct song_event *e) { return song_event_kind(e) == SONG_NOTE; }
 
+/* A clip block (design 8f, blocks.h) is an FX event in a track's own part
+ * with bit 7 of `a` set: the clip's row in the low bits, or all set for a
+ * stop, and a 24-bit length whose bits 16 to 23 are in `b`. The FX lane's
+ * stutters (glitch.h) keep `a` below 0x80. */
+enum { SONG_BLOCK = 0x80, SONG_BLOCK_STOP = 0xff };
+static inline int song_is_block(const struct song_event *e) { return song_event_kind(e) == SONG_FX && (e->a & SONG_BLOCK); }
+static inline int song_is_stutter(const struct song_event *e) { return song_event_kind(e) == SONG_FX && !(e->a & SONG_BLOCK); }
+static inline uint32_t song_block_length(const struct song_event *e) { return e->length | (uint32_t)e->b << 16; }
+static inline void song_block_resize(struct song_event *e, uint32_t length)
+{
+    e->length = (uint16_t)length;
+    e->b = (uint8_t)(length >> 16);
+}
+
 struct song_tempo { uint32_t clock; uint16_t bpm100; };
 struct song_meter { uint16_t bar; uint8_t beats, unit; }; /* from bar (0-based), beats/unit */
 struct song_marker { uint32_t clock; char name[SONG_MARKER_NAME]; };

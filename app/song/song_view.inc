@@ -148,6 +148,18 @@ static void song_row(const struct song *s, unsigned t)
     const struct song_event *e = song_track(s, t, &count);
     if (s->open && t != song_editing(s)) count = 0; /* only the open clip's row */
     uint16_t color = frame_views[t].audible ? colors[t] : DIM;
+    for (unsigned i = 0; i < count && !s->open; ++i) { /* clip blocks, shaded and numbered, under the notes */
+        uint32_t at = song_event_start(&e[i]), stop = at + song_block_length(&e[i]);
+        if (at >= end) break;
+        if (!song_is_block(&e[i]) || stop <= song_window) continue;
+        unsigned x = song_x(at), w = song_x(stop) - x, stopped = e[i].a == SONG_BLOCK_STOP;
+        uint16_t shade = stopped ? PANEL : (uint16_t)(colors[t] >> 1 & 0x7befU);
+        paint_fill(x, y, w > 1 ? w - 1U : 1U, SONG_ROW - 2, shade);
+        if (song_visible(at) && w > 9) {
+            if (stopped) text(x + 2, y + 1, "X", 1, DIM, shade);
+            else number(x + 2, y + 1, (e[i].a & (SONG_GRID_ROWS - 1U)) + 1, 1, 1, BACK, shade);
+        }
+    }
     for (unsigned i = first > 32 ? first - 32 : 0; i < count; ++i) {
         uint32_t at = song_event_start(&e[i]);
         if (at >= end) break;
@@ -177,7 +189,8 @@ static void song_draw(void)
     song_footer(s, "MARKER");
     song_notice_expire();
     char selection[40], part[12];
-    if (song_now.recording) {
+    if (song_port_clip_armed()) strcpy(selection, "REC FROM THE CLIP'S NEXT PASS");
+    else if (song_now.recording) {
         strcpy(selection, "REC ");
         strcat(selection, song_rec_modes[song_port_recorder()->mode]);
         strcat(selection, "  PLAY OR REC STOPS");

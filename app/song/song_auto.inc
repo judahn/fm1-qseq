@@ -109,7 +109,7 @@ static void song_auto_conductor_row(const struct song *s)
     const struct song_event *e = song_track(s, 0, &count);
     for (unsigned i = 0; i < count && song_event_start(&e[i]) < end; ++i) {
         uint32_t at = song_event_start(&e[i]);
-        if (song_event_kind(&e[i]) != SONG_FX || at + e[i].length <= song_window) continue;
+        if (!song_is_stutter(&e[i]) || at + e[i].length <= song_window) continue;
         unsigned x1 = at > song_window ? song_x(at) : SONG_X, x2 = song_x(at + e[i].length < end ? at + e[i].length : end);
         paint_fill(x1, AUTO_C + AUTO_CH - 3, x2 > x1 + 1 ? x2 - x1 : 2, 3, song_auto_mode == 2 ? 0xf81fU : DIM);
     }

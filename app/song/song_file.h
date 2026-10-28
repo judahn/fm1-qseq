@@ -11,9 +11,10 @@
  *   the glitch entries in use, humanize and seed, then per track its
  *   event count and events at 8 bytes each (the FX lane among track 1's).
  *   Version 2 (phase 7) adds the launch quantize, the row names in use and
- *   the clips: cell, length, event count and events. Version 1 still loads,
- *   with an empty grid. */
-enum { SONG_FILE_VERSION = 2 };
+ *   the clips: cell, length, event count and events. Version 3 lets the
+ *   tracks hold clip blocks (blocks.h), the layout unchanged. Versions 1 and
+ *   2 still load, with no blocks, and version 1 with an empty grid. */
+enum { SONG_FILE_VERSION = 3 };
 /* Streams the song into a writer, or with a writer that has no pool,
  * just counts it and takes its CRC. */
 void song_file_write(struct pool_writer *w, const struct song *s, const uint8_t *sounds, uint32_t sounds_bytes);

@@ -203,7 +203,7 @@ static void test_file(void)
     data = write_song(&song, &length);
     CHECK(data != NULL);
     memcpy(first, data, length);
-    CHECK_EQ(first[0], 2);
+    CHECK_EQ(first[0], 3);
     song_clip_open(&song, cells[1]);                       /* open in the editor: the same bytes */
     data = write_song(&song, &bytes);
     CHECK(bytes == length && !memcmp(data, first, length));
@@ -225,7 +225,7 @@ static void test_file(void)
     CHECK(other.launch_q == 2 && other.events == 8 && consistent(&other));
     for (unsigned c = 0; c < SONG_CELLS; ++c) CHECK_EQ(other.clip_length[c], 0);
     CHECK_EQ(song_file_check(first, length, &block, &n), -1); /* version 1 with the grid's bytes after */
-    first[0] = 3;
+    first[0] = 4;
     CHECK_EQ(song_file_check(first, length, &block, &n), -1);
     /* Cells out of order, and a clip with no length, are refused. */
     song.clip_length[song_cell(1, 0)] = 480;

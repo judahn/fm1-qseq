@@ -10,8 +10,8 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../web/workbench');
-for (const name of ['bytes', 'song_file', 'kit_file', 'midi_file', 'song_midi', 'wav', 'link']) require(path.join(dir, name + '.js'));
-const { bytes: B, songFile: S, kitFile: K, midiFile: M, songMidi: SM, wav: W, link: L } = globalThis.FM1SongWorkbench;
+for (const name of ['bytes', 'song_file', 'song_clips', 'kit_file', 'midi_file', 'song_midi', 'wav', 'link']) require(path.join(dir, name + '.js'));
+const { bytes: B, songFile: S, songClips: SC, kitFile: K, midiFile: M, songMidi: SM, wav: W, link: L } = globalThis.FM1SongWorkbench;
 
 let checks = 0, failed = 0;
 const check = (ok, what) => { checks++; if (!ok) { failed++; console.log('FAIL', what); } };
@@ -64,6 +64,7 @@ check(S.barClock(song(), 2) === 3840 && S.barClock(song(), 4) === 3840 + 2 * 168
 // header carries the payload's version, and version 1 payloads and files still read and write
 // back byte for byte, with an empty grid.
 const withClips = song();
+withClips.version = 2;
 withClips.launchQ = 4;
 withClips.rows = [{ row: 0, name: S.markerField('VERSE') }, { row: 15, name: S.markerField('OUTRO') }];
 withClips.clips = [{ cell: 3, length: 1920, events: [S.event(0, S.KIND.NOTE, 60, 100, 240), S.event(960, S.KIND.CONTROL, 74, 9, 0)] },
@@ -87,9 +88,62 @@ const noLength = song(); noLength.clips = [{ cell: 9, length: 0, events: [] }];
 throws(() => S.decode(S.encode(noLength)), 'a clip with no length is refused');
 const tooMany = song(); tooMany.clips = [{ cell: 0, length: 480, events: Array.from({ length: 4096 }, (_, i) => S.event(i, S.KIND.NOTE, 60, 1, 1)) }];
 throws(() => S.decode(S.encode(tooMany)), 'clips over the event pool are refused');
-const future = payload2.slice(); future[0] = 3;
+const future = payload2.slice(); future[0] = 4;
 throws(() => S.decode(future), 'a newer version is refused');
 check(SM.exportMidi(withClips).skipped.clips === 2, 'MIDI export reports the clips it leaves out');
+
+// Version 3 (phase 7b): clip blocks on the tracks round trip, and are refused in a version 2
+// payload or inside a clip. Expand (song_clips.js) makes what the device's Expand job does: the
+// clip pass after pass from the block's start, cut off at its end, the track's own events inside
+// gone, and the controllers set at its edges. MIDI export expands every block.
+const byClock = (a, b) => S.clockOf(a) - S.clockOf(b);
+const withBlocks = song();
+withBlocks.clips = [{ cell: 2, length: 960, events: [S.event(0, S.KIND.NOTE, 72, 100, 100), S.event(240, S.KIND.CONTROL, 74, 50, 0),
+  S.event(480, S.KIND.NOTE, 74, 100, 700), S.event(1200, S.KIND.NOTE, 99, 100, 10)] }];
+withBlocks.tracks[0] = withBlocks.tracks[0].concat([S.block(1920, 2400, 2)]).sort(byClock);
+withBlocks.tracks[3] = [S.event(0, S.KIND.NOTE, 40, 100, 3000), S.block(960, 960, 15), S.block(2880, 100000, 16)];
+const payload3 = S.encode(withBlocks), back3 = S.decode(payload3);
+check(payload3[0] === 3 && B.same(S.encode(back3), payload3) && back3.tracks[0].filter(S.isBlock).length === 1 &&
+  S.blockLength(back3.tracks[3][2]) === 100000 && back3.tracks[3][2].a === 0xff, 'version 3 keeps the blocks, long ones and stops');
+throws(() => S.decode(S.encode({ ...withBlocks, version: 2 })), 'a block in a version 2 payload is refused');
+const blockInClip = song(); blockInClip.clips = [{ cell: 1, length: 480, events: [S.block(0, 480, 0)] }];
+throws(() => S.decode(S.encode(blockInClip)), 'a block inside a clip is refused');
+const badRow = song(); badRow.tracks[1] = [{ ...S.block(0, 480, 0), a: 0x90 }];
+throws(() => S.decode(S.encode(badRow)), 'a block past the grid is refused');
+const expanded = SC.expand(withBlocks), t0 = expanded.tracks[0], at = (list, pitch) => list.filter(e => S.kindOf(e) === S.KIND.NOTE && e.a === pitch).map(S.clockOf);
+check(!expanded.tracks.flat().some(S.isBlock), 'expand leaves no blocks');
+check(same(at(t0, 72), [1920, 2880, 3840]) && same(at(t0, 74), [2400, 3360]) && !at(t0, 99).length, 'expand: the clip pass by pass, cut at the end');
+check(!t0.some(e => S.kindOf(e) === S.KIND.PROGRAM && S.clockOf(e) === 1920), 'expand: the track\'s own events inside go');
+check(same(t0.filter(e => S.kindOf(e) === S.KIND.CONTROL && e.a === 74).map(e => [S.clockOf(e), e.b]), [[1920, 50], [2160, 50], [3120, 50], [4080, 50]]),
+  'expand: the clip\'s controller from its start, then each pass');
+check(t0.some(e => S.kindOf(e) === S.KIND.CONTROL && e.a === 7 && e.b === 100 && S.clockOf(e) === 4320), 'expand: the track\'s controller back at the end');
+check(t0.some(e => S.kindOf(e) === S.KIND.FX), 'expand: the FX lane stays');
+const t3 = expanded.tracks[3];
+check(t3.length === 1 && t3[0].length === 960, 'expand: a note sounding into a block ends where it starts, a stop leaves nothing');
+const blockMidi = SM.exportMidi(withBlocks), midiBack = M.read(blockMidi.bytes);
+const onsAt = (track, pitch) => midiBack.tracks[track].filter(e => e.status === 0x90 && e.data[0] === pitch && e.data[1]).map(e => e.tick);
+check(blockMidi.skipped.blocks === 3 && same(onsAt(1, 74), [2400, 3360]) && same(onsAt(1, 72), [1920, 2880, 3840]), 'MIDI export expands the blocks');
+check(same(SC.list(withClips).map(c => [c.cell, c.track, c.row, c.length, c.events, c.name]), [[3, 0, 3, 1920, 2, ''], [127, 7, 15, 960, 0, 'OUTRO']]),
+  'the clips of a song, listed');
+// A clip copied into another song: replacing the cell there, glitch moved to that song's table.
+const source = song();
+source.glitch = [{ index: 2, word: 0x123 }];
+source.clips = [{ cell: 5, length: 480, events: [S.event(0, S.KIND.NOTE, 60, 100, 100), { ...S.event(240, S.KIND.NOTE, 62, 100, 100), at: (240 | 2 << 26) >>> 0 }] }];
+const target = song();
+target.glitch = [{ index: 1, word: 0x77 }, { index: 5, word: 0x123 }];
+target.clips = [{ cell: 9, length: 960, events: [] }];
+const copied = SC.copy(source, 5, target, 9);
+const clip9 = copied.song.clips.find(c => c.cell === 9);
+check(copied.song.clips.length === 1 && clip9.length === 480 && clip9.events.length === 2 && S.glitchOf(clip9.events[1]) === 5 &&
+  !copied.dropped, 'a clip copied into another song, its glitch found there');
+check(B.same(S.encode(S.decode(S.encode(copied.song))), S.encode(copied.song)), 'the song with the copied clip saves');
+const full = song(); full.glitch = Array.from({ length: 31 }, (_, i) => ({ index: i + 1, word: 0x1000 + i }));
+const crowded = SC.copy(source, 5, full, 0);
+check(crowded.dropped === 1 && S.glitchOf(crowded.song.clips[0].events[1]) === 0, 'a full glitch table: that note plays plain');
+const added = SC.copy(source, 5, song(), 33);
+const entry = added.song.glitch.find(g => g.word === 0x123);
+check(added.song.glitch.length === 2 && entry && S.glitchOf(added.song.clips[0].events[1]) === entry.index, 'a new glitch entry when it isn\'t there');
+throws(() => SC.copy(source, 6, target, 0), 'no clip there, nothing copied');
 
 // MIDI file writer and reader: delta times, running status, note-off as velocity 0.
 const lengths = [0, 127, 128, 16383, 16384, 0x0fffffff];

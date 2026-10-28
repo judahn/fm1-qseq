@@ -75,7 +75,7 @@ SONG_SMALL uint32_t song_file_crc(const struct song *s, const uint8_t *sounds, u
 }
 
 /* Reading, with every count and value checked against the bounds. */
-struct reader { const uint8_t *p; uint32_t left; int bad; };
+struct reader { const uint8_t *p; uint32_t left; int bad; unsigned version; };
 static const uint8_t *take(struct reader *r, uint32_t n)
 {
     if (r->bad || n > r->left) { r->bad = 1; return NULL; }
@@ -102,6 +102,8 @@ SONG_SMALL static int get_part(struct reader *r, struct song *s, unsigned part, 
         struct song_event e;
         e.at = get32(r); e.a = (uint8_t)get8(r); e.b = (uint8_t)get8(r); e.length = (uint16_t)get16(r);
         if (song_event_start(&e) < last || (song_is_note(&e) && (e.a > 127 || !e.length))) r->bad = 1;
+        if (song_is_block(&e) && (r->version < 3 || part >= SONG_TRACKS || !song_block_length(&e) ||
+                                  (e.a != SONG_BLOCK_STOP && e.a >= SONG_BLOCK + SONG_GRID_ROWS))) r->bad = 1; /* blocks: tracks only */
         last = song_event_start(&e);
         if (s) s->event[total + i] = e;
     }
@@ -111,8 +113,8 @@ SONG_SMALL static int get_part(struct reader *r, struct song *s, unsigned part, 
 SONG_SMALL static int parse(struct song *s, const uint8_t *data, uint32_t bytes, unsigned apply,
                             const uint8_t **sounds, uint32_t *sounds_bytes)
 {
-    struct reader r = {data, bytes, 0};
-    unsigned version = get8(&r);
+    struct reader r = {data, bytes, 0, 0};
+    unsigned version = r.version = get8(&r);
     if (!version || version > SONG_FILE_VERSION) return -1;
     *sounds_bytes = get16(&r);
     *sounds = take(&r, *sounds_bytes);

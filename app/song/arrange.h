@@ -19,6 +19,7 @@ struct song_clip {
     uint32_t length;
     uint16_t count;
     uint8_t tracks; /* the tracks it was copied from, one bit each */
+    uint8_t cell;   /* a clip copied in the grid: its cell plus 1 (blocks.h), else 0 */
 };
 int song_copy(const struct song *s, struct song_clip *clip, unsigned tracks, uint32_t from, uint32_t to);
 int song_cut(struct song *s, struct song_clip *clip, unsigned tracks, uint32_t from, uint32_t to);

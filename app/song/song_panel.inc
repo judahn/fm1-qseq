@@ -27,8 +27,8 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
         if (shift) { song_list_open(); return 1; }
         song_save_key(now);
     }
-    if (song_port_recorder()->active && (*pressed & (BUTTON(PLAY) | BUTTON(REC)))) {
-        song_port_record_stop(); /* PLAY or REC ends the take */
+    if ((song_port_recorder()->active || song_port_clip_armed()) && (*pressed & (BUTTON(PLAY) | BUTTON(REC)))) {
+        song_port_record_end(!(*pressed & BUTTON(PLAY))); /* PLAY or REC ends the take, REC in a clip playing on */
         *pressed &= ~(BUTTON(PLAY) | BUTTON(REC));
     }
     if (*pressed & BUTTON(PLAY)) {
@@ -39,7 +39,7 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
     if (*pressed & BUTTON(REC)) { /* the mode chooser */
         *pressed &= ~BUTTON(REC);
         if (!p->playing) { page = music_page = SONG_REC; cache->shown_page = ~0U; return 1; }
-        notice = "STOP FIRST TO RECORD";
+        notice = clip && !song_port_record_clip() ? "REC FROM THE CLIP'S NEXT PASS" : "STOP FIRST TO RECORD";
         notice_until = now + 2000U;
     }
     if (*pressed & BUTTON(ENV)) {

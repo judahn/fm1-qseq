@@ -11,6 +11,7 @@
 //   5b the workbench's Songs and Kits sections (preview_5b.mjs)
 //   6  edit jobs (preview_6.mjs)
 //   7  the clip grid and launching (preview_7.mjs)
+//   7b clips in the song: takes, blocks, Expand, the open clip (preview_7b.mjs)
 // Each records named checks with actual and expected values, and every
 // failure is printed with its phase and name. Screenshots go to docs/.
 //   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright node tests/preview_check.mjs
@@ -30,12 +31,13 @@ import { phase5a } from './preview_5a.mjs';
 import { phase5b } from './preview_5b.mjs';
 import { phase6 } from './preview_6.mjs';
 import { phase7 } from './preview_7.mjs';
+import { phase7b } from './preview_7b.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const phases = [['1', phase1], ['2', phase2], ['diagnostics', phaseDiag], ['3', phase3], ['4', phase4], ['4b', phase4b],
-  ['5a', phase5a], ['5b', phase5b], ['6', phase6], ['7', phase7]];
+  ['5a', phase5a], ['5b', phase5b], ['6', phase6], ['7', phase7], ['7b', phase7b]];
 const only = process.env.PREVIEW_PHASES ? process.env.PREVIEW_PHASES.split(',') : null;
 const browser = await chromium.launch();
 const runs = [];

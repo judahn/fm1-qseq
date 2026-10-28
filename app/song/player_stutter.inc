@@ -11,12 +11,15 @@ SONG_SMALL static void emit_tracks(struct song_player *p, uint32_t end)
     for (unsigned t = 0; t < SONG_TRACKS; ++t) emit_track(p, t, end); /* player_clips.inc */
 }
 
+/* A track the stutter repeats: on the song, outside a block. Clips, and
+ * blocks, play on through a stutter. */
+static int stutters(const struct song_player *p, unsigned t) { return on_song(p, t) && p->blk[t] == SONG_FROM_NONE; }
 /* Everything sounding on the song stops, and swung or repeating hits still
- * due go. Clips play on through a stutter. */
+ * due go. */
 SONG_SMALL static void cut(struct song_player *p)
 {
     for (unsigned t = 0; t < SONG_TRACKS; ++t)
-        if (on_song(p, t)) song_player_cut(p, t);
+        if (stutters(p, t)) song_player_cut(p, t);
 }
 /* The slice's notes on one track, repeat after repeat, up to `stop`. */
 SONG_SMALL static void stutter_track(struct song_player *p, unsigned t, uint32_t stop)
@@ -51,12 +54,11 @@ SONG_SMALL static void stutter_track(struct song_player *p, unsigned t, uint32_t
 /* A stutter on the FX lane starts when playing reaches it. */
 SONG_SMALL static void fx_lane(struct song_player *p, uint32_t end)
 {
-    if (p->song->open) return; /* track 1's part may hold a clip */
-    unsigned count;
-    const struct song_event *e = song_track(p->song, 0, &count);
-    for (unsigned i = song_find(p->song, 0, p->next); p->stut_at == NEVER && i < count && song_event_start(&e[i]) < end; ++i) {
+    unsigned count, part = song_owner(p->song, 0); /* track 1's own part, a clip open there or not */
+    const struct song_event *e = song_track(p->song, part, &count);
+    for (unsigned i = song_find(p->song, part, p->next); p->stut_at == NEVER && i < count && song_event_start(&e[i]) < end; ++i) {
         uint32_t at = song_event_start(&e[i]), len = song_slice_clocks(e[i].a);
-        if (song_event_kind(&e[i]) != SONG_FX || at < len) continue;
+        if (!song_is_stutter(&e[i]) || at < len) continue;
         p->stut_at = p->stut_anchor = at;
         p->stut_to = at + e[i].length;
         p->stut_len = len;
@@ -78,16 +80,15 @@ SONG_SMALL static void emit(struct song_player *p, uint32_t end)
         }
         uint32_t stop = end < p->stut_to ? end : p->stut_to;
         for (unsigned t = 0; t < SONG_TRACKS; ++t)
-            if (on_song(p, t)) stutter_track(p, t, stop);
+            if (stutters(p, t)) stutter_track(p, t, stop);
             else emit_track(p, t, stop);
         if (stop == p->stut_to) { /* rejoin the song where it is now */
             cut(p);
             for (unsigned t = 0; t < SONG_TRACKS; ++t)
-                if (on_song(p, t)) p->cursor[t] = (uint16_t)song_find(p->song, t, stop);
+                if (stutters(p, t)) { song_place(p, t, stop); chase_track(p, t, stop); }
             p->stut_at = p->stut_to = NEVER;
             p->stut_running = 0;
             p->next = stop;
-            song_player_chase(p, stop);
             emit_tracks(p, end);
         }
     } else emit_tracks(p, end);

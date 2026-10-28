@@ -21,15 +21,10 @@ SONG_SMALL static void chased(void *context, unsigned track, unsigned lane, unsi
 {
     lane_out(context, track, lane, value, 1);
 }
-SONG_SMALL void song_player_chase(struct song_player *p, uint32_t clock)
-{
-    for (unsigned t = 0; t < SONG_TRACKS; ++t)
-        if (on_song(p, t)) song_chase(p->song, t, clock, chased, p); /* clips chase as they launch */
-}
 SONG_SMALL void song_player_hold(const struct song_player *p, struct song_place *place)
 {
     const struct song *s = p->song;
-    place->at = song_player_clock(p);
+    place->at = timeline(p);
     place->rate = song_rate(s->tempo[p->segment].bpm100);
     place->inside = p->playing ? p->pos - song_units(s, p->segment, place->at) : 0;
 }
@@ -101,6 +96,6 @@ SONG_SMALL uint32_t song_player_clock_at(const struct song_player *p, uint64_t f
     const struct song *s = p->song;
     unsigned k = p->segment;
     uint64_t back = (p->frame - frame) * song_rate(s->tempo[k].bpm100), inside = p->pos - s->tempo_units[k];
-    return s->tempo[k].clock + (uint32_t)(back < inside ? (inside - back) / SONG_UNITS_PER_CLOCK : 0);
+    return view(p, s->tempo[k].clock + (uint32_t)(back < inside ? (inside - back) / SONG_UNITS_PER_CLOCK : 0));
 }
 #endif

@@ -17,7 +17,7 @@ function installRig() {
   globalThis.previewButtons = { FX: 2, SCL: 3, ENV: 4, LFO: 5, EDIT: 6, GLO: 7, HOME: 8, SAVE: 9, ARP: 10, SEQ: 11, PLAY: 12, REC: 13 };
   globalThis.previewRig = () => {
     const r = { B: previewButtons, wasm, meter: false, rms: 0, blocks: 0 };
-    r.boot = () => { r.c = new FM1SimulatorCore(wasm, null, null).c; return r; };
+    r.boot = () => { r.core = new FM1SimulatorCore(wasm, null, null); r.c = r.core.c; return r; };
     r.tap = b => { r.c.sim_control(0, b, 1); r.c.sim_control(0, b, 0); };
     r.key = k => { r.c.sim_control(1, k, 1); r.c.sim_control(1, k, 0); };
     r.held = (b, fn) => { r.c.sim_control(0, b, 1); fn(); r.c.sim_control(0, b, 0); };
@@ -107,13 +107,39 @@ export function savePng(root, name, from, key) {
 /* A screenshot of a page element that comes out the same every run: the
  * element in view, the pointer parked where nothing hovers, no focus, fonts
  * loaded, and transitions finished (a button's hover fade lasts 0.12 s, and
- * every screenshot follows a click). */
+ * every screenshot follows a click). Chromium still shades the rounded edges
+ * of a few controls one level differently on some runs, so a shot within one
+ * level of the file already there, pixel for pixel, leaves the file alone. */
 export async function shot(locator, file) {
   const page = locator.page();
   await locator.scrollIntoViewIfNeeded();
   await page.mouse.move(0, 0);
   await page.evaluate(() => { document.activeElement?.blur?.(); return document.fonts.ready.then(() => undefined); });
-  await locator.screenshot({ path: file, animations: 'disabled' });
+  const png = await locator.screenshot({ animations: 'disabled' });
+  if (!(await samePicture(page, file, png))) fs.writeFileSync(file, png);
+}
+
+async function samePicture(page, file, png) {
+  if (!fs.existsSync(file)) return false;
+  const old = fs.readFileSync(file);
+  if (old.equals(png)) return true;
+  return page.evaluate(async ([a, b]) => {
+    const pixels = async (data) => {
+      const img = new Image();
+      img.src = 'data:image/png;base64,' + data;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = img.width;
+      c.height = img.height;
+      const g = c.getContext('2d');
+      g.drawImage(img, 0, 0);
+      return g.getImageData(0, 0, c.width, c.height);
+    };
+    const p = await pixels(a), q = await pixels(b);
+    if (p.width !== q.width || p.height !== q.height) return false;
+    for (let i = 0; i < p.data.length; ++i) if (Math.abs(p.data[i] - q.data[i]) > 1) return false;
+    return true;
+  }, [old.toString('base64'), png.toString('base64')]);
 }
 
 /* Named checks for one phase. Each records its name, the actual value, what

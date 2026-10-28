@@ -4,8 +4,10 @@
  * encoded back to the same bytes. A .fm1song file is a 16-byte header with
  * a CRC, then that payload, so device to file to device is byte for byte.
  * Version 2 (phase 7) adds the clip grid after the tracks: the launch
- * quantize, the row names and the clips. Version 1 still reads, with an
- * empty grid, and writes back as version 1. */
+ * quantize, the row names and the clips. Version 3 lets the tracks hold
+ * clip blocks (an FX event with bit 7 of `a` set, the row or 0xff for a
+ * stop, and a 24-bit length, bits 16 to 23 in `b`). Versions 1 and 2 still
+ * read and write back as themselves. */
 (function (root) {
   'use strict';
   const ns = root.FM1SongWorkbench = root.FM1SongWorkbench || {};
@@ -13,7 +15,7 @@
 
   const LIMITS = { tracks: 8, events: 4096, tempos: 32, meters: 32, markers: 16, bars: 999, clock: 0xffffff,
     tempoMin: 2000, tempoMax: 30000, sounds: 1999, preset: 223, rows: 16, cells: 128 };
-  const VERSION = 2;
+  const VERSION = 3;
   const KIND = { NOTE: 0, CONTROL: 1, PROGRAM: 2, FX: 3 };
   const ENGINES = ['DX7', '303', '808', 'PSG', 'PLUCK', 'SAMPLER'];
   const MAGIC = 0x47534d46; /* "FMSG" */
@@ -22,13 +24,18 @@
   const kindOf = e => (e.at >>> 24) & 3;
   const glitchOf = e => (e.at >>> 26) & 31;
   const event = (clock, kind, a, b, length) => ({ at: (clock | kind << 24) >>> 0, a, b, length });
+  const isBlock = e => kindOf(e) === KIND.FX && (e.a & 0x80) !== 0;
+  const blockLength = e => e.length + e.b * 65536;
+  const block = (clock, length, row) => event(clock, KIND.FX, row < 16 ? 0x80 | row : 0xff, length >>> 16, length & 0xffff);
 
-  /* A part's events: a track's or a clip's, in clock order. */
-  function events(r, what) {
+  /* A part's events: a track's or a clip's, in clock order. Blocks only on
+   * a track, from version 3. */
+  function events(r, what, blocks) {
     const count = r.u16(), list = [];
     for (let i = 0, last = 0; i < count; i++) {
       const e = { at: r.u32(), a: r.u8(), b: r.u8(), length: r.u16() };
       check(clockOf(e) >= last && (kindOf(e) !== KIND.NOTE || (e.a <= 127 && e.length > 0)), 'Bad event on ' + what);
+      check(!isBlock(e) || (blocks && blockLength(e) > 0 && (e.a === 0xff || e.a < 0x90)), 'Bad clip block on ' + what);
       last = clockOf(e);
       list.push(e);
     }
@@ -90,7 +97,7 @@
     song.humanizeVelocity = r.take(8).slice();
     song.seed = r.u32();
     song.tracks = [];
-    for (let t = 0; t < LIMITS.tracks; t++) song.tracks.push(events(r, 'track ' + (t + 1)));
+    for (let t = 0; t < LIMITS.tracks; t++) song.tracks.push(events(r, 'track ' + (t + 1), version > 2));
     song.launchQ = 2;
     song.rows = [];
     song.clips = [];
@@ -105,7 +112,7 @@
       for (let n = r.u8(), i = 0; i < n; i++) {
         const cell = r.u8(), length = r.u16();
         check(cell < LIMITS.cells && length > 0 && (!i || cell > song.clips[i - 1].cell), 'Bad clip');
-        song.clips.push({ cell, length, events: events(r, 'track ' + ((cell >> 4) + 1) + ', row ' + ((cell & 15) + 1)) });
+        song.clips.push({ cell, length, events: events(r, 'track ' + ((cell >> 4) + 1) + ', row ' + ((cell & 15) + 1), false) });
       }
     }
     check(eventCount(song) <= LIMITS.events, 'More events than a song holds');
@@ -165,7 +172,7 @@
   const programOf = (song, track) => song.sounds[1 + track * LIMITS.preset + 2];
 
   ns.songFile = { LIMITS, KIND, ENGINES, VERSION, decode, encode, wrap, unwrap, barClock, engineOf, programOf, eventCount,
-    clockOf, kindOf, glitchOf, event, name: song => text(song.name), nameField: value => field(value, 12, 32, true),
+    clockOf, kindOf, glitchOf, event, isBlock, blockLength, block, name: song => text(song.name), nameField: value => field(value, 12, 32, true),
     markerName: m => text(m.name), markerField: value => field(value, 8, 0, true) };
   if (typeof module === 'object' && module.exports) module.exports = ns.songFile;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

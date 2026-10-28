@@ -23,7 +23,7 @@ SONG_SMALL static unsigned fx_only(const struct song *s, unsigned tracks, uint32
 {
     unsigned n = 0, count, end = song_find(s, 0, to);
     const struct song_event *e = song_track(s, 0, &count);
-    for (unsigned i = song_find(s, 0, from); !(tracks & 1U) && i < end; ++i) n += song_event_kind(&e[i]) == SONG_FX;
+    for (unsigned i = song_find(s, 0, from); !(tracks & 1U) && i < end; ++i) n += song_is_stutter(&e[i]);
     return n;
 }
 SONG_SMALL static void clear(struct song *s, unsigned tracks, uint32_t from, uint32_t to)
@@ -37,9 +37,12 @@ SONG_SMALL static void clear(struct song *s, unsigned tracks, uint32_t from, uin
 SONG_SMALL static struct song_event moved(const struct song_event *e, uint32_t at, uint32_t limit)
 {
     struct song_event c = *e;
-    uint32_t start = song_event_start(e);
+    uint32_t start = song_event_start(e), block = song_is_block(e);
     c.at = (e->at & ~(SONG_FRESH | 0xffffffU)) | at;
-    if (limit > start && start + c.length > limit) c.length = (uint16_t)(limit - start);
+    if (limit > start && start + (block ? song_block_length(e) : c.length) > limit) {
+        if (block) song_block_resize(&c, limit - start);
+        else c.length = (uint16_t)(limit - start);
+    }
     return c;
 }
 
@@ -68,6 +71,7 @@ SONG_SMALL int song_copy(const struct song *s, struct song_clip *clip, unsigned 
     clip->count = 0;
     clip->length = to - from;
     clip->tracks = (uint8_t)tracks;
+    clip->cell = 0;
     memcpy(clip->glitch, s->glitch, sizeof clip->glitch);
     v.fill = 1;
     for (unsigned t = 0; t < SONG_TRACKS; ++t) {
@@ -77,7 +81,7 @@ SONG_SMALL int song_copy(const struct song *s, struct song_clip *clip, unsigned 
         unsigned count, end = song_find(s, t, to);
         const struct song_event *e = song_track(s, t, &count);
         for (unsigned i = song_find(s, t, from); i < end; ++i) {
-            if (!whole && song_event_kind(&e[i]) != SONG_FX) continue;
+            if (!whole && !song_is_stutter(&e[i])) continue;
             clip->event[clip->count] = moved(&e[i], song_event_start(&e[i]) - from, to);
             clip->track[clip->count++] = (uint8_t)t;
         }
@@ -97,18 +101,18 @@ SONG_SMALL int song_paste(struct song *s, const struct song_clip *clip, uint32_t
     unsigned freed = insert ? 0 : in_range(s, targets, at, at + clip->length);
     if (s->events - freed + clip->count > SONG_EVENTS) return -1;
     unsigned fx = 0;
-    for (unsigned i = 0; i < clip->count; ++i) fx += song_event_kind(&clip->event[i]) == SONG_FX;
+    for (unsigned i = 0; i < clip->count; ++i) fx += song_is_stutter(&clip->event[i]);
     if (insert) { if (song_insert_time(s, at, clip->length)) return -1; }
     else {
         clear(s, targets, at, at + clip->length);
         unsigned count, first = song_find(s, 0, at);
         const struct song_event *e = song_track(s, 0, &count);
         for (unsigned i = song_find(s, 0, at + clip->length); fx && i-- > first;) /* the FX lane's stutters there too */
-            if (song_event_kind(&e[i]) == SONG_FX) (void)song_remove(s, 0, i);
+            if (song_is_stutter(&e[i])) (void)song_remove(s, 0, i);
     }
     for (unsigned i = 0; i < clip->count; ++i) {
         struct song_event e = song_board_event(s, clip, i, at);
-        (void)song_add_event(s, song_event_kind(&e) == SONG_FX ? 0 : single ? track : clip->track[i], &e);
+        (void)song_add_event(s, song_is_stutter(&e) ? 0 : single ? track : clip->track[i], &e);
     }
     return 0;
 }
@@ -134,7 +138,7 @@ SONG_SMALL int song_duplicate(struct song *s, unsigned tracks, uint32_t *from, u
         if (whole) song_chase(s, t, a, start_value, &v); /* these land at b, after the originals */
         /* The copies sort after the originals, so these indexes hold. */
         for (unsigned i = song_find(s, t, a), end = song_find(s, t, b); i < end; ++i) {
-            if (!whole && song_event_kind(&s->event[s->first[t] + i]) != SONG_FX) continue;
+            if (!whole && !song_is_stutter(&s->event[s->first[t] + i])) continue;
             struct song_event e = moved(&s->event[s->first[t] + i], song_event_start(&s->event[s->first[t] + i]) + length, b);
             (void)song_add_event(s, t, &e);
         }

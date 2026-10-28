@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* The Songs part of the "Songs and kits" section (phase 5b): the device's
- * songs, the open song file, factory templates, and MIDI export and import. */
+ * songs, the open song file, factory templates, MIDI export and import, and
+ * the open song's clips, copied into a song on the device (phase 7b). */
 (function (root) {
   'use strict';
   if (typeof document === 'undefined') return;
-  const ns = root.FM1SongWorkbench, ui = ns.ui, $ = ui.$, S = ns.songFile, SM = ns.songMidi;
+  const ns = root.FM1SongWorkbench, ui = ns.ui, $ = ui.$, S = ns.songFile, SM = ns.songMidi, SC = ns.songClips;
   const html = `<h3>Songs</h3>
 <label>On the device <select id="sw-songs" size="6"></select></label>
 <div><button id="sw-song-download">Download song file</button><button id="sw-song-midi">Export MIDI</button>
@@ -15,6 +16,10 @@
 <p id="sw-current">No song file open.</p>
 <div><button id="sw-current-upload">Upload as a new song</button><button id="sw-current-replace">Replace the selected song</button>
 <button id="sw-current-save">Save song file</button><button id="sw-current-midi">Export MIDI</button></div>
+<h4>Clips in the open song</h4>
+<div class="field-row"><label>Clip <select id="sw-clips" size="4"></select></label>
+<label>Into track <select id="sw-clip-track"></select></label><label>Row <select id="sw-clip-row"></select></label></div>
+<div><button id="sw-clip-copy">Copy into the selected device song</button></div>
 <div id="sw-import" hidden><h4>MIDI import</h4>
 <p class="quiet-note">Pick a part of the file for each FM-1 track. Sounds, kit and settings come from the open song file
 (or the first factory sound set). Controllers a track's engine doesn't take are left out.</p>
@@ -30,6 +35,10 @@
     const notes = song.tracks.flat().filter(e => S.kindOf(e) === S.KIND.NOTE).length;
     $('sw-current').textContent = 'Open: ' + S.name(song) + ' (' + from + '), ' + payload.length + ' bytes, ' + S.eventCount(song) +
       ' events (' + notes + ' notes), ' + song.bars + ' bars.';
+    const bar = 1920 / song.meters[0].unit * song.meters[0].beats, beat = 1920 / song.meters[0].unit;
+    const span = n => (n % bar ? n / beat + (n === beat ? ' beat' : ' beats') : n / bar + (n === bar ? ' bar' : ' bars'));
+    $('sw-clips').replaceChildren(...SC.list(song).map(c => ui.option(c.cell, 'T' + (c.track + 1) + ' row ' + (c.row + 1) +
+      (c.name ? ' ' + c.name : '') + ', ' + span(c.length) + ', ' + c.events + ' events')));
     ui.enable();
   }
   function midiFile(song, name) {
@@ -37,9 +46,10 @@
     if (s.glitched) left.push(s.glitched + ' glitch attributes');
     if (s.fx) left.push(s.fx + ' FX lane events');
     if (s.humanize) left.push('humanize');
-    if (s.clips) left.push(s.clips + (s.clips > 1 ? ' clips' : ' clip'));
+    if (s.clips) left.push('the grid of ' + s.clips + (s.clips > 1 ? ' clips' : ' clip'));
     ui.save(out.bytes, ui.slug(name) + '.mid');
-    ui.status('MIDI file saved.' + (left.length ? ' Left out (they stay in the song file): ' + left.join(', ') + '.' : ''));
+    ui.status('MIDI file saved' + (s.blocks ? ', ' + s.blocks + (s.blocks > 1 ? ' clip blocks' : ' clip block') + ' expanded' : '') + '.' +
+      (left.length ? ' Left out (they stay in the song file): ' + left.join(', ') + '.' : ''));
   }
   async function base() {
     return current ? current.song : S.decode(await ns.templates.build(0));
@@ -80,6 +90,25 @@
   const part = {
     mount() {
       $('sw-songs-part').innerHTML = html;
+      for (let i = 0; i < 16; i++) {
+        if (i < 8) $('sw-clip-track').append(ui.option(i, String(i + 1)));
+        $('sw-clip-row').append(ui.option(i, String(i + 1)));
+      }
+      $('sw-clips').onchange = () => { const c = Number($('sw-clips').value); $('sw-clip-track').value = String(c >> 4); $('sw-clip-row').value = String(c & 15); };
+      $('sw-clip-copy').onclick = ui.act(async () => {
+        const s = need(), cell = $('sw-clips').value;
+        if (!current || cell === '') throw Error('Select a clip of the open song first');
+        const into = Number($('sw-clip-track').value) * 16 + Number($('sw-clip-row').value);
+        const dropped = await ui.run(async link => {
+          const read = await link.readSong(s.id, ui.progress), made = SC.copy(current.song, Number(cell), S.decode(read.bytes), into);
+          await link.writeSong(s.id, S.encode(made.song), ui.progress);
+          await ui.refresh(link);
+          return made.dropped;
+        });
+        $('sw-songs').value = String(s.id);
+        ui.status('Clip copied into ' + s.name + ', track ' + ((into >> 4) + 1) + ' row ' + ((into & 15) + 1) + '.' +
+          (dropped ? ' ' + dropped + ' notes lost their glitch: that song\'s table is full.' : ''));
+      });
       $('sw-song-download').onclick = ui.act(async () => {
         const s = need(), read = await ui.run(link => link.readSong(s.id, ui.progress));
         ui.save(S.wrap(read.bytes), ui.slug(s.name) + '.fm1song');
@@ -156,7 +185,7 @@
     },
     enable(busy) {
       for (const id of ['sw-song-download', 'sw-song-midi', 'sw-song-load', 'sw-song-delete', 'sw-song-save']) $(id).disabled = busy;
-      for (const id of ['sw-current-upload', 'sw-current-replace', 'sw-current-save', 'sw-current-midi']) $(id).disabled = busy || !current;
+      for (const id of ['sw-current-upload', 'sw-current-replace', 'sw-current-save', 'sw-current-midi', 'sw-clip-copy']) $(id).disabled = busy || !current;
       $('sw-import-go').disabled = busy || !midi;
     },
     state: () => ({ current, midi })

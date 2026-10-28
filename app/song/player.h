@@ -63,6 +63,24 @@ struct song_player {
      * clips keep their phase. A clip's notes are timed on the transport. */
     uint32_t shift, base[SONG_TRACKS], launch_at[SONG_TRACKS];
     uint8_t from[SONG_TRACKS], waiting[SONG_TRACKS];
+    /* A track on the song inside a clip block (blocks.h) plays that clip,
+     * row in blk (SONG_FROM_STOP for a stop, SONG_FROM_NONE outside one),
+     * from base, a song clock here, until blk_end. blk_next is the track's
+     * next block from its cursor. */
+    uint32_t blk_end[SONG_TRACKS];
+    uint16_t blk_next[SONG_TRACKS];
+    uint8_t blk[SONG_TRACKS];
+    /* The clip open in the editor plays on its track, its passes from the
+     * transport clock edit_base, while the song plays on. The editor works
+     * in the clip's time: song_player_clock, the playhead, jumps and the
+     * target are in it, and the song's own place while stopped is song_at.
+     * A jump while playing moves the clip's pass at the next bar line. */
+    uint32_t edit_base, song_at;
+    /* Recording a performance (design 8f): perf is 1 while armed and 2 once
+     * the take runs, when the song's loop and end are ignored. Every launch
+     * that takes effect meanwhile is logged, at its song clock. */
+    struct song_launch { uint32_t clock; uint8_t track, to; } log[16];
+    uint8_t perf, log_in, log_out;
 #endif
 };
 #if SONG_UI
@@ -114,9 +132,11 @@ int song_player_bake(const struct song_player *live, struct song *s, unsigned tr
 void song_player_launch(struct song_player *p, unsigned track, unsigned to);
 /* The transport clock playing now. */
 uint32_t song_player_transport(const struct song_player *p);
-/* Playing moves to `clock` at once, the transport running on, as a clip
- * opens or closes in the editor. Stopped, the playhead moves. */
-void song_player_seek(struct song_player *p, uint32_t clock);
+/* After a clip opens in the editor (opening) or closes, with its track:
+ * playing, the clip comes in at once in step with the song's bar, and on
+ * closing the track goes back to what it played. Stopped, the playhead
+ * moves between the clip's time and the song's. */
+void song_player_edit(struct song_player *p, unsigned track, unsigned opening);
 /* A track's notes, repeats and waiting swung notes end now. */
 void song_player_cut(struct song_player *p, unsigned track);
 #endif

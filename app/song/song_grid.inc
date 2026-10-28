@@ -6,7 +6,7 @@
  * row (an empty cell stops the track, the SONG row hands it back to the
  * song), G4 to G5 rows 1 to 8 of the page. SCL opens the clip at the cursor,
  * ENV names the row, and SHIFT plus F3, G3, A3 or B3, and E4 copy, cut,
- * paste and delete the cell. */
+ * paste and delete the cell. REC records a performance (song_perf.c). */
 #include "clips.h"
 
 enum { GRID_X = 46, GRID_W = 24, GRID_SONG = 34, GRID_Y = 52, GRID_H = 16, GRID_EMPTY = 0x2104 };
@@ -93,7 +93,8 @@ static void song_grid_draw(void)
     knob(2, "-", "", colors[2]);
     knob(3, "LAUNCH Q", song_launch_names[s->launch_q % 5U], colors[3]);
     song_notice_expire();
-    const char *hint = notice ? notice : grid_naming ? "ENV OR SAVE DONE" : (previous_buttons & BUTTON(FX))
+    const char *hint = notice ? notice : grid_naming ? "ENV OR SAVE DONE" : song_perf_state() == 2 ? "REC: LAUNCHES BECOME BLOCKS"
+        : song_perf_state() ? "REC ARMED: LAUNCH OR PLAY" : (previous_buttons & BUTTON(FX))
         ? "F3 COPY G3 CUT A3 PASTE E4 DELETE" : grid_page ? "F3-F4 LAUNCH  G4-G5 ROWS 9-16" : "F3-F4 LAUNCH  G4-G5 ROWS 1-8";
     song_hint(hint);
 }
@@ -138,7 +139,11 @@ static int song_grid_input(const struct fm1_controls *c, uint32_t *pressed, uint
         else song_save_key(now);
     }
     if (*pressed & BUTTON(PLAY)) { if (song_port_player()->playing) song_port_stop(); else song_start(now); }
-    if (*pressed & BUTTON(REC)) { notice = "REC IN THE GRID COMES LATER"; notice_until = now + 1500U; }
+    if (*pressed & BUTTON(REC)) { /* a performance: armed, then every launch is a block in the song */
+        if (song_perf_state()) { song_perf_end(); notice = "TAKE ENDED"; }
+        else notice = song_perf_arm() ? "NOT NOW" : "REC: LAUNCH OR PLAY TO START";
+        notice_until = now + 1500U;
+    }
     if ((*pressed & BUTTON(ENV)) && grid_row) {
         if (grid_naming) grid_name_done();
         else { grid_naming = 1; grid_letter = 0; }

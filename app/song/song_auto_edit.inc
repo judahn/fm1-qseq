@@ -8,7 +8,7 @@ static int song_fx_at(const struct song *s, uint32_t at)
     unsigned count, i = song_find(s, 0, at + 1U);
     const struct song_event *e = song_track(s, 0, &count);
     while (i-- > 0)
-        if (song_event_kind(&e[i]) == SONG_FX) return song_event_start(&e[i]) + e[i].length > at ? (int)i : -1;
+        if (song_is_stutter(&e[i])) return song_event_start(&e[i]) + e[i].length > at ? (int)i : -1;
     return -1;
 }
 
@@ -48,7 +48,7 @@ static void song_auto_delete(struct song *s, unsigned shift, uint32_t now)
         const struct song_event *e = song_track(s, 0, &count);
         int one = song_fx_at(s, at);
         for (unsigned i = song_find(s, 0, s->loop_end); shift && i-- > first;)
-            if (song_event_kind(&e[i]) == SONG_FX && !song_remove(s, 0, i)) ++cleared;
+            if (song_is_stutter(&e[i]) && !song_remove(s, 0, i)) ++cleared;
         if (!shift && one >= 0 && !song_remove(s, 0, (unsigned)one)) cleared = 1;
         notice = cleared ? "STUTTERS DELETED" : "NO STUTTER HERE";
     } else if (shift) {
@@ -77,8 +77,8 @@ static void song_auto_step(const struct song *s, int direction)
     else if (song_auto_mode == 2) {
         unsigned count, i = song_find(s, 0, direction > 0 ? at + 1U : at);
         const struct song_event *e = song_track(s, 0, &count);
-        if (direction > 0) { for (; i < count && to < 0; ++i) if (song_event_kind(&e[i]) == SONG_FX) to = song_event_start(&e[i]); }
-        else while (i-- > 0 && to < 0) if (song_event_kind(&e[i]) == SONG_FX) to = song_event_start(&e[i]);
+        if (direction > 0) { for (; i < count && to < 0; ++i) if (song_is_stutter(&e[i])) to = song_event_start(&e[i]); }
+        else while (i-- > 0 && to < 0) if (song_is_stutter(&e[i])) to = song_event_start(&e[i]);
     } else if (song_auto_mode)
         for (unsigned m = 0; m < s->meters; ++m) {
             uint32_t c = song_bar_clock(s, s->meter[m].bar);

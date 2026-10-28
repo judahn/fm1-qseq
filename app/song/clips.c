@@ -74,6 +74,7 @@ SONG_SMALL int song_clip_copy(const struct song *s, struct song_clip *board, uns
     board->length = length;
     board->count = (uint16_t)n;
     board->tracks = (uint8_t)(1U << track);
+    board->cell = (uint8_t)(cell + 1U);
     memcpy(board->glitch, s->glitch, sizeof board->glitch);
     for (unsigned i = 0; i < n; ++i) {
         board->event[i] = e[i];
@@ -125,7 +126,7 @@ SONG_SMALL int song_clip_paste(struct song *s, const struct song_clip *board, un
     for (unsigned i = 0; i < board->count; ++i) {
         struct song_event e = song_board_event(s, board, i, 0);
         unsigned t = single ? cell / SONG_GRID_ROWS : board->track[i];
-        if (song_event_kind(&e) != SONG_FX) /* the FX lane stays with the song */
+        if (song_event_kind(&e) != SONG_FX) /* the FX lane and the blocks stay with the song */
             (void)song_add_event(s, song_owner(s, song_cell_part(song_cell(t, row))), &e);
     }
     return 0;

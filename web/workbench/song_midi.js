@@ -2,8 +2,9 @@
 /* Songs to and from Standard MIDI Files (phase 5b, design 8b). Export is
  * format 1 at 480 PPQ: a conductor track (name, tempo, time signatures,
  * markers) and one track per FM-1 track on channels 1 to 8, with notes,
- * controllers and program changes. Glitch attributes, the FX lane and
- * humanize stay in the song file and are left out of MIDI. Import maps the
+ * controllers and program changes, every clip block expanded into what it
+ * plays (song_clips.js). Glitch attributes, the FX lane, humanize and the
+ * clip grid stay in the song file and are left out of MIDI. Import maps the
  * file's tracks onto FM-1 tracks and reports what doesn't fit first. */
 (function (root) {
   'use strict';
@@ -19,7 +20,8 @@
 
   function exportMidi(song) {
     const skipped = { fx: 0, glitched: 0, humanize: song.humanizeTime.some(v => v) || song.humanizeVelocity.some(v => v),
-      clips: (song.clips || []).length };
+      clips: (song.clips || []).length, blocks: ns.songClips.blocks(song) };
+    song = ns.songClips.expand(song);
     let end = S.barClock(song, song.bars), seq = 0;
     const conductor = [{ tick: 0, order: 0, seq: seq++, meta: M.META.NAME, data: M.ascii(S.name(song)) }];
     for (const m of song.meters) conductor.push({ tick: S.barClock(song, m.bar), order: 1, seq: seq++, meta: M.META.METER, data: M.meter(m.beats, m.unit) });

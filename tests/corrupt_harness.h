@@ -3,7 +3,7 @@
  * and the kit table's power-loss test (test_kit_copies.c): a
  * RAM flash and pool (ram_flash.h, so they run on the full device build's
  * layout too), a seeded random, a song with something of everything a file
- * holds, the device's load path, what a loaded song promises, and a stock
+ * holds (clip blocks too), the device's load path, what a loaded song promises, and a stock
  * bank with the transfer path's import. */
 #ifndef FM1_TEST_CORRUPT_HARNESS_H
 #define FM1_TEST_CORRUPT_HARNESS_H
@@ -12,6 +12,7 @@
 #include "song_file.h"
 #include "kits.h"
 #include "clips.h"
+#include "blocks.h"
 #include "glitch.h"
 #include "lanes.h"
 #include <stddef.h>
@@ -60,6 +61,8 @@ static void build(struct song *s, unsigned variant)
     song_add_event(s, song_cell_part(cells[1]), &clip_cc);
     memcpy(s->row_name[5], "CHORUS", 6);
     s->launch_q = 3;
+    song_block_put(s, 3, 1920, 5760, 5);      /* clips in the song (phase 7b): a block, and a stop */
+    song_block_put(s, 0, 3840, 4800, SONG_BLOCK_STOP);
 }
 static int save(const struct song *s, unsigned id)
 {

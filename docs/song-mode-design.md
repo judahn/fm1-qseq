@@ -458,6 +458,25 @@ changes it everywhere it's used.
 **Storage.** Song files gain the clip table and the clip lanes, and older song files load with an empty grid.
 Clip events come out of the song's shared event pool, and a block costs a few bytes.
 
+**As built in 7b** (10/28):
+- A block is an event on its track (song file version 3), so bar edits, undo and saving carry it like a note.
+  It ends at its length or where the track's next block starts. A block placed over others removes those
+  starting inside it and ends one reaching in where it starts. That one's tail isn't kept, since it would
+  start its clip over.
+- Inside a block the track's notes, controllers and program changes are silent. The clip's controllers are
+  chased at the block's start and the track's own again at its end. The FX lane plays on.
+- A take ignores jumps too, and the song grows to hold it. REC again or stopping ends it.
+- The grid's copy pastes as a block only into the song it came from, while that cell still holds the clip.
+  Pasting selects the block, so Duplicate extends it, and blocks of one clip back to back join into one when
+  the first is a whole number of passes.
+- Expand works on the blocks starting in the job's range, on the picked tracks. Swing and random glitch are
+  rolled where the notes now sit, the same as before when a block starts on a bar line.
+- An open clip plays on its track like a launched one, in step with the song's bar when opened while playing.
+  The editor works in the clip's time, a jump while playing moves the clip's pass at the next bar line, and
+  closing gives the track back to what it played. REC again ends a recording into it and playing goes on,
+  while PLAY stops both.
+- MIDI export expands every block in the workbench, the only place export happens.
+
 **Later:** Live's follow actions, such as "after 4 bars, play a random clip from this column", next to the
 glitch tools.
 

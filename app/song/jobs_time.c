@@ -60,7 +60,8 @@ SONG_SMALL int song_job_stretch(struct song *s, const struct song_range *r, unsi
         for (unsigned i = song_find(s, t, r->from), last = song_find(s, t, r->to); i < last; ++i) {
             struct song_event e = s->event[s->first[t] + i];
             e.at = (e.at & ~(SONG_FRESH | 0xffffffU)) | scale(r->from, song_event_start(&e), rate);
-            if (e.length) {
+            if (song_is_block(&e)) song_block_resize(&e, (uint32_t)(((uint64_t)song_block_length(&e) * rate + 50U) / 100U));
+            else if (e.length) {
                 uint32_t n = ((uint32_t)e.length * rate + 50U) / 100U;
                 e.length = (uint16_t)(n < 1 ? 1 : n > 0xffff ? 0xffff : n);
             }

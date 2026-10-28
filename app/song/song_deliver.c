@@ -161,6 +161,9 @@ SONG_SMALL void song_deliver_start(unsigned count_in)
 }
 SONG_SMALL void song_port_stop(void)
 {
+#if SONG_UI
+    song_perf_end(); /* a performance take ends where playing got to */
+#endif
     uint32_t state = lock();
     song_player_stop(song_port_player());
     unlock(state);
@@ -187,6 +190,9 @@ SONG_SMALL void song_port_resume(const struct song_place *place, uint32_t state)
 #endif
 SONG_SMALL void song_port_jump(uint32_t clock)
 {
+#if SONG_UI
+    if (song_port_player()->perf == 2) return; /* a performance take runs straight on */
+#endif
     uint32_t state = lock();
     song_player_jump(song_port_player(), clock);
     unlock(state);

@@ -6,6 +6,7 @@
  * white keys copy, cut, paste (inserting or over), duplicate, insert bars
  * and delete bars. */
 #include "arrange.h"
+#include "blocks.h"
 #include "record.h"
 #include "undo.h"
 
@@ -44,12 +45,19 @@ static void song_action(unsigned which, uint32_t now)
     int r;
     if (which == 0) r = song_copy(s, c, song_selected(), s->loop_start, s->loop_end);
     else if (which == 1) r = song_cut(s, c, song_selected(), s->loop_start, s->loop_end);
-    else if (which <= 3) r = c->length ? song_paste(s, c, at, track, which == 2) : -1;
-    else if (which == 4) r = song_duplicate(s, song_selected(), &s->loop_start, &s->loop_end);
+    else if (which <= 3 && c->cell && !s->open) { /* a clip from the grid: a block, selected so Duplicate extends it */
+        r = which == 2 && song_insert_time(s, at, c->length) ? -1 : song_block_paste(s, c, at);
+        if (!r) { s->loop_start = at; s->loop_end = at + c->length; }
+    } else if (which <= 3) r = c->length ? song_paste(s, c, at, track, which == 2) : -1;
+    else if (which == 4) {
+        r = song_duplicate(s, song_selected(), &s->loop_start, &s->loop_end);
+        song_blocks_join(s, song_selected());
+    }
     else if (which == 5) r = song_insert_time(s, s->loop_start, s->loop_end - s->loop_start);
     else r = song_delete_time(s, s->loop_start, s->loop_end);
     song_port_resume(&place, state);
-    notice = !r ? done[which] : which >= 2 && which <= 3 && !c->length ? "COPY SOMETHING FIRST" : "DOESN'T FIT";
+    notice = !r ? done[which] : which >= 2 && which <= 3 && !c->length ? "COPY SOMETHING FIRST"
+        : r == -2 ? "THAT CLIP IS IN ANOTHER SONG" : "DOESN'T FIT";
     notice_until = now + 1500U;
 }
 /* SHIFT+K2: the marker section around the playhead, then the next ones. */

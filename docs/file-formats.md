@@ -7,8 +7,8 @@ start `0xFFFFFFFF`, final inversion), the same as the device's `pool_crc` and th
 
 Code: `app/song/song_file.c` (the payload on the device), `app/song/song_transfer.c` (the commands),
 `web/workbench/` (the codecs, MIDI and the workbench sections), with tests in `tests/workbench_test.mjs`,
-`tests/test_clips.c`, `tests/test_corrupt.c` (damaged songs and pool), `tests/preview_5b.mjs` and
-`tests/preview_7.mjs`.
+`tests/test_clips.c`, `tests/test_blocks.c`, `tests/test_corrupt.c` (damaged songs and pool),
+`tests/preview_5b.mjs`, `tests/preview_7.mjs` and `tests/preview_7b.mjs`.
 
 ## Song file (`.fm1song`)
 
@@ -18,7 +18,7 @@ uploading the file gives the device the same bytes back, so device to file to de
 | Offset | Size | Field |
 |---|---|---|
 | 0 | 4 | Magic `FMSG` (`46 4D 53 47`) |
-| 4 | 2 | File version, the payload's: 1 or 2 |
+| 4 | 2 | File version, the payload's: 1, 2 or 3 |
 | 6 | 2 | Flags, 0 |
 | 8 | 4 | Payload length |
 | 12 | 4 | CRC-32 of the payload |
@@ -72,12 +72,31 @@ A clip's events are a track's: notes, controllers and program changes in clock o
 start. A clip keeps any events past its length, which stay quiet until the length grows again. The FX lane stays
 with the song and never sits in a clip. The 4,096-event limit counts the tracks and the clips together.
 
-The device saves every song as version 2 and reads both versions. A version 1 song loads with an empty grid and
-the launch quantize at a bar. The workbench reads both, writes a song back in the version it came in, and
-wraps each payload in a file of the same version, so an older song file keeps its bytes.
+A version 1 song loads with an empty grid and the launch quantize at a bar.
 
 Size: version 1 plus 3 bytes, 9 per named row, and 5 per clip plus 8 per clip event. The test song saved by the
 phase 7 firmware is 7,644 bytes.
+
+### Song payload, version 3 (phase 7b, clips in the song)
+
+Version 3 is version 2 with the payload version byte 3, and a track may hold clip blocks among its events. The
+layout doesn't change. A block is an event of kind 3 with bit 7 of a set:
+
+| Field | Value |
+|---|---|
+| `at` | The block's start clock, kind 3 |
+| a | `0x80` plus the clip's row (0 to 15) in the track's own column, or `0xFF` for a stop |
+| b | Bits 16 to 23 of the block's length |
+| length | Bits 0 to 15 of the block's length, which is 1 clock or more |
+
+The FX lane's stutters keep a below `0x80`. A block ends at its length or where the track's next block starts.
+Inside it, the track plays the clip from the block's start, pass after pass, or nothing for a stop, and its
+own events stay quiet. Blocks sit only on the tracks, never in a clip, and a version 1 or 2 payload with one
+is refused.
+
+The device saves every song as version 3 and reads all three. The workbench reads all three, writes a song
+back in the version it came in, and wraps each payload in a file of the same version, so an older song file
+keeps its bytes. A block costs 8 bytes.
 
 ## Kit file (`.fm1kit`)
 
@@ -155,8 +174,13 @@ Export is format 1 at 480 ticks per quarter note, so clocks carry over unchanged
 the song name, a time signature at the start of each signature's bar, the tempo changes and the markers.
 Tracks 2 to 9 are the FM-1 tracks 1 to 8 on MIDI channels 1 to 8, named after their engines, with the notes,
 controllers and program changes, and a program change at the start when the track's saved program is known
-and nothing else sits there. Every track ends at the end of the last bar. Glitch attributes, the FX lane,
-humanize and the clips are left out (the workbench says how many), and stay in the song file.
+and nothing else sits there. Every track ends at the end of the last bar. Clip blocks are expanded into what
+they play, as the device's Expand job does: the clip pass after pass from the block's start, cut off at its
+end, the track's own events inside it gone, and the controllers set at its edges. Glitch attributes, the FX
+lane, humanize and the clip grid itself are left out (the workbench says how many), and stay in the song file.
+
+The workbench also lists the open song's clips, and copies one into a cell of a song on the device. Its glitch
+attributes move to that song's glitch table, and a note whose attributes don't fit there plays plain.
 
 Import takes format 0 and 1 files with any tick rate. Each part is a track and channel pair. Parts on
 channels 1 to 8, one per channel, map to the FM-1 track of that number, as an export does. Otherwise the
