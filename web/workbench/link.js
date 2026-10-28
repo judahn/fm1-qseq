@@ -35,6 +35,9 @@
     return { command: bytes[5], token: bytes[6] | bytes[7] << 7, status: out[0], data: Uint8Array.from(out.slice(1)) };
   }
   const failure = status => Object.assign(Error(ERRORS[status] || 'Device error ' + status), { status });
+  /* A sample as the device tells samples apart: CRC, size and length. */
+  const sampleKey = s => s.crc + ':' + s.bytes + ':' + s.frames;
+  const padKey = p => sampleKey({ crc: crc32(p.data), bytes: p.data.length, frames: p.frames });
 
   /* send(requests) answers [{status, data}] for a list of [command, payload]. */
   class Link {
@@ -111,12 +114,14 @@
       }
     }
     /* What a kit would add: its samples not on the device yet, by CRC, size
-     * and length, as the device itself tells them apart. */
-    async kitCost(pads) {
-      const have = await this.samples(), seen = new Set(have.map(s => s.crc + ':' + s.bytes + ':' + s.frames));
-      let sectors = 1, fresh = 0; /* the kit table is rewritten next to the old one */
+     * and length, as the device itself tells them apart. The kit table is
+     * kept twice, a sector each: rewriting it takes one free sector, and the
+     * first kit two. */
+    async kitCost(pads, kits = 1) {
+      const have = await this.samples(), seen = new Set(have.map(sampleKey));
+      let sectors = kits ? 1 : 2, fresh = 0;
       for (const p of pads) {
-        const key = crc32(p.data) + ':' + p.data.length + ':' + p.frames;
+        const key = padKey(p);
         if (!p.frames || seen.has(key)) continue;
         seen.add(key); fresh++;
         sectors += K().sectors(p.data.length);
@@ -124,7 +129,7 @@
       return { sectors, fresh };
     }
     async writeKit(kit, progress = () => {}) {
-      const info = await this.info(), cost = await this.kitCost(K().readBank(kit.bank));
+      const info = await this.info(), cost = await this.kitCost(K().readBank(kit.bank), info.kits);
       check(!info.playing, ERRORS[85]);
       check(info.kits < info.maxKits, 'The device holds ' + info.maxKits + ' kits at most');
       check(info.free >= cost.sectors, 'Not enough room on the device: this kit needs ' + cost.sectors * 4 + ' KB, ' + info.free * 4 + ' KB is free');
@@ -135,6 +140,20 @@
         const r = await this.one(47, [...field(kit.name, 16), ...settings]);
         return { id: le16(r.data, 0), fresh: cost.fresh };
       } catch (error) { await this.one(16).catch(() => {}); throw error; }
+    }
+    /* A kit on the device with these samples, pad for pad, or null. Only
+     * when every sample is there already are the kits' pads read. */
+    async findKit(pads) {
+      const keys = pads.map(p => (p.frames ? padKey(p) : '')), byId = new Map((await this.samples()).map(s => [s.id, sampleKey(s)]));
+      const there = new Set(byId.values());
+      if (!keys.every(key => !key || there.has(key))) return null;
+      for (const kit of await this.kits()) {
+        let head;
+        try { head = await this.one(42, u16(kit.id)); } finally { await this.one(49).catch(() => {}); }
+        const ids = Array.from({ length: 8 }, (_, i) => le16(head.data, 25 + i * 2));
+        if (head.status !== 1 && ids.every((id, i) => (id ? byId.get(id) || '?' : '') === keys[i])) return kit;
+      }
+      return null;
     }
     setKit(id, name, params) { return this.one(44, [...u16(id), ...field(name, 16), ...(params ? [1, ...params] : [0, ...new Uint8Array(48)])]); }
     deleteSong(id) { return this.one(39, u16(id)); }

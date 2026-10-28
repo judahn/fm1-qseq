@@ -4,8 +4,9 @@
 // against the page's simulator. Songs go down and back up byte for byte,
 // through MIDI and back, and from a factory template. A kit built from
 // generated WAVs is written, shared samples are stored once, and a pad
-// plays. The stock sample loader and clear go through the pool, and the
-// protocol's errors come back as they should. Saves docs/phase5b-*.png.
+// plays. The stock sample loader and clear go through the pool, the
+// built-in sounds go over as a kit once, and the protocol's errors come back
+// as they should. Saves docs/phase5b-*.png.
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
@@ -217,6 +218,41 @@ export async function phase5b(browser, root) {
   await page.waitForTimeout(500);
   out.cleared = (await device()).info;
 
+  // 8. The built-in kit: the simulator boots with FM1 Open's 8 built-in sounds
+  // as its stock bank, so the workbench finds them there and sends nothing.
+  // With the kits using those samples deleted, it sends them as BUILT-IN, and
+  // a second time finds that kit.
+  await page.click('#mode-library');
+  for (let i = 0; i < 40 && !/Up to date/.test(await act('#sw-refresh')); i++) await page.waitForTimeout(250);
+  const atStart = await device();
+  out.builtinThere = await act('#sw-kit-builtin');
+  const afterThere = await device();
+  out.stockKitsGone = await page.evaluate(async () => {
+    const link = FM1SongWorkbench.link.simulator(FM1SimProtocol), gone = [];
+    for (const k of await link.kits()) {
+      const head = await link.one(42, [k.id & 255, k.id >> 8]);
+      await link.one(49);
+      const ids = Array.from({ length: 8 }, (_, i) => head.data[25 + i * 2] | head.data[26 + i * 2] << 8);
+      if (ids.some(id => id >= 0xf000)) { await link.deleteKit(k.id); gone.push(k.name); }
+    }
+    return gone;
+  });
+  await act('#sw-refresh');
+  const before8 = await device();
+  out.builtinSent = await act('#sw-kit-builtin');
+  const afterSent = await device();
+  out.builtinAgain = await act('#sw-kit-builtin');
+  const afterAgain = await device();
+  out.builtin = await page.evaluate(async () => {
+    const ns = FM1SongWorkbench, link = ns.link.simulator(FM1SimProtocol);
+    const kit = (await link.kits()).find(k => k.name === 'BUILT-IN'), read = await link.readKit(kit.id), pads = ns.kitFile.readBank(read.bank);
+    return { names: pads.map(p => p.name).join(), frames: pads.reduce((n, p) => n + p.frames, 0), bank: read.bank.length,
+      audio: pads.reduce((n, p) => n + p.data.length, 0), sectors: pads.reduce((n, p) => n + ns.kitFile.sectors(p.data.length), 0) };
+  });
+  out.builtinCounts = { start: atStart.kits.length, there: afterThere.kits.length, before: before8.kits.length, sent: afterSent.kits.length,
+    again: afterAgain.kits.length, sectors: afterSent.info.sampleSectors - before8.info.sampleSectors,
+    againSectors: afterAgain.info.sampleSectors - afterSent.info.sampleSectors };
+
   // 7. Errors: playing, a full pool and bad data are refused with their codes,
   // and the stock commands still answer.
   out.errors = await page.evaluate(async () => {
@@ -300,6 +336,21 @@ export async function phase5b(browser, root) {
   t.eq('with one new sample', l.after.samples, l.before.samples + 1);
   t.eq('clear drops the songs', q.cleared.songs, 0);
   t.eq('clear keeps the kits', q.cleared.kits, l.after.kits);
+  const bi = q.builtin, bc = q.builtinCounts;
+  t.match('built-in kit: found as the stock bank, nothing sent', q.builtinThere, /already on the device as kit \d+, STOCK BANK\. Nothing sent/);
+  t.eq('built-in kit: no kit added', bc.there, bc.start);
+  t.eq('the kits using the stock bank\'s samples deleted', q.stockKitsGone.length, 2);
+  t.match('built-in kit: sent as 8 new samples, 88 KB', q.builtinSent, /written: BUILT-IN, the 8 built-in sounds, 8 new samples\. Its samples take 88 KB/);
+  t.eq('built-in kit: one kit more', bc.sent, bc.before + 1);
+  t.eq('built-in kit: its pads by name', bi.names, 'BWOOM,PAH,HEY,WAH,HAHA,YOI,TSI,SHAA');
+  t.eq('built-in kit: 106,560 frames', bi.frames, 106560);
+  t.eq('built-in kit: a 76,436-byte bank', bi.bank, 76436);
+  t.eq('built-in kit: 75,924 bytes of audio (74.1 KB)', bi.audio, 75924);
+  t.eq('built-in kit: 22 pool sectors (88 KB) for its samples', bi.sectors, 22);
+  t.eq('built-in kit: the device\'s sample sectors grow by those 22', bc.sectors, 22);
+  t.match('built-in kit sent again: found, nothing sent', q.builtinAgain, /already on the device as kit \d+, BUILT-IN\. Nothing sent/);
+  t.eq('built-in kit sent again: no kit added', bc.again, bc.sent);
+  t.eq('built-in kit sent again: nothing written', bc.againSectors, 0);
   t.eq('stock command 11 still answers', e.stock11, 2);
   t.eq('stock command 0 still answers', e.stock0, 14);
   t.eq('a song write while playing: refused (85)', e.playing, 85);

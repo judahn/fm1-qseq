@@ -6,10 +6,11 @@
 /* The kit library (design section 8, Kits). A kit is 8 sample references,
  * with the pads' names, and optional pad settings. A sample is its own
  * extent in the pool, the SEA5 data right after the header, so a pad
- * binds straight to mapped flash. All kits share one table object. A
- * stock bank found at its old address stays there as one legacy extent,
- * its samples numbered KIT_LEGACY + pad. Kits that share a sample point at
- * the one copy. */
+ * binds straight to mapped flash. All kits share one table object, kept
+ * twice so a power cut or a damaged sector can't lose it. A stock bank
+ * found at its old address stays there as one legacy extent, its samples
+ * numbered KIT_LEGACY + pad. Kits that share a sample point at the one
+ * copy. */
 enum { KIT_PADS = 8, KIT_PARAMS = 6, KIT_LEGACY = 0xf000, KIT_BANK_HEADER = 512, KIT_CHUNK = 228, KIT_MAX = 32 };
 struct kit {
     uint16_t sample[KIT_PADS];               /* 0 for an empty pad */
@@ -28,10 +29,11 @@ int kit_write(struct song_pool *p, unsigned id, const char *name, const struct k
 unsigned kit_refs(const struct song_pool *p, unsigned ref); /* how many kits use a sample */
 /* Deletes a kit, and the samples no other kit uses. */
 int kit_delete(struct song_pool *p, unsigned id);
-/* After a scan: a stock bank no kit uses becomes a kit named `name`, and
- * samples no kit uses (an import cut short) go. Returns that kit or 0. When
- * the kit table is damaged (its CRC is checked), or samples have no table,
- * nothing is made or deleted. */
+/* After a scan: a copy of the kit table that is damaged, missing or behind
+ * is made again from the newest whole one, a stock bank no kit uses becomes
+ * a kit named `name`, and samples no kit uses (an import cut short) go.
+ * Returns that kit or 0. When both copies are damaged (their CRCs are
+ * checked), or samples have no table, nothing is made or deleted. */
 unsigned kit_tidy(struct song_pool *p, const char *name);
 
 /* A stock-format bank streamed in by the transfer path, turned into

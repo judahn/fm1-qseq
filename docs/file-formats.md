@@ -105,8 +105,14 @@ is CRC-32 over the whole bank with bytes 12 to 19 (the CRC and commit words) tak
 
 Size: 512 bytes plus 228 per 320 frames of audio, about 22.8 KB per second at 32 kHz. On the device each
 sample is its own pool extent of ceil((64 + bytes) / 4096) sectors, and kits that share a sample (same bytes,
-same length) point at one copy. The workbench counts that before writing, so a kit that doesn't fit is
-refused before anything is sent.
+same length) point at one copy. Every kit's name, pads and settings sit in one kit table, kept twice, a sector
+each, written one after the other, so a power cut or a damaged sector leaves a whole copy. The workbench
+counts all of that before writing, so a kit that doesn't fit is refused before anything is sent.
+
+The workbench can also send FM1 Open's 8 built-in sounds (BWOOM, PAH, HEY, WAH, HAHA, YOI, TSI and SHAA) as a
+kit named BUILT-IN, made by the simulator as the stock sample library makes them: 106,560 frames, a 76,436-byte
+bank, 22 sectors (88 KB) on the device. When a kit with the same samples on the same pads is already there,
+it says so and sends nothing.
 
 ## Transfer commands 32 to 50
 

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception
 // Node unit tests for the song workbench (web/workbench, phase 5b): the MIDI
 // writer and reader, the song and kit file codecs (with phase 7's clips),
-// songs to MIDI and back, and sample prep. No dependencies:
+// songs to MIDI and back, sample prep, and the built-in kit against a fake
+// device. No dependencies:
 //   node tests/workbench_test.mjs
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -9,8 +10,8 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../web/workbench');
-for (const name of ['bytes', 'song_file', 'kit_file', 'midi_file', 'song_midi', 'wav']) require(path.join(dir, name + '.js'));
-const { bytes: B, songFile: S, kitFile: K, midiFile: M, songMidi: SM, wav: W } = globalThis.FM1SongWorkbench;
+for (const name of ['bytes', 'song_file', 'kit_file', 'midi_file', 'song_midi', 'wav', 'link']) require(path.join(dir, name + '.js'));
+const { bytes: B, songFile: S, kitFile: K, midiFile: M, songMidi: SM, wav: W, link: L } = globalThis.FM1SongWorkbench;
 
 let checks = 0, failed = 0;
 const check = (ok, what) => { checks++; if (!ok) { failed++; console.log('FAIL', what); } };
@@ -151,6 +152,48 @@ throws(() => K.readKit(kitBad), 'a damaged kit file is refused');
 const bankBad = bank.slice(); bankBad[600] ^= 1;
 throws(() => K.readBank(bankBad), 'a damaged bank is refused');
 check(K.sectors(4032) === 1 && K.sectors(4033) === 2, 'pool sectors per sample');
+
+// The built-in kit: FM1 Open's 8 sounds by name. Before sending it, the device is asked
+// whether a kit already has those samples, pad for pad, and the kits' pads are read only
+// when every sample is there. The kit table is kept twice: the first kit needs two sectors.
+const builtinPads = K.BUILT_IN.map((name, i) => ({ name, frames: 320 * (i + 2) - 3, data: chunk(i + 2) }));
+const builtinBank = K.buildBank(builtinPads), builtin = K.builtinKit(builtinBank);
+check(builtin.name === 'BUILT-IN' && !builtin.params && B.same(builtin.bank, builtinBank) && builtin.pads.length === 8, 'built-in kit from the 8 sounds');
+throws(() => K.builtinKit(bank), 'a bank that is not the 8 built-in sounds is refused');
+const swapped = builtinPads.slice(); [swapped[0], swapped[1]] = [swapped[1], swapped[0]];
+throws(() => K.builtinKit(K.buildBank(swapped)), 'the built-in sounds out of order are refused');
+const le16b = v => [v & 255, v >> 8 & 255], le32b = v => [v & 255, v >>> 8 & 255, v >>> 16 & 255, v >>> 24];
+function fakeDevice(samples, kits) {
+  const sent = [], none = { status: 1, data: new Uint8Array(0) };
+  const reply = (command, p) => {
+    sent.push(command);
+    const id = p[0] | p[1] << 8, kit = kits.find(k => k.id === id), s = samples[p[0]], k = kits[p[0]];
+    if (command === 48) return s ? { status: 0, data: Uint8Array.from([...le16b(s.id), ...le32b(s.data.length), ...le32b(s.frames),
+      ...le32b(B.crc32(s.data)), 1, ...B.field(s.name, 16)]) } : none;
+    if (command === 41) return k ? { status: 0, data: Uint8Array.from([...le16b(k.id), ...B.field(k.name, 16), 255, 0, ...le32b(1000)]) } : none;
+    if (command === 42) return kit ? { status: 0, data: Uint8Array.from([...le32b(1000), ...le32b(0), ...B.field(kit.name, 16), 0,
+      ...kit.pads.flatMap(le16b)]) } : none;
+    return { status: 0, data: new Uint8Array(0) };
+  };
+  return { sent, link: new L.Link(async requests => requests.map(([command, payload]) => reply(command, payload))) };
+}
+{
+  const stored = builtinPads.map((p, i) => ({ ...p, id: 3 + i })), legacy = builtinPads.map((p, i) => ({ ...p, id: 0xf000 + i }));
+  const empty = fakeDevice([], [{ id: 1, name: 'MINE', pads: [1, 0, 0, 0, 0, 0, 0, 0] }]);
+  check(await empty.link.findKit(builtin.pads) === null && !empty.sent.includes(42), 'built-in kit: no samples there, no kit read');
+  const most = fakeDevice(stored.slice(1), [{ id: 1, name: 'MINE', pads: stored.map(s => s.id) }]);
+  check(await most.link.findKit(builtin.pads) === null && !most.sent.includes(42), 'built-in kit: 7 of 8 samples there, no kit read');
+  const order = stored.map(s => s.id); [order[0], order[1]] = [order[1], order[0]];
+  const both = fakeDevice([...stored, ...legacy], [{ id: 2, name: 'OTHER', pads: order }, { id: 4, name: 'STOCK BANK', pads: legacy.map(s => s.id) }]);
+  const found = await both.link.findKit(builtin.pads);
+  check(found && found.id === 4 && found.name === 'STOCK BANK', 'built-in kit: found as the stock bank, not as the same samples on other pads');
+  check(both.sent.filter(c => c === 42).length === 2 && both.sent.filter(c => c === 49).length === 2, 'built-in kit: each kit read is ended');
+  const half = fakeDevice(stored, [{ id: 5, name: 'HALF', pads: [...stored.slice(0, 4).map(s => s.id), 0, 0, 0, 0] }]);
+  check(await half.link.findKit(builtin.pads) === null, 'built-in kit: a kit with only some of them is not it');
+  const per = builtinPads.reduce((n, p) => n + K.sectors(p.data.length), 0);
+  const cost = await empty.link.kitCost(builtin.pads, 0), again = await both.link.kitCost(builtin.pads, 2);
+  check(cost.sectors === 2 + per && cost.fresh === 8 && again.sectors === 1 && again.fresh === 0, 'kit cost: two table copies for the first kit, one after');
+}
 
 // Sample prep: WAV in and out, resampling, and each step of the chain.
 const tone = Float32Array.from({ length: 44100 }, (_, i) => 0.5 * Math.sin(2 * Math.PI * 441 * i / 44100));

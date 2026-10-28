@@ -30,7 +30,8 @@ What it means for the data on the device:
 - The settings sector (15) and the staging sector (16) move, so the MIDI, clock and Bluetooth settings start
   from their defaults.
 - Stock projects are overwritten, and the stock sample bank can't stay, because it starts at sector 17. Kits
-  come from the workbench, which keeps its sample transfers in this build.
+  come from the workbench, which keeps its sample transfers in this build. Its "Send the built-in kit" puts
+  FM1 Open's 8 built-in sounds back as a kit (88 KB).
 - The SDK's settings area (VM) takes the space between the code and the Bluetooth sector, 64 KB at this size
   instead of 32 KB, and the Bluetooth sector moves. Both are untested on hardware.
 

@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* Corrupt data in the kit library (test_corrupt.c does songs and the pool
- * directory): the kit table, banks coming in through the transfer path, and
- * a stock bank in place where the stock firmware kept it, all damaged with
- * flipped bits, cut short and scrambled. Seeded, so a failure repeats. */
+ * directory): the kit table's two copies, banks coming in through the
+ * transfer path, and a stock bank in place where the stock firmware kept
+ * it, all damaged with flipped bits, cut short and scrambled. Seeded, so a
+ * failure repeats. */
 #include "corrupt_harness.h"
 
 /* Every kit, its name and its bank read back, as the song list and the
@@ -22,9 +23,11 @@ static void read_all(void)
     }
 }
 
-/* The kit table holds every kit in one object. Damaged, its kits may be
- * lost, but nothing reads wrong memory, and boot's tidy-up (kit_tidy) never
- * deletes a sample it can't be sure no kit uses. */
+/* The kit table holds every kit, kept twice. Either copy damaged, nothing
+ * is lost: the other is read, and boot's tidy-up (kit_tidy) makes the
+ * damaged one again. Both damaged, the kits are lost, but nothing reads
+ * wrong memory, and the tidy-up deletes and writes nothing, since it can't
+ * be sure no kit uses a sample. */
 static void test_kit_table(void)
 {
     memset(flash, 0xff, sizeof flash);
@@ -40,26 +43,55 @@ static void test_kit_table(void)
     scan();
     const struct song_pool clean = pool;
     const unsigned stored = samples();
-    const struct pool_extent *table = pool_find(&clean, POOL_KIT, 1);
-    CHECK(stored == 4 && table && kit_count(&pool) == 2);
+    CHECK(stored == 4 && kit_count(&pool) == 2 && copies_alike());
     wrong = 0;
-    unsigned flips = 0, kits_lost = 0;
-    const uint32_t payload_bits = table->length * 8U, header = table->sector * POOL_SECTOR;
-    for (unsigned bit = 0; bit < payload_bits + 256U + POOL_HEADER * 8U; ++bit, ++flips) {
+    unsigned flips = 0, kits_lost = 0, remade = 0;
+    for (unsigned copy = 1; copy <= 2; ++copy) {
+        const struct pool_extent *table = pool_find(&clean, POOL_KIT, copy);
+        const uint32_t payload_bits = table->length * 8U, header = table->sector * POOL_SECTOR;
+        for (unsigned bit = 0; bit < payload_bits + 256U + POOL_HEADER * 8U; ++bit, ++flips) {
+            memcpy(flash, good, sizeof flash);
+            if (bit < payload_bits) flip(raw(pool_address(table)), bit); /* every bit of the copy */
+            else if (bit < payload_bits + 256U) *raw(pool_address(table)) = (uint8_t)(bit - payload_bits); /* every kit count */
+            else flip(raw(header), bit - payload_bits - 256U); /* every bit of its header */
+            scan();
+            remade += !copies_alike();
+            read_all();
+            kits_lost += kit_count(&pool) != 2;
+            (void)kit_tidy(&pool, "STOCK BANK");          /* as at boot */
+            if (samples() != stored || kit_count(&pool) != 2 || !copies_alike()) went_wrong("kit table copy damaged (copy, try):", (long)(copy * 100000U + bit));
+            scan();                                       /* and as at the next boot */
+            if (kit_count(&pool) != 2 || !copies_alike()) went_wrong("kit table copy made again (copy, try):", (long)(copy * 100000U + bit));
+            read_all();
+        }
+    }
+    CHECK_EQ(kits_lost, 0);
+    CHECK(remade > 1000);
+    /* Both copies damaged: a bit in each payload, or each header. */
+    static uint8_t damaged[BYTES];
+    unsigned both = 0, both_lost = 0;
+    const struct pool_extent *a = pool_find(&clean, POOL_KIT, 1), *b = pool_find(&clean, POOL_KIT, 2);
+    for (unsigned k = 0; k < 400; ++k, ++both) {
         memcpy(flash, good, sizeof flash);
-        if (bit < payload_bits) flip(raw(pool_address(table)), bit); /* every bit of the table */
-        else if (bit < payload_bits + 256U) *raw(pool_address(table)) = (uint8_t)(bit - payload_bits); /* every kit count */
-        else flip(raw(header), bit - payload_bits - 256U); /* every bit of its header */
+        if (k < 300) {
+            flip(raw(pool_address(a)), rnd() % (a->length * 8U));
+            flip(raw(pool_address(b)), rnd() % (b->length * 8U));
+        } else {
+            flip(raw(a->sector * POOL_SECTOR), rnd() % (offsetof(struct pool_header, header_crc) * 8U));
+            flip(raw(b->sector * POOL_SECTOR), rnd() % (offsetof(struct pool_header, header_crc) * 8U));
+        }
         scan();
         read_all();
-        kits_lost += kit_count(&pool) != 2;
-        (void)kit_tidy(&pool, "STOCK BANK");              /* as at boot */
-        if (samples() != stored) went_wrong("kit table damaged, try", (long)bit);
-        read_all();
+        both_lost += kit_count(&pool) == 0;
+        memcpy(damaged, flash, sizeof flash);
+        (void)kit_tidy(&pool, "STOCK BANK");
+        if (samples() != stored || memcmp(damaged, flash, sizeof flash)) went_wrong("both kit table copies damaged, try", (long)k);
     }
     memcpy(flash, good, sizeof flash);
     scan();
-    printf("kit table: %u damaged tables (%u lost their kits), samples lost after boot's tidy-up: %u\n", flips, kits_lost, wrong);
+    printf("kit table: %u damaged copies (%u lost a kit, %u made again at boot), %u with both damaged (%u lost their kits), "
+           "samples lost or flash written wrongly: %u\n", flips, kits_lost, remade, both, both_lost, wrong);
+    CHECK_EQ(both_lost, both);
     CHECK_EQ(wrong, 0);
 }
 

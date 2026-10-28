@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* The Kits part of the "Songs and kits" section (phase 5b): a kit built
- * from up to 8 WAVs with prep per pad, kit files, and the device's kit
- * library. Encoding to SEA5 runs in a private copy of the simulator. */
+ * from up to 8 WAVs with prep per pad, kit files, the device's kit library,
+ * and FM1 Open's built-in sounds sent as a kit. Encoding to SEA5 runs in a
+ * private copy of the simulator. */
 (function (root) {
   'use strict';
   /* The page declares the simulator's bytes with const, so not on globalThis. */
@@ -13,7 +14,7 @@
   const html = `<h3>Kits</h3>
 <label>On the device <select id="sw-kits" size="5"></select></label>
 <div><button id="sw-kit-use">Use on the device</button><button id="sw-kit-download">Download kit file</button>
-<button id="sw-kit-delete">Delete</button></div>
+<button id="sw-kit-delete">Delete</button><button id="sw-kit-builtin">Send the built-in kit</button></div>
 <h4>Build a kit</h4>
 <div class="field-row"><label>Kit name <input id="sw-kit-name" type="text" maxlength="15" value="NEW KIT"></label>
 <label>Open a kit file <input id="sw-kit-file" type="file" accept=".fm1kit"></label></div>
@@ -40,6 +41,16 @@
     const out = encoder.sim_sample_encode();
     if (!out) throw Error('Encoding failed');
     return new Uint8Array(encoder.memory.buffer, out, encoder.sim_sample_bytes()).slice();
+  }
+  /* FM1 Open's 8 built-in sounds, made by a fresh copy of the simulator as
+   * the stock sample library makes them (sdk/Samples.js), as a kit. */
+  async function builtin() {
+    const wasm = await root.FM1Web.assetBytes(simulator(), 2097152, 'The simulator failed its check');
+    const c = (await WebAssembly.instantiate(wasm, {})).instance.exports;
+    c._initialize();
+    const at = c.sim_factory(), bytes = c.sim_factory_size();
+    if (!at || !bytes) throw Error('The built-in sounds failed to load');
+    return KF.builtinKit(new Uint8Array(c.memory.buffer, at, bytes).slice());
   }
   function options(pad) {
     const o = {};
@@ -128,6 +139,21 @@
         const used = KF.readBank(kit.bank).filter(p => p.frames).length;
         ui.status('Kit ' + result.id + ' written: ' + result.fresh + ' new samples, ' + (used - result.fresh) + ' already on the device.');
       });
+      $('sw-kit-builtin').onclick = ui.act(async () => {
+        const kit = await builtin();
+        const r = await ui.run(async link => {
+          const have = await link.findKit(kit.pads);
+          if (have) return { have };
+          const written = await link.writeKit(kit, ui.progress);
+          await ui.refresh(link);
+          return written;
+        });
+        const at = r.have ? r.have.id : r.id;
+        $('sw-kits').value = String(at);
+        ui.status(r.have ? 'The built-in sounds are already on the device as kit ' + at + ', ' + r.have.name + '. Nothing sent.'
+          : 'Kit ' + at + ' written: BUILT-IN, the 8 built-in sounds, ' + r.fresh + ' new samples. Its samples take ' +
+            kit.pads.reduce((n, p) => n + KF.sectors(p.data.length), 0) * 4 + ' KB on the device.');
+      });
       $('sw-kit-use').onclick = ui.act(async () => {
         const k = selectedKit();
         await ui.run(async link => { await link.useKit(k.id); await ui.refresh(link); });
@@ -154,7 +180,7 @@
       if (kits.some(k => String(k.id) === keep)) $('sw-kits').value = keep;
     },
     enable(busy) {
-      for (const id of ['sw-kit-use', 'sw-kit-download', 'sw-kit-delete', 'sw-kit-write']) $(id).disabled = busy;
+      for (const id of ['sw-kit-use', 'sw-kit-download', 'sw-kit-delete', 'sw-kit-write', 'sw-kit-builtin']) $(id).disabled = busy;
     },
     state: () => ({ pads, built })
   };

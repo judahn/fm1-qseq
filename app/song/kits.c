@@ -35,32 +35,71 @@ SONG_SMALL int kit_sample(const struct song_pool *p, unsigned ref, struct kit_sa
     memcpy(out->name, h.name, 15);
     return out->data ? 0 : -1;
 }
-/* Every kit lives in one table object (POOL_KIT, id 1): a count, then per
- * kit its id, name and record, in id order. A kit costs 84 bytes there. */
+/* Every kit lives in a table object (POOL_KIT): a count, then per kit its
+ * id, name and record, in id order. A kit costs 84 bytes there, so the table
+ * is one sector at most. It is kept twice, ids 1 and 2, written one after
+ * the other, so a power cut or a damaged sector leaves a whole copy. The
+ * newest whole copy is the table. */
 struct kit_entry { uint16_t id; char name[16]; struct kit kit; };
 _Static_assert(sizeof(struct kit_entry) == 84, "kit table entry");
+_Static_assert(POOL_HEADER + 1 + KIT_MAX * sizeof(struct kit_entry) <= POOL_SECTOR, "a kit table copy is one sector");
 static struct kit_entry table[KIT_MAX];
-/* The table's kit count, 0 when there is none, or -1 when it is there but
- * damaged: its CRC, or a count that doesn't match its length. */
-SONG_SMALL static int load_table(const struct song_pool *p)
+/* A copy's kit count, or -1 when it is missing or damaged: its CRC, or a
+ * count that doesn't match its length. */
+SONG_SMALL static int whole(const struct song_pool *p, const struct pool_extent *e)
 {
-    const struct pool_extent *e = pool_find(p, POOL_KIT, 1);
     uint8_t n = 0;
-    if (!e) return 0;
-    if (pool_check(p, e) || p->flash->read(pool_address(e), &n, 1) || n > KIT_MAX || e->length != 1U + n * sizeof table[0] ||
-        p->flash->read(pool_address(e) + 1U, table, n * sizeof table[0])) return -1;
+    if (!e || pool_check(p, e) || p->flash->read(pool_address(e), &n, 1) || n > KIT_MAX || e->length != 1U + n * sizeof table[0])
+        return -1;
     return n;
 }
-SONG_SMALL static unsigned load(const struct song_pool *p) { int n = load_table(p); return n > 0 ? (unsigned)n : 0U; }
+/* The table, read in from the newest whole copy (its id in `used`): its
+ * kit count, 0 when there is none, or -1 when every copy there is damaged. */
+SONG_SMALL static int load_table(const struct song_pool *p, unsigned *used)
+{
+    const struct pool_extent *a = pool_find(p, POOL_KIT, 1), *b = pool_find(p, POOL_KIT, 2), *t;
+    if (!a && !b) return 0;
+    if (b && (!a || b->generation - a->generation < 0x80000000U)) { t = a; a = b; b = t; } /* a: the newest */
+    int n = whole(p, a);
+    if (n < 0) { n = whole(p, b); a = b; }
+    if (n > 0 && p->flash->read(pool_address(a) + 1U, table, (unsigned)n * sizeof table[0])) n = -1;
+    if (used && n >= 0) *used = a->id;
+    return n;
+}
+SONG_SMALL static unsigned load(const struct song_pool *p) { int n = load_table(p, NULL); return n > 0 ? (unsigned)n : 0U; }
+/* Both copies whole and alike. */
+SONG_SMALL static int alike(const struct song_pool *p)
+{
+    const struct pool_extent *a = pool_find(p, POOL_KIT, 1), *b = pool_find(p, POOL_KIT, 2);
+    return whole(p, a) >= 0 && whole(p, b) >= 0 && a->length == b->length &&
+           !memcmp(p->flash->map(pool_address(a), a->length), p->flash->map(pool_address(b), b->length), a->length);
+}
+/* Both copies, one after the other. The change counts once the first is
+ * committed, so there must be room for both before either is written: a
+ * sector each, less the one the first copy's old sector gives back. A copy
+ * left behind would come back as the newest once compacting moved it, so a
+ * second copy that fails goes. With no kits both copies go, and the change
+ * counts once both have. */
 SONG_SMALL static int store(struct song_pool *p, unsigned n)
 {
-    struct pool_writer w;
-    if (!n) return pool_find(p, POOL_KIT, 1) ? pool_delete(p, POOL_KIT, 1) : 0;
-    if (pool_begin(&w, p, POOL_KIT, 1, "KITS", 1U + n * sizeof table[0])) return w.error;
-    const uint8_t count = (uint8_t)n;
-    pool_put(&w, &count, 1);
-    pool_put(&w, table, n * sizeof table[0]);
-    return pool_end(&w);
+    int r = 0;
+    if (!n) {
+        for (unsigned id = 1; id <= 2; ++id) if (pool_find(p, POOL_KIT, id)) r |= pool_delete(p, POOL_KIT, id);
+        return r;
+    }
+    if (pool_free(p) < (pool_find(p, POOL_KIT, 1) ? 1U : 2U)) return -1;
+    for (unsigned id = 1; id <= 2; ++id) {
+        struct pool_writer w;
+        const uint8_t count = (uint8_t)n;
+        if (!pool_begin(&w, p, POOL_KIT, id, "KITS", 1U + n * sizeof table[0])) {
+            pool_put(&w, &count, 1);
+            pool_put(&w, table, n * sizeof table[0]);
+            (void)pool_end(&w);
+        }
+        if (w.error && id == 1) return w.error;
+        if (w.error) (void)pool_delete(p, POOL_KIT, 2);
+    }
+    return 0;
 }
 SONG_SMALL static int find(unsigned n, unsigned id)
 {
@@ -130,12 +169,19 @@ SONG_SMALL int kit_delete(struct song_pool *p, unsigned id)
 }
 SONG_SMALL unsigned kit_tidy(struct song_pool *p, const char *name)
 {
-    /* A damaged table, or samples with no table at all: the library doesn't
-     * read whole, so nothing here can be sure a sample is unused. Leave it. */
-    int kits = load_table(p);
+    /* Both copies of the table damaged, or samples with no table at all: the
+     * library doesn't read whole, so nothing here can be sure a sample is
+     * unused. Leave it. One whole copy is enough, and the other is made again
+     * from it. */
+    unsigned used = 0;
+    int kits = load_table(p, &used);
     for (unsigned i = 0; !kits && i < p->count; ++i)
         if (p->extent[i].type == POOL_SAMPLE) kits = -1;
     if (kits < 0) return 0;
+    if (kits && !alike(p)) { /* the other copy first, so an old one can't come back */
+        (void)pool_delete(p, POOL_KIT, 3U - used);
+        (void)store(p, (unsigned)kits);
+    }
     unsigned made = 0;
     const uint8_t *base;
     const struct bank_header *h = legacy(p, &base);

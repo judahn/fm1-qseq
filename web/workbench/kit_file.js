@@ -55,6 +55,15 @@
     return bank;
   }
 
+  /* FM1 Open's 8 built-in sounds as a kit. `bank` is the bank the simulator
+   * makes for them (sim_factory, as sdk/Samples.js gets it). */
+  const BUILT_IN = ['BWOOM', 'PAH', 'HEY', 'WAH', 'HAHA', 'YOI', 'TSI', 'SHAA'];
+  function builtinKit(bank) {
+    const pads = readBank(bank);
+    check(pads.every((p, i) => p.name === BUILT_IN[i] && p.frames), 'The built-in sounds are not the expected 8');
+    return { name: 'BUILT-IN', params: null, bank: bank.slice(), pads };
+  }
+
   /* "FMKT", version 1, flags (1: pad settings), name[16], settings[8][6],
    * bank length, CRC-32 of the header's first 76 bytes and then the bank. */
   function writeKit(kit) {
@@ -73,7 +82,7 @@
     return kit;
   }
 
-  ns.kitFile = { HEADER, RATE, CHUNK_FRAMES, CHUNK_BYTES, PADS, PARAMS, chunkBytes, sectors, bankCrc, readBank, buildBank,
-    writeKit, readKit };
+  ns.kitFile = { HEADER, RATE, CHUNK_FRAMES, CHUNK_BYTES, PADS, PARAMS, BUILT_IN, chunkBytes, sectors, bankCrc, readBank, buildBank,
+    builtinKit, writeKit, readKit };
   if (typeof module === 'object' && module.exports) module.exports = ns.kitFile;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -86,15 +86,16 @@ static void test_song_payloads(void)
 }
 
 /* The pool's directory with damaged headers, payloads and stray sectors: the
- * damaged object goes or still checks out whole, and every other one loads. */
-static int others_load(unsigned skip_song, unsigned kit_too)
+ * damaged object goes or still checks out whole, and every other one loads.
+ * The kit is always there: its table is kept twice. */
+static int others_load(unsigned skip_song)
 {
     static struct song into;
     int ok = 1;
     for (unsigned id = 1; id <= 3; ++id)
         if (id != skip_song) ok &= !load(id, &into) && whole(&into);
     struct kit k;
-    return ok && (!kit_too || (kit_count(&pool) == 1 && !kit_read(&pool, 1, &k)));
+    return ok && kit_count(&pool) == 1 && !kit_read(&pool, 1, &k);
 }
 static void test_pool_directory(void)
 {
@@ -106,7 +107,7 @@ static void test_pool_directory(void)
     CHECK_EQ(import(bank, bytes, bytes, &kit), 0);
     memcpy(good, flash, sizeof flash);
     scan();
-    CHECK(others_load(0, 1));
+    CHECK(others_load(0));
     const struct song_pool clean = pool;
     wrong = 0;
     unsigned flips = 0, dropped = 0;
@@ -118,7 +119,7 @@ static void test_pool_directory(void)
             const struct pool_extent *now = pool_find(&pool, e->type, e->id);
             dropped += !now;
             int ok = !now || (now->sector == e->sector && now->sectors == e->sectors && now->length == e->length);
-            ok &= others_load(e->type == POOL_SONG ? e->id : 0, e->type != POOL_KIT);
+            ok &= others_load(e->type == POOL_SONG ? e->id : 0);
             if (!ok) went_wrong("pool header bit flipped (extent, bit):", (long)(i * 1000U + bit));
             flip(raw(e->sector * POOL_SECTOR), bit);
         }
@@ -134,7 +135,7 @@ static void test_pool_directory(void)
             ++hits;
             scan();
             refused_two += load(2, &target) != 0;
-            if (!others_load(2, 1)) went_wrong("song 2's payload damaged at", (long)at);
+            if (!others_load(2)) went_wrong("song 2's payload damaged at", (long)at);
         }
         *raw(at) = keep;
     }
@@ -164,7 +165,7 @@ static void test_pool_directory(void)
             memcpy(at, &h, sizeof h);
         }
         scan();
-        if (pool.count != clean.count || !others_load(0, 1)) went_wrong("a stray sector, try", (long)k);
+        if (pool.count != clean.count || !others_load(0)) went_wrong("a stray sector, try", (long)k);
         memcpy(at, good_at(s * POOL_SECTOR), POOL_SECTOR);
         ++strays;
     }

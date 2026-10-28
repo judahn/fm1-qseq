@@ -23,7 +23,7 @@ done
 # storage tests again with the pool on logical sectors 25 to 125 through it
 # (tests/ram_flash.h), every file built with the device's configuration.
 FULL="-DSONG_DEVICE_FULL=1 -DTEST_FULL_LAYOUT -I$ROOT/sdk/include"
-for name in test_flash_map test_store test_corrupt test_corrupt_kits; do
+for name in test_flash_map test_store test_corrupt test_corrupt_kits test_kit_copies; do
     # shellcheck disable=SC2086
     $CC $FLAGS $FULL -I"$ROOT/app/song" "$ROOT/tests/$name.c" $SOURCES -o "$OUT/${name}_full"
     "$OUT/${name}_full" || status=1

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* Shared by the corrupt-data tests (test_corrupt.c, test_corrupt_kits.c): a
+/* Shared by the corrupt-data tests (test_corrupt.c, test_corrupt_kits.c)
+ * and the kit table's power-loss test (test_kit_copies.c): a
  * RAM flash and pool (ram_flash.h, so they run on the full device build's
  * layout too), a seeded random, a song with something of everything a file
  * holds, the device's load path, what a loaded song promises, and a stock
@@ -140,6 +141,13 @@ static unsigned samples(void)
     unsigned n = 0;
     for (unsigned i = 0; i < pool.count; ++i) n += pool.extent[i].type == POOL_SAMPLE;
     return n;
+}
+/* Both copies of the kit table there, whole and alike. */
+static int copies_alike(void)
+{
+    const struct pool_extent *a = pool_find(&pool, POOL_KIT, 1), *b = pool_find(&pool, POOL_KIT, 2);
+    return a && b && !pool_check(&pool, a) && !pool_check(&pool, b) && a->length == b->length &&
+           !memcmp(f_map(pool_address(a), a->length), f_map(pool_address(b), b->length), a->length);
 }
 
 #endif
