@@ -23,12 +23,13 @@ static uint32_t song_window = ~0U, song_drawn_x = ~0U, song_ranged = ~0U;
 static uint8_t song_low[SONG_TRACKS], song_high[SONG_TRACKS];
 static struct {
     uint32_t clock, target, ghost_from, ghost_to;
-    uint8_t playing, jumping, shift, recording, selected, ghost_tracks;
+    uint8_t playing, jumping, shift, recording, selected, ghost_tracks, glitching;
 } song_now; /* taken by the marking pass, used by every band */
 static void select_track(int delta);
 static void song_start(uint32_t now);
 #if SONG_UI
 #include "song_select.inc"
+#include "song_glitch.inc"
 #include "lanes.h"
 
 static uint32_t song_span(void) { return (16U >> song_zoom) * (uint32_t)SONG_WHOLE; }
@@ -155,16 +156,7 @@ static void song_draw(void)
     for (unsigned t = 0; t < SONG_TRACKS; ++t) song_row(s, t);
     song_playhead_line();
     if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
-    char start[24], end[24];
-    song_position(s, s->loop_start, start, 0);
-    song_position(s, s->loop_end, end, 0);
-    if (song_now.recording) song_knob_footer(); /* K1 to K4 record parameters */
-    else {
-        knob(0, song_now.shift ? "MARKER" : "SNAP", song_now.shift ? "< >" : song_snaps[song_zoom], colors[0]);
-        knob(1, "LOOP IN", start, colors[1]);
-        knob(2, "LOOP OUT", end, colors[2]);
-        knob(3, "ZOOM", song_spans[song_zoom], colors[3]);
-    }
+    song_footer(s, "MARKER");
     if (notice && (int32_t)(frame_time - notice_until) >= 0) notice = NULL;
     char selection[40], part[12];
     if (song_now.recording) {
@@ -182,8 +174,10 @@ static void song_draw(void)
         else for (unsigned t = 0; t < SONG_TRACKS && strlen(selection) < 34; ++t)
             if (picked >> t & 1U) { strcat(selection, " T"); decimal(part, (int)t + 1, 1); strcat(selection, part); }
     }
-    const char *hint = notice ? notice : song_now.jumping ? "JUMP WAITS FOR THE NEXT BAR"
-        : song_now.shift ? "SHIFT: F3-E4 EDIT  F4-G5 MARKERS"
+    char glitch[40];
+    const char *hint = notice ? notice : song_now.glitching ? song_stutter_hint(glitch)
+        : song_now.jumping ? "JUMP WAITS FOR THE NEXT BAR"
+        : song_now.shift ? "F3-E4 EDIT F#3-A#3 MANGLE F4-G5 MARK"
         : (previous_buttons & BUTTON(LFO)) ? "LFO + F3-F4 TRACKS  G4 ALL" : selection;
     uint32_t sig = signature(0, hint, (unsigned)strlen(hint));
     if (sig == cache->hint_cache) return;

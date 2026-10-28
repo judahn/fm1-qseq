@@ -6,6 +6,7 @@
  * where the copy starts, so it sounds the same wherever it lands. */
 #include "arrange.h"
 #include "lanes.h"
+#include "glitch.h"
 #include "song_config.h"
 #include <string.h>
 #if SONG_UI
@@ -15,6 +16,14 @@ SONG_SMALL static unsigned in_range(const struct song *s, unsigned tracks, uint3
     unsigned n = 0;
     for (unsigned t = 0; t < SONG_TRACKS; ++t)
         if (tracks >> t & 1U) n += song_find(s, t, to) - song_find(s, t, from);
+    return n;
+}
+/* Stutters on the FX lane (track 1) when track 1 itself isn't in the mask. */
+SONG_SMALL static unsigned fx_only(const struct song *s, unsigned tracks, uint32_t from, uint32_t to)
+{
+    unsigned n = 0, count, end = song_find(s, 0, to);
+    const struct song_event *e = song_track(s, 0, &count);
+    for (unsigned i = song_find(s, 0, from); !(tracks & 1U) && i < end; ++i) n += song_event_kind(&e[i]) == SONG_FX;
     return n;
 }
 SONG_SMALL static void clear(struct song *s, unsigned tracks, uint32_t from, uint32_t to)
@@ -29,7 +38,7 @@ SONG_SMALL static struct song_event moved(const struct song_event *e, uint32_t a
 {
     struct song_event c = *e;
     uint32_t start = song_event_start(e);
-    c.at = (e->at & 0x7f000000U) | at;
+    c.at = (e->at & ~(SONG_FRESH | 0xffffffU)) | at;
     if (limit > start && start + c.length > limit) c.length = (uint16_t)(limit - start);
     return c;
 }
@@ -54,17 +63,21 @@ SONG_SMALL int song_copy(const struct song *s, struct song_clip *clip, unsigned 
     struct start_values v = {(struct song *)s, clip, from, to, 0, 0};
     for (unsigned t = 0; t < SONG_TRACKS; ++t)
         if (tracks >> t & 1U) song_chase(s, t, from, start_value, &v);
-    if (from >= to || !(tracks & 0xffU) || in_range(s, tracks, from, to) + v.count > SONG_CLIP_EVENTS) return -1;
+    if (from >= to || !(tracks & 0xffU) ||
+        in_range(s, tracks, from, to) + v.count + fx_only(s, tracks, from, to) > SONG_CLIP_EVENTS) return -1;
     clip->count = 0;
     clip->length = to - from;
     clip->tracks = (uint8_t)tracks;
+    memcpy(clip->glitch, s->glitch, sizeof clip->glitch);
     v.fill = 1;
     for (unsigned t = 0; t < SONG_TRACKS; ++t) {
-        if (!(tracks >> t & 1U)) continue;
-        song_chase(s, t, from, start_value, &v);
+        unsigned whole = tracks >> t & 1U;
+        if (!whole && t) continue;
+        if (whole) song_chase(s, t, from, start_value, &v);
         unsigned count, end = song_find(s, t, to);
         const struct song_event *e = song_track(s, t, &count);
         for (unsigned i = song_find(s, t, from); i < end; ++i) {
+            if (!whole && song_event_kind(&e[i]) != SONG_FX) continue;
             clip->event[clip->count] = moved(&e[i], song_event_start(&e[i]) - from, to);
             clip->track[clip->count++] = (uint8_t)t;
         }
@@ -83,24 +96,40 @@ SONG_SMALL int song_paste(struct song *s, const struct song_clip *clip, uint32_t
     if (!clip->length || track >= SONG_TRACKS || at + clip->length > SONG_MAX_CLOCK) return -1;
     unsigned freed = insert ? 0 : in_range(s, targets, at, at + clip->length);
     if (s->events - freed + clip->count > SONG_EVENTS) return -1;
+    unsigned fx = 0;
+    for (unsigned i = 0; i < clip->count; ++i) fx += song_event_kind(&clip->event[i]) == SONG_FX;
     if (insert) { if (song_insert_time(s, at, clip->length)) return -1; }
-    else clear(s, targets, at, at + clip->length);
+    else {
+        clear(s, targets, at, at + clip->length);
+        unsigned count, first = song_find(s, 0, at);
+        const struct song_event *e = song_track(s, 0, &count);
+        for (unsigned i = song_find(s, 0, at + clip->length); fx && i-- > first;) /* the FX lane's stutters there too */
+            if (song_event_kind(&e[i]) == SONG_FX) (void)song_remove(s, 0, i);
+    }
     for (unsigned i = 0; i < clip->count; ++i) {
         struct song_event e = moved(&clip->event[i], at + song_event_start(&clip->event[i]), 0);
-        (void)song_add_event(s, single ? track : clip->track[i], &e);
+        unsigned glitch = song_event_glitch(&e), fx_event = song_event_kind(&e) == SONG_FX;
+        if (glitch) { /* the same attributes, wherever they sit in this song's table */
+            int at_now = song_glitch_intern(s, clip->glitch[glitch]);
+            e.at = (e.at & ~SONG_GLITCH_BITS) | (uint32_t)(at_now > 0 ? at_now : 0) << SONG_GLITCH_SHIFT;
+        }
+        (void)song_add_event(s, fx_event ? 0 : single ? track : clip->track[i], &e);
     }
     return 0;
 }
 SONG_SMALL int song_duplicate(struct song *s, unsigned tracks, uint32_t *from, uint32_t *to)
 {
     uint32_t a = *from, b = *to, length = b - a;
-    if (a >= b || s->events + in_range(s, tracks, a, b) > SONG_EVENTS || song_insert_time(s, b, length)) return -1;
+    if (a >= b || s->events + in_range(s, tracks, a, b) + fx_only(s, tracks, a, b) > SONG_EVENTS ||
+        song_insert_time(s, b, length)) return -1;
     struct start_values v = {s, NULL, a, b, 0, 2};
     for (unsigned t = 0; t < SONG_TRACKS; ++t) {
-        if (!(tracks >> t & 1U)) continue;
-        song_chase(s, t, a, start_value, &v); /* these land at b, after the originals */
+        unsigned whole = tracks >> t & 1U;
+        if (!whole && t) continue;
+        if (whole) song_chase(s, t, a, start_value, &v); /* these land at b, after the originals */
         /* The copies sort after the originals, so these indexes hold. */
         for (unsigned i = song_find(s, t, a), end = song_find(s, t, b); i < end; ++i) {
+            if (!whole && song_event_kind(&s->event[s->first[t] + i]) != SONG_FX) continue;
             struct song_event e = moved(&s->event[s->first[t] + i], song_event_start(&s->event[s->first[t] + i]) + length, b);
             (void)song_add_event(s, t, &e);
         }

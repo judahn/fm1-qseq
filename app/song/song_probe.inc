@@ -60,6 +60,9 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
                     (uint32_t)song.meter[index].beats << 16 | (uint32_t)song.meter[index].unit << 24 : 0;
     case 33: return player.touch_track | (uint32_t)player.touch_lane[index & 3U] << 8;
     case 34: return song_port_engine(track);
+    case 35: return index < count ? song_glitch_word(&song, &e[index]) : 0;
+    case 36: return index ? player.stut_to : player.stut_at;
+    case 37: return song.humanize_time[track & 7U] | (uint32_t)song.humanize_velocity[track & 7U] << 8;
 #endif
     case 18: return index < count ? e[index].b : 0;
     case 19: return song.swing | (uint32_t)song.swing_grid << 8 | (uint32_t)song.swing_tracks << 16;

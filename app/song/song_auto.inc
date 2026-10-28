@@ -2,8 +2,8 @@
 /* song-mode: the automation view (SHIFT+LFO, design sections 7 and 8c).
  * The conductor row on top holds tempo and time signature changes, and
  * each track row shows one lane's curve. SELECT picks a row, past track 1
- * up to the conductor, and PRESETS the lane shown, or tempo or time
- * signature on the conductor. While stopped, ALGO sets the change at the
+ * up to the conductor, and PRESETS the lane shown, or on the conductor
+ * tempo, time signature or the FX lane's stutters. While stopped, ALGO sets the change at the
  * playhead: tempo there, the time signature from that bar, or a program
  * change. SCL deletes the change at the playhead and SHIFT+SCL clears the
  * shown lanes in the selection. Everything else works as in the song view,
@@ -11,7 +11,7 @@
 
 enum { AUTO_C = SONG_ROWS, AUTO_CH = 13, AUTO_Y = SONG_ROWS + 15, AUTO_ROW = 16 };
 static uint8_t song_auto_lanes[SONG_TRACKS]; /* lane shown per track, 0 for the first knob's */
-static uint8_t song_auto_conductor, song_auto_meter;
+static uint8_t song_auto_conductor, song_auto_mode; /* mode: tempo, time signature, FX lane */
 static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now);
 
 static unsigned song_auto_lane(unsigned t) { return song_auto_lanes[t] ? song_auto_lanes[t] : song_knob_lane(t, 0); }
@@ -30,7 +30,7 @@ static void song_auto_curve(const struct song *s, unsigned t, unsigned lane, uns
     unsigned count, x0 = SONG_X, i = song_find(s, t, song_window);
     const struct song_event *e = song_track(s, t, &count);
     for (; i < count && song_event_start(&e[i]) < end; ++i) {
-        if (song_is_note(&e[i]) || song_event_lane(&e[i]) != lane) continue;
+        if (!song_is_lane(&e[i]) || song_event_lane(&e[i]) != lane) continue;
         unsigned x = song_x(song_event_start(&e[i])), next = song_event_value(&e[i]);
         unsigned a = song_auto_level(y, h, value < 0 ? next : (unsigned)value), b = song_auto_level(y, h, next);
         if (value >= 0) paint_fill(x0, a, x - x0 + 1U, 1, color);
@@ -67,12 +67,12 @@ static void song_auto_row(const struct song *s, unsigned t)
     }
     song_auto_curve(s, t, lane, y + 1, AUTO_ROW - 3, frame_views[t].audible ? colors[t] : DIM);
 }
-/* Tempo as a step line between the song's slowest and fastest, and the
- * time signature changes as flags. */
+/* Tempo as a step line between the song's slowest and fastest, the time
+ * signature changes as flags, and the FX lane's stutters as bars. */
 static void song_auto_conductor_row(const struct song *s)
 {
     if (paint_rendering && (AUTO_C >= paint_top + PAINT_ROWS || AUTO_C + AUTO_CH <= paint_top)) return;
-    uint32_t sig = signature(song_window ^ (song_zoom << 28) ^ (song_auto_conductor << 30) ^ (song_auto_meter << 31),
+    uint32_t sig = signature(song_window ^ (song_zoom << 27) ^ (song_auto_conductor << 29) ^ (song_auto_mode << 30),
                              &s->revision, sizeof s->revision);
     if (sig == cache->seq_cache) return;
     cache->seq_cache = sig;
@@ -91,9 +91,9 @@ static void song_auto_conductor_row(const struct song *s)
     for (;; ++k) {
         unsigned level = high > low ? (s->tempo[k].bpm100 - low) * 127U / (high - low) : 64U;
         unsigned x = k + 1U < s->tempos && s->tempo[k + 1].clock < end ? song_x(s->tempo[k + 1].clock) : SONG_X + SONG_W;
-        paint_fill(x0, song_auto_level(AUTO_C + 1, h, level), x - x0, 1, song_auto_meter ? DIM : TEXT);
+        paint_fill(x0, song_auto_level(AUTO_C + 1, h, level), x - x0, 1, song_auto_mode ? DIM : TEXT);
         if (x >= SONG_X + SONG_W) break;
-        paint_fill(x, AUTO_C + 1, 1, h, song_auto_meter ? DIM : TEXT);
+        paint_fill(x, AUTO_C + 1, 1, h, song_auto_mode ? DIM : TEXT);
         x0 = x;
     }
     for (unsigned m = 0; m < s->meters; ++m) {
@@ -102,7 +102,15 @@ static void song_auto_conductor_row(const struct song *s)
         char sig_text[12], unit[12];
         decimal(sig_text, s->meter[m].beats, 1); strcat(sig_text, "/"); decimal(unit, s->meter[m].unit, 1); strcat(sig_text, unit);
         paint_fill(song_x(at), AUTO_C, 1, AUTO_CH, AMBER);
-        text(song_x(at) + 2, AUTO_C + 3, sig_text, 1, song_auto_meter ? AMBER : DIM, BACK);
+        text(song_x(at) + 2, AUTO_C + 3, sig_text, 1, song_auto_mode == 1 ? AMBER : DIM, BACK);
+    }
+    unsigned count;
+    const struct song_event *e = song_track(s, 0, &count);
+    for (unsigned i = 0; i < count && song_event_start(&e[i]) < end; ++i) {
+        uint32_t at = song_event_start(&e[i]);
+        if (song_event_kind(&e[i]) != SONG_FX || at + e[i].length <= song_window) continue;
+        unsigned x1 = at > song_window ? song_x(at) : SONG_X, x2 = song_x(at + e[i].length < end ? at + e[i].length : end);
+        paint_fill(x1, AUTO_C + AUTO_CH - 3, x2 > x1 + 1 ? x2 - x1 : 2, 3, song_auto_mode == 2 ? 0xf81fU : DIM);
     }
 }
 static void song_auto_draw(void)
@@ -115,18 +123,12 @@ static void song_auto_draw(void)
     for (unsigned t = 0; t < SONG_TRACKS; ++t) song_auto_row(s, t);
     song_playhead_line();
     if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
-    char start[24], end[24], hint[40], part[24];
-    if (song_now.recording) song_knob_footer();
-    else {
-        song_position(s, s->loop_start, start, 0);
-        song_position(s, s->loop_end, end, 0);
-        knob(0, song_now.shift ? "CHANGE" : "SNAP", song_now.shift ? "< >" : song_snaps[song_zoom], colors[0]);
-        knob(1, "LOOP IN", start, colors[1]);
-        knob(2, "LOOP OUT", end, colors[2]);
-        knob(3, "ZOOM", song_spans[song_zoom], colors[3]);
-    }
+    char hint[40], part[24];
+    song_footer(s, "CHANGE");
     if (notice && (int32_t)(frame_time - notice_until) >= 0) notice = NULL;
-    if (song_auto_conductor && !song_auto_meter) {
+    if (song_now.glitching) song_stutter_hint(hint);
+    else if (song_auto_conductor && song_auto_mode == 2) strcpy(hint, "FX STUTTERS  SCL DEL  SHIFT+SCL CLEAR");
+    else if (song_auto_conductor && !song_auto_mode) {
         unsigned bpm = s->tempo[song_tempo_at(s, song_now.clock)].bpm100;
         strcpy(hint, "TEMPO "); decimal(part, (int)(bpm / 100), 1); strcat(hint, part);
         strcat(hint, "."); decimal(part, (int)(bpm % 100), 2); strcat(hint, part);
@@ -168,7 +170,7 @@ static int song_auto_input(const struct fm1_controls *c, uint32_t *pressed, uint
     else if (k.encoders[0] > 0 && song_auto_conductor) { song_auto_conductor = 0; k.encoders[0] = 0; }
     else if (song_auto_conductor) k.encoders[0] = 0;
     if (c->encoders[6]) {
-        if (song_auto_conductor) song_auto_meter = c->encoders[6] > 0;
+        if (song_auto_conductor) song_auto_mode = (uint8_t)clamp(song_auto_mode + c->encoders[6], 0, 2);
         else { /* the engine's parameters, then programs where it has them */
             const uint8_t *index;
             unsigned n = song_params(song_port_engine(track), &index), lane = song_auto_lane(track), at = 0;

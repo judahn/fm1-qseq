@@ -71,6 +71,7 @@ static void song_now_read(struct song *s)
     song_now.jumping = p->jumping;
     song_now.shift = (previous_buttons & BUTTON(FX)) != 0;
     song_now.recording = song_port_recorder()->active;
+    song_now.glitching = (previous_buttons & BUTTON(ARP)) != 0;
     song_now.selected = (uint8_t)song_selected();
     const struct song_clip *c = song_port_clip();
     unsigned single = c->tracks && !(c->tracks & (c->tracks - 1U));
@@ -92,13 +93,27 @@ static void song_playhead_line(void)
         paint_fill(song_drawn_x, SONG_RULER, 1, SONG_BOTTOM - SONG_RULER, GREEN);
 }
 /* The four recording knobs, by parameter name, on the take track. */
-static void song_knob_footer(void)
+static void song_knob_footer(unsigned from)
 {
     unsigned t = song_port_recorder()->track, engine = song_port_engine(t);
-    for (unsigned k = 0; k < 4; ++k) {
+    for (unsigned k = from; k < 4; ++k) {
         char value[12];
         const struct song_param *p = song_param_for(engine, song_knob_lane(t, k));
         decimal(value, (int)song_knob_value(t, k), 1);
         knob(k, p ? p->name : "-", value, song_knob_held(k) ? AMBER : colors[k]);
     }
+}
+/* The footer: snap, loop and zoom, or the recording knobs during a take,
+ * with K1 as the stutter's drift while GLITCH is down. */
+static void song_footer(const struct song *s, const char *shift_k1)
+{
+    if (song_now.glitching) song_stutter_knob();
+    if (song_now.recording) { song_knob_footer(song_now.glitching); return; }
+    char start[24], end[24];
+    song_position(s, s->loop_start, start, 0);
+    song_position(s, s->loop_end, end, 0);
+    if (!song_now.glitching) knob(0, song_now.shift ? shift_k1 : "SNAP", song_now.shift ? "< >" : song_snaps[song_zoom], colors[0]);
+    knob(1, "LOOP IN", start, colors[1]);
+    knob(2, "LOOP OUT", end, colors[2]);
+    knob(3, "ZOOM", song_spans[song_zoom], colors[3]);
 }

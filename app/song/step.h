@@ -20,6 +20,7 @@ struct song_step {
     uint8_t chord[STEP_CHORD], chord_count;   /* keys held for the next entry */
     uint8_t last[STEP_CHORD], last_count, tie_ok;
     uint8_t preview[STEP_CHORD], preview_count, preview_track;
+    uint32_t glitch;              /* the entry glitch word (glitch.h) */
 };
 
 /* step.c: entering, rests, ties, deleting and moving. Entering calls return
@@ -51,6 +52,9 @@ void step_cycle_dots(struct song_step *st);
 void step_set_velocity(struct song_step *st, int delta);
 void step_set_gate(struct song_step *st, int delta);
 void step_pick(struct song_step *st, unsigned pitch);
+/* One glitch field on the selected notes, or the entry setting. -1 when
+ * the song's glitch table is full. */
+int step_set_glitch(struct song_step *st, unsigned field, int delta);
 /* By scale steps (semitones when chromatic), or octaves. Drum tracks move
  * along their pad notes instead. Returns how many notes moved. */
 unsigned step_transpose(struct song_step *st, int steps, unsigned octaves);

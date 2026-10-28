@@ -5,7 +5,7 @@
 
 /* Multi-level undo as diffs (design section 9). An edit is a transaction of
  * records: notes added or removed, a time shift, and when the small maps
- * (tempo, meters, markers, loop, swing and key) changed, their earlier
+ * (tempo, meters, markers, loop, feel, key, glitch table) changed, their earlier
  * state. Moving the loop alone is not a step, and recording settings are
  * preferences, not edits.
  * Undo applies the inverses backwards and redo replays them. The oldest
@@ -19,6 +19,8 @@ struct song_maps {
     uint32_t loop_start, loop_end;
     uint16_t bars;
     uint8_t tempos, meters, markers, loop_on, swing, swing_grid, swing_tracks, key_root, key_scale;
+    uint8_t humanize_time[SONG_TRACKS], humanize_velocity[SONG_TRACKS];
+    uint32_t glitch[32];
 };
 struct song_undo {
     uint8_t data[SONG_UNDO_BYTES];

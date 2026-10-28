@@ -10,8 +10,15 @@ static uint32_t song_leds(uint32_t bits, unsigned visible)
     if (visible < SONG) return bits;
     bits &= ~(BUTTON(HOME) | BUTTON(ENV) | BUTTON(FX) | BUTTON(GLO) | BUTTON(REC) | BUTTON(LFO));
     if (previous_buttons & BUTTON(FX)) bits |= BUTTON(FX);
+#if SONG_UI
+    bits = song_stuttering() ? bits | BUTTON(ARP) : bits & ~BUTTON(ARP);
+#endif
     if (visible == SONG) return bits | BUTTON(SEQ) | (p->song->loop_on ? BUTTON(ENV) : 0);
+#if SONG_UI
+    if (visible == SONG_STEP) return bits | BUTTON(REC) | (previous_buttons & BUTTON(LFO)) | (song_glitch_layer ? BUTTON(ARP) : 0);
+#else
     if (visible == SONG_STEP) return bits | BUTTON(REC) | (previous_buttons & BUTTON(LFO));
+#endif
     return visible == SONG_SETUP ? bits | BUTTON(GLO) : bits;
 }
 /* Key lights: the scale on pitched tracks, or the swinging tracks on the

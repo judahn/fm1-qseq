@@ -3,6 +3,7 @@
  * Every length is a whole number of clocks: 64th to whole, triplet on any
  * of them, dot or double dot, except a double-dotted plain 64th (52.5). */
 #include "step.h"
+#include "glitch.h"
 #include "song_config.h"
 #include <string.h>
 #if SONG_UI
@@ -93,14 +94,19 @@ SONG_SMALL static int enter(struct song_step *st, const uint8_t *pitches, unsign
     unsigned fresh = 0;
     for (unsigned i = 0; i < count; ++i) fresh += find_note(st, st->pointer, pitches[i]) < 0;
     if (s->events + fresh > SONG_EVENTS) return -1;
+    int glitch = song_glitch_intern(s, st->glitch); /* entered notes get the entry glitch */
+    uint32_t flags = (uint32_t)(glitch > 0 ? glitch : 0) << SONG_GLITCH_SHIFT;
     for (unsigned i = 0; i < count; ++i) {
         unsigned velocity = step_entry_velocity(st);
         int at = find_note(st, st->pointer, pitches[i]);
-        if (at < 0) (void)song_add_note(s, st->track, st->pointer, pitches[i], velocity, length);
-        else {
+        if (at < 0) {
+            const struct song_event e = {st->pointer | flags, pitches[i], (uint8_t)velocity, (uint16_t)length};
+            (void)song_add_event(s, st->track, &e);
+        } else {
             struct song_event e = s->event[at]; /* the same pitch again replaces it */
             e.b = (uint8_t)velocity;
             e.length = (uint16_t)length;
+            e.at = (e.at & ~SONG_GLITCH_BITS) | flags;
             step_change(st, (unsigned)at, &e);
         }
     }

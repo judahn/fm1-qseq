@@ -33,10 +33,14 @@ static inline uint32_t song_rate(unsigned bpm100) { return 480U * bpm100; }
 /* Event kinds. A note keeps its pitch in a, velocity in b and its length in
  * clocks (1..65535). A controller keeps its number in a and value in b, a
  * program change its program in a, and both have length 0. Controllers
- * and program changes are automation (lanes.h). */
-enum { SONG_NOTE, SONG_CONTROL, SONG_PROGRAM };
+ * and program changes are automation (lanes.h). A stutter on the FX lane
+ * (glitch.h) sits on track 1, slice in a, drift in b, for its length. */
+enum { SONG_NOTE, SONG_CONTROL, SONG_PROGRAM, SONG_FX };
 #define SONG_FRESH 0x80000000U /* flag in `at`: recorded in the take that is running */
-/* Start clock in bits 0..23 of `at`, kind in bits 24..30. */
+/* Start clock in bits 0..23 of `at`, kind in bits 24..25, a note's glitch
+ * (an index into the song's glitch table, 0 for none) in bits 26..30. */
+#define SONG_GLITCH_SHIFT 26
+#define SONG_GLITCH_BITS (31U << SONG_GLITCH_SHIFT)
 struct song_event {
     uint32_t at;
     uint8_t a, b;
@@ -44,7 +48,8 @@ struct song_event {
 };
 _Static_assert(sizeof(struct song_event) == 8, "song event layout");
 static inline uint32_t song_event_start(const struct song_event *e) { return e->at & 0xffffffU; }
-static inline unsigned song_event_kind(const struct song_event *e) { return e->at >> 24 & 0x7fU; }
+static inline unsigned song_event_kind(const struct song_event *e) { return e->at >> 24 & 3U; }
+static inline unsigned song_event_glitch(const struct song_event *e) { return e->at >> SONG_GLITCH_SHIFT & 31U; }
 static inline int song_is_note(const struct song_event *e) { return song_event_kind(e) == SONG_NOTE; }
 
 struct song_tempo { uint32_t clock; uint16_t bpm100; };
@@ -73,6 +78,12 @@ struct song {
     /* The controller each of K1 to K4 records on each track, 0 for the
      * engine's default (lanes.h). */
     uint8_t knob_cc[SONG_TRACKS][4];
+    /* Glitch (glitch.h): the attribute words notes point at (entry 0 is
+     * none), humanize per track in clocks and velocity steps, and the seed
+     * for every random choice. */
+    uint32_t glitch[32];
+    uint8_t humanize_time[SONG_TRACKS], humanize_velocity[SONG_TRACKS];
+    uint32_t seed;
 };
 
 /* Editing (song.c). Calls return 0, or -1 when invalid or full. */

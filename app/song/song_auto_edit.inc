@@ -1,7 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* song-mode: editing in the automation view, included by song_auto.inc.
  * Setting and deleting changes at the playhead, clearing the shown lanes
- * in the selection, and stepping from change to change. */
+ * (or the FX lane) in the selection, and stepping from change to change. */
+/* The FX lane's stutter covering a clock, as a track 1 index, or -1. */
+static int song_fx_at(const struct song *s, uint32_t at)
+{
+    unsigned count, i = song_find(s, 0, at + 1U);
+    const struct song_event *e = song_track(s, 0, &count);
+    while (i-- > 0)
+        if (song_event_kind(&e[i]) == SONG_FX) return song_event_start(&e[i]) + e[i].length > at ? (int)i : -1;
+    return -1;
+}
 
 /* ALGO on the conductor row or a program lane, while stopped. */
 static void song_auto_set(struct song *s, int delta, unsigned shift, uint32_t now)
@@ -11,7 +20,8 @@ static void song_auto_set(struct song *s, int delta, unsigned shift, uint32_t no
     unsigned bar = song_bar_at(s, at, &start, NULL);
     notice_until = now + 1500U;
     if (p->playing) { notice = "STOP TO EDIT CHANGES"; return; }
-    if (song_auto_conductor && !song_auto_meter) {
+    if (song_auto_conductor && song_auto_mode == 2) notice = "RECORD STUTTERS WITH GLITCH";
+    else if (song_auto_conductor && !song_auto_mode) {
         int bpm = s->tempo[song_tempo_at(s, at)].bpm100 + delta * (shift ? 1 : 100);
         notice = song_port_set_tempo(at, (unsigned)clamp(bpm, SONG_TEMPO_MIN, SONG_TEMPO_MAX)) ? "TEMPO CHANGES FULL" : NULL;
     } else if (song_auto_conductor) { /* QY70 range, listed x/4, x/8, x/16 */
@@ -33,7 +43,15 @@ static void song_auto_delete(struct song *s, unsigned shift, uint32_t now)
 {
     uint32_t at = song_port_player()->playhead;
     notice_until = now + 1500U;
-    if (shift) {
+    if (song_auto_conductor && song_auto_mode == 2) {
+        unsigned count, cleared = 0, first = song_find(s, 0, shift ? s->loop_start : 0);
+        const struct song_event *e = song_track(s, 0, &count);
+        int one = song_fx_at(s, at);
+        for (unsigned i = song_find(s, 0, s->loop_end); shift && i-- > first;)
+            if (song_event_kind(&e[i]) == SONG_FX && !song_remove(s, 0, i)) ++cleared;
+        if (!shift && one >= 0 && !song_remove(s, 0, (unsigned)one)) cleared = 1;
+        notice = cleared ? "STUTTERS DELETED" : "NO STUTTER HERE";
+    } else if (shift) {
         unsigned picked = song_selected(), cleared = 0;
         for (unsigned t = 0; t < SONG_TRACKS; ++t)
             if (picked >> t & 1U) cleared += song_lane_clear(s, 1U << t, song_auto_lane(t), s->loop_start, s->loop_end);
@@ -41,7 +59,7 @@ static void song_auto_delete(struct song *s, unsigned shift, uint32_t now)
     } else if (song_auto_conductor) {
         struct song_place place;
         uint32_t state = song_port_hold(&place);
-        notice = (song_auto_meter ? song_remove_meter(s, song_bar_at(s, at, NULL, NULL)) : song_remove_tempo(s, at))
+        notice = (song_auto_mode == 1 ? song_remove_meter(s, song_bar_at(s, at, NULL, NULL)) : song_remove_tempo(s, at))
                      ? "NO CHANGE HERE" : "CHANGE DELETED";
         song_port_resume(&place, state);
     }
@@ -56,7 +74,12 @@ static void song_auto_step(const struct song *s, int direction)
     uint32_t at = song_port_player()->playhead;
     int64_t to = -1;
     if (!song_auto_conductor) to = song_lane_next(s, track, song_auto_lane(track), at, direction);
-    else if (song_auto_meter)
+    else if (song_auto_mode == 2) {
+        unsigned count, i = song_find(s, 0, direction > 0 ? at + 1U : at);
+        const struct song_event *e = song_track(s, 0, &count);
+        if (direction > 0) { for (; i < count && to < 0; ++i) if (song_event_kind(&e[i]) == SONG_FX) to = song_event_start(&e[i]); }
+        else while (i-- > 0 && to < 0) if (song_event_kind(&e[i]) == SONG_FX) to = song_event_start(&e[i]);
+    } else if (song_auto_mode)
         for (unsigned m = 0; m < s->meters; ++m) {
             uint32_t c = song_bar_clock(s, s->meter[m].bar);
             if (direction > 0 ? c > at && to < 0 : c < at) to = c;

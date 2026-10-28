@@ -20,9 +20,13 @@ SONG_SMALL void song_maps_read(const struct song *s, struct song_maps *m)
     m->tempos = s->tempos; m->meters = s->meters; m->markers = s->markers; m->loop_on = s->loop_on;
     m->swing = s->swing; m->swing_grid = s->swing_grid; m->swing_tracks = s->swing_tracks;
     m->key_root = s->key_root; m->key_scale = s->key_scale;
+    memcpy(m->humanize_time, s->humanize_time, sizeof m->humanize_time);
+    memcpy(m->humanize_velocity, s->humanize_velocity, sizeof m->humanize_velocity);
+    memcpy(m->glitch, s->glitch, sizeof m->glitch);
 }
 /* Which groups of the maps differ, one bit each. */
-enum { MAP_TEMPO = 1, MAP_METER = 2, MAP_MARKER = 4, MAP_LOOP = 8, MAP_BARS = 16, MAP_SWING = 32, MAP_KEY = 64 };
+enum { MAP_TEMPO = 1, MAP_METER = 2, MAP_MARKER = 4, MAP_LOOP = 8, MAP_BARS = 16, MAP_SWING = 32, MAP_KEY = 64,
+       MAP_GLITCH = 128 };
 #define DIFF(bit, field) (memcmp(&a->field, &b->field, sizeof a->field) ? (unsigned)(bit) : 0U)
 SONG_SMALL static unsigned changed(const struct song_maps *a, const struct song_maps *b)
 {
@@ -30,7 +34,8 @@ SONG_SMALL static unsigned changed(const struct song_maps *a, const struct song_
            DIFF(MAP_MARKER, marker) | DIFF(MAP_MARKER, markers) | DIFF(MAP_LOOP, loop_start) |
            DIFF(MAP_LOOP, loop_end) | DIFF(MAP_LOOP, loop_on) | DIFF(MAP_BARS, bars) | DIFF(MAP_SWING, swing) |
            DIFF(MAP_SWING, swing_grid) | DIFF(MAP_SWING, swing_tracks) | DIFF(MAP_KEY, key_root) |
-           DIFF(MAP_KEY, key_scale);
+           DIFF(MAP_KEY, key_scale) | DIFF(MAP_SWING, humanize_time) | DIFF(MAP_SWING, humanize_velocity) |
+           DIFF(MAP_GLITCH, glitch);
 }
 #undef DIFF
 /* Writes back only the groups in `mask`, so a step never moves what it
@@ -42,7 +47,12 @@ SONG_SMALL static void maps_write(struct song *s, const struct song_maps *m, uns
     if (mask & MAP_MARKER) { memcpy(s->marker, m->marker, sizeof m->marker); s->markers = m->markers; }
     if (mask & MAP_LOOP) { s->loop_start = m->loop_start; s->loop_end = m->loop_end; s->loop_on = m->loop_on; }
     if (mask & MAP_BARS) s->bars = m->bars;
-    if (mask & MAP_SWING) { s->swing = m->swing; s->swing_grid = m->swing_grid; s->swing_tracks = m->swing_tracks; }
+    if (mask & MAP_SWING) {
+        s->swing = m->swing; s->swing_grid = m->swing_grid; s->swing_tracks = m->swing_tracks;
+        memcpy(s->humanize_time, m->humanize_time, sizeof m->humanize_time);
+        memcpy(s->humanize_velocity, m->humanize_velocity, sizeof m->humanize_velocity);
+    }
+    if (mask & MAP_GLITCH) memcpy(s->glitch, m->glitch, sizeof m->glitch);
     if (mask & MAP_KEY) { s->key_root = m->key_root; s->key_scale = m->key_scale; }
     song_tempo_refresh(s);
     ++s->revision;

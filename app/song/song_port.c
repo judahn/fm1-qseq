@@ -9,6 +9,7 @@
 #include "arrange.h"
 #include "record.h"
 #include "lanes.h"
+#include "glitch.h"
 static struct song_undo undo;
 static struct song_clip clip;
 static struct song_recorder recorder;
@@ -68,6 +69,15 @@ SONG_SMALL static void deliver_control(void *context, unsigned track, unsigned s
 #endif
 }
 int64_t song_port_live_clock(void) { return live_clock(); }
+/* Each drum track's pads, for glitch's pad swap, as playing starts. */
+SONG_SMALL static void pads(void)
+{
+    for (unsigned t = 0; t < SONG_TRACKS; ++t) {
+        unsigned n = groove_pad_count(t);
+        player.pad_count[t] = (uint8_t)(n < 16 ? n : 16);
+        for (unsigned i = 0; i < player.pad_count[t]; ++i) player.pads[t][i] = (uint8_t)groove_pad_note(t, i);
+    }
+}
 #endif
 SONG_SMALL static void ensure(void)
 {
@@ -128,6 +138,7 @@ SONG_SMALL int song_port_start(void)
     song_diag_reset();
 #if SONG_UI
     player.click = song.metronome == 1;
+    pads();
 #endif
     song_deliver_start(0);
     return 0;
@@ -167,6 +178,7 @@ SONG_SMALL int song_port_record(unsigned mode, unsigned track)
 #endif
     song_diag_reset();
     uint64_t now = (uint64_t)song_port_blocks() * FM1_BLOCK_FRAMES;
+    pads();
     song_deliver_start(song.count_in);
     first_frame = song.count_in ? player.frame : now; /* in the count-in the player waits at the first beat */
     return 0;
@@ -174,6 +186,7 @@ SONG_SMALL int song_port_record(unsigned mode, unsigned track)
 SONG_SMALL void song_port_record_stop(void)
 {
     if (!recorder.active) return;
+    song_stutter_release(); /* a stutter still held goes on the FX lane */
     int64_t now = live_clock();
     uint32_t clock = player.playing && now >= 0 ? (uint32_t)now : recorder.last;
     song_knobs_release(clock); /* before the chase on stop */

@@ -20,6 +20,10 @@ const struct song_param *song_param_for(unsigned engine, unsigned cc); /* NULL i
 unsigned song_knob_cc(const struct song *s, unsigned engine, unsigned track, unsigned knob);
 unsigned song_programs(unsigned engine); /* program count, 0 when it has none */
 
+static inline int song_is_lane(const struct song_event *e)
+{
+    return song_event_kind(e) == SONG_CONTROL || song_event_kind(e) == SONG_PROGRAM;
+}
 static inline unsigned song_event_lane(const struct song_event *e)
 {
     return song_event_kind(e) == SONG_PROGRAM ? SONG_LANE_PROGRAM : e->a;

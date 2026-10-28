@@ -1,13 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* K1 to K4 while recording. Each knob drives one lane on the take track:
- * a turn sends the new value at once and writes it into the take (touch.h),
- * and a knob left alone for a moment lets go, so the lane goes back to
- * what the song had. The player keeps a held lane quiet meanwhile. */
+/* Live performance glue. K1 to K4 while recording: each knob drives one
+ * lane on the take track. A turn sends the new value at once and writes it
+ * into the take (touch.h), and a knob left alone for a moment lets go, so
+ * the lane goes back to what the song had. The player keeps a held lane
+ * quiet meanwhile. And GLITCH: the stutter, written to the FX lane when a
+ * take is running. */
 #include "song_port.h"
 #include "instrument.h"
 #include "lanes.h"
 #include "touch.h"
 #include "record.h"
+#include "glitch.h"
 #if SONG_UI
 _Static_assert(SONG_DX7 == GROOVE_DX7 && SONG_303 == GROOVE_303 && SONG_808 == GROOVE_808 &&
                SONG_PSG == GROOVE_PSG && SONG_PLUCK == GROOVE_PLUCK && SONG_SAMPLER == GROOVE_SAMPLE,
@@ -94,4 +97,33 @@ SONG_SMALL void song_knobs_wrap(uint32_t loop_end)
     for (struct song_event *e = s->event + s->first[track]; count--; ++e)
         if (!song_is_note(e)) e->at &= ~SONG_FRESH;
 }
+
+static uint8_t stutter_slice, stutter_on;
+static int8_t stutter_drift;
+SONG_SMALL void song_stutter_hold(unsigned slice, int drift)
+{
+    struct song_player *p = song_port_player();
+    uint32_t state = song_port_lock();
+    song_player_stutter(p, song_slice_clocks(slice), drift);
+    song_port_unlock(state);
+    stutter_slice = (uint8_t)slice;
+    stutter_drift = (int8_t)drift;
+    stutter_on = p->stut_at != 0xffffffffU;
+}
+SONG_SMALL void song_stutter_drift(int drift)
+{
+    stutter_drift = (int8_t)drift;
+    song_player_stutter_drift(song_port_player(), drift);
+}
+SONG_SMALL void song_stutter_release(void)
+{
+    struct song_player *p = song_port_player();
+    if (!stutter_on) return;
+    stutter_on = 0;
+    uint32_t state = song_port_lock(), began = song_player_stutter_stop(p), to = p->stut_to;
+    song_port_unlock(state);
+    if (began != 0xffffffffU && song_port_recorder()->active && to > began)
+        (void)song_fx_add(song_port_song(), began, to - began, stutter_slice, stutter_drift);
+}
+unsigned song_stuttering(void) { return stutter_on && song_port_player()->stut_at != 0xffffffffU; }
 #endif

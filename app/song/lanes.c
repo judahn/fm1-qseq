@@ -53,7 +53,7 @@ SONG_SMALL struct song_event song_lane_event(uint32_t clock, unsigned lane, unsi
     if (lane == SONG_LANE_PROGRAM) return (struct song_event){clock | (uint32_t)SONG_PROGRAM << 24, (uint8_t)value, 0, 0};
     return (struct song_event){clock | (uint32_t)SONG_CONTROL << 24, (uint8_t)lane, (uint8_t)value, 0};
 }
-static int matches(const struct song_event *e, unsigned lane) { return !song_is_note(e) && song_event_lane(e) == lane; }
+static int matches(const struct song_event *e, unsigned lane) { return song_is_lane(e) && song_event_lane(e) == lane; }
 
 SONG_SMALL int song_lane_at(const struct song *s, unsigned track, unsigned lane, uint32_t clock)
 {
@@ -91,7 +91,7 @@ SONG_SMALL void song_chase(const struct song *s, unsigned track, uint32_t clock,
     unsigned count, at = song_find(s, track, clock);
     const struct song_event *e = song_track(s, track, &count);
     for (unsigned i = 0; i < count; ++i) {
-        if (song_is_note(&e[i])) continue;
+        if (!song_is_lane(&e[i])) continue;
         unsigned lane = song_event_lane(&e[i]), word = lane >> 5, bit = 1U << (lane & 31U);
         if (i < at) { value[lane] = (uint8_t)song_event_value(&e[i]); seen[word] |= bit; send[word] |= bit; }
         else if (!(seen[word] & bit)) { /* the first change after: it sets the lane until then */

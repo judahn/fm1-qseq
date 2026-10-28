@@ -4,6 +4,7 @@
  * take the new length, gate or velocity too, so what is shown is what they
  * get. Landing on notes loads their settings, as far as they match. */
 #include "step.h"
+#include "glitch.h"
 #include "song_config.h"
 #include <string.h>
 #if SONG_UI
@@ -61,6 +62,7 @@ SONG_SMALL static void load(struct song_step *st, const struct song_event *e)
     static const uint8_t gates[STEP_GATES] = {1, 0, 2, 3};
     struct song_step trial = *st;
     if (!st->random_level) st->velocity = e->b;
+    st->glitch = song_glitch_word(st->song, e);
     for (unsigned g = 0; g <= STEP_GATES; ++g) {
         trial.gate = g ? gates[g - 1] : st->gate;
         for (trial.dots = 0; trial.dots < 3; ++trial.dots)
@@ -143,6 +145,19 @@ SONG_SMALL void step_set_velocity(struct song_step *st, int delta)
     v = v < 1 ? 1 : v > 127 + STEP_RANDOMS ? 127 + STEP_RANDOMS : v;
     st->random_level = (uint8_t)(v > 127 ? v - 127 : 0);
     if (v <= 127) st->velocity = (uint8_t)v;
+}
+/* Glitch, one field at a time: on notes each keeps its other fields, so a
+ * chord keeps its differences. On an empty position: the entry setting. */
+SONG_SMALL int step_set_glitch(struct song_step *st, unsigned field, int delta)
+{
+    unsigned index[STEP_CHORD], n = step_selection(st, index);
+    int result = 0;
+    for (unsigned i = 0; i < n; ++i) {
+        uint32_t word = song_glitch_turn(song_glitch_word(st->song, &st->song->event[index[i]]), field, delta);
+        result |= song_glitch_apply(st->song, st->track, index[i] - st->song->first[st->track], word);
+    }
+    st->glitch = n ? song_glitch_word(st->song, &st->song->event[index[0]]) : song_glitch_turn(st->glitch, field, delta);
+    return result;
 }
 SONG_SMALL void step_pick(struct song_step *st, unsigned pitch)
 {

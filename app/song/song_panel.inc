@@ -21,6 +21,7 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
     struct song_player *p = song_port_player();
     unsigned shift = (c->buttons & BUTTON(FX)) != 0;
     unsigned picking = (c->buttons & BUTTON(LFO)) != 0;
+    unsigned glitching = song_stutter_input(c, *pressed, key_down, now);
     if (song_port_recorder()->active && (*pressed & (BUTTON(PLAY) | BUTTON(REC)))) {
         song_port_record_stop(); /* PLAY or REC ends the take */
         *pressed &= ~(BUTTON(PLAY) | BUTTON(REC));
@@ -58,11 +59,11 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
     octave = clamp(octave + !!(*pressed & BUTTON(OCT_UP)) - !!(*pressed & BUTTON(OCT_DOWN)), -2, 2);
     select_track(c->encoders[0]);
     if (song_port_recorder()->active) { /* K1 to K4 record parameters on the take track */
-        for (unsigned k = 0; k < 4; ++k)
+        for (unsigned k = glitching; k < 4; ++k) /* K1 drifts the stutter while GLITCH is down */
             if (c->encoders[2 + k]) song_knob_turn(k, fm_encoder_delta(2 + k, c->encoders[2 + k]), now);
         return 1;
     }
-    int move = c->encoders[2];
+    int move = glitching ? 0 : c->encoders[2];
     if (move && shift) {
         /* Marker to marker, from a pending jump or the playhead. */
         uint32_t at = p->playing ? (p->jumping ? p->jump : song_player_clock(p)) : p->playhead;
@@ -96,6 +97,9 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
          * F4 to G5: markers 1 to 9. */
         for (unsigned i = 0; i < 7; ++i)
             if (down & (1U << white_keys[i])) song_action(i, now);
+        static const uint8_t mangle_keys[3] = {1, 3, 5}; /* F#3, G#3, A#3 */
+        for (unsigned i = 0; i < 3; ++i)
+            if (down & (1U << mangle_keys[i])) song_mangle(i, now);
         for (unsigned i = 0; i < 9; ++i)
             if (down & (1U << white_keys[7 + i])) {
                 if (i < s->markers) song_port_jump(s->marker[i].clock);
@@ -188,6 +192,7 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
 static int song_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
 {
 #if SONG_UI
+    if (page >= SONG) arp_down = 0; /* ARP is GLITCH here, never the stock arpeggiator page */
     if (!(c->buttons & (BUTTON(HOME) | BUTTON(SAVE)))) song_combo_from = 0;
     else if ((*pressed & (BUTTON(HOME) | BUTTON(SAVE))) && page >= SONG) song_combo_from = page;
     song_undo_begin(song_port_undo(), song_port_song());

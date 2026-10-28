@@ -5,7 +5,7 @@
 #if SONG_UI
 
 static int fresh(const struct song_event *e) { return (e->at & SONG_FRESH) != 0; }
-static int on_lane(const struct song_event *e, unsigned lane) { return !song_is_note(e) && song_event_lane(e) == lane; }
+static int on_lane(const struct song_event *e, unsigned lane) { return song_is_lane(e) && song_event_lane(e) == lane; }
 
 /* The lane's value just before `clock` as this touch has it: its own
  * changes, or what was there before it began. */

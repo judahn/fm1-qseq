@@ -2,7 +2,8 @@
 /* song-mode: the song settings page (design section 8a). Starting tempo and
  * time signature, swing and key. ALGO turns between the knob pages, and
  * the first eight white keys switch swing per track. The third page picks
- * the parameter each of K1 to K4 records on a track (SELECT for the track). */
+ * the parameter each of K1 to K4 records on a track, and the fourth sets the
+ * track's humanize (SELECT for the track on both). */
 
 static unsigned song_setup_page, song_setup_back = SONG, song_glo_from;
 static void song_tempo_text(const struct song *s, char out[24])
@@ -21,6 +22,38 @@ static void song_setup_row(unsigned y, const char *label, const char *value, uns
 {
     text(8, y, label, 1, live ? ACCENT : DIM, BACK);
     text(84, y - 3, value, 2, TEXT, BACK);
+}
+/* Page 4: humanize for the current track, up to 30 clocks and 30 steps. */
+static void song_humanize_draw(void)
+{
+    const struct song *s = song_port_song();
+    char time[12], velocity[12];
+    strcpy(time, "+-"); decimal(time + 2, s->humanize_time[track], 1);
+    strcpy(velocity, "+-"); decimal(velocity + 2, s->humanize_velocity[track], 1);
+    uint32_t sig = 0x4a5eU ^ track << 4 ^ (uint32_t)s->humanize_time[track] << 8 ^ (uint32_t)s->humanize_velocity[track] << 16;
+    if ((!paint_rendering || (paint_top < 192 && paint_top + PAINT_ROWS > 30)) && sig != cache->middle_cache) {
+        cache->middle_cache = sig;
+        paint_fill(0, 30, 240, 162, BACK);
+        if (paint_rendering) {
+            text(8, 40, "HUMANIZE", 1, DIM, BACK);
+            text(92, 37, "T", 2, colors[track], BACK);
+            number(106, 37, (int)track + 1, 1, 2, colors[track], BACK);
+            song_setup_row(76, "TIMING", time, 1);
+            text(84, 96, "CLOCKS EARLY OR LATE", 1, DIM, BACK);
+            song_setup_row(128, "VELOCITY", velocity, 1);
+            text(84, 148, "EACH NOTE, AT RANDOM", 1, DIM, BACK);
+        }
+    }
+    if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
+    knob(0, "TIMING", time, colors[0]);
+    knob(1, "VELOCITY", velocity, colors[1]);
+    knob(2, "-", "--", colors[2]);
+    knob(3, "-", "--", colors[3]);
+    if (cache->hint_cache != 4U) {
+        cache->hint_cache = 4U;
+        paint_fill(6, 231, 228, 7, BACK);
+        text(6, 231, "SELECT TRACK  ALGO PAGE  GLO BACK", 1, DIM, BACK);
+    }
 }
 /* Page 3: the recording knobs of the current track. */
 static void song_knobs_draw(void)
@@ -67,6 +100,7 @@ static void song_setup_draw(void)
         text(8, 7, "SONG SETTINGS", 2, ACCENT, BACK);
     }
     if (song_setup_page == 2) { song_knobs_draw(); return; }
+    if (song_setup_page == 3) { song_humanize_draw(); return; }
     unsigned page2 = song_setup_page != 0;
     uint32_t sig = signature(page2 | (uint32_t)s->metronome << 4, &s->swing, 5) ^ s->tempo[0].bpm100 ^ ((uint32_t)s->meter[0].beats << 16) ^
                    ((uint32_t)s->meter[0].unit << 24);
@@ -126,9 +160,13 @@ static int song_setup_input(const struct fm1_controls *c, uint32_t *pressed, uin
     if (*pressed & BUTTON(PLAY)) { if (p->playing) song_port_stop(); else song_start(now); }
     *pressed &= ~(BUTTON(PLAY) | BUTTON(FX) | BUTTON(REC) | BUTTON(ARP) | BUTTON(ENV) | BUTTON(SCL) | BUTTON(LFO));
     if (*pressed & (BUTTON(HOME) | BUTTON(EDIT) | BUTTON(GLO) | BUTTON(SAVE))) return 0;
-    song_setup_page = (unsigned)clamp((int)song_setup_page + c->encoders[1], 0, 2);
+    song_setup_page = (unsigned)clamp((int)song_setup_page + c->encoders[1], 0, 3);
     const int16_t *k = c->encoders + 2;
-    if (song_setup_page == 2) {
+    if (song_setup_page == 3) {
+        select_track(c->encoders[0]);
+        s->humanize_time[track] = (uint8_t)clamp(s->humanize_time[track] + k[0], 0, 30);
+        s->humanize_velocity[track] = (uint8_t)clamp(s->humanize_velocity[track] + k[1], 0, 30);
+    } else if (song_setup_page == 2) {
         select_track(c->encoders[0]);
         const uint8_t *index;
         unsigned n = song_params(song_port_engine(track), &index);
@@ -157,7 +195,7 @@ static int song_setup_input(const struct fm1_controls *c, uint32_t *pressed, uin
         s->key_scale = (uint8_t)clamp(s->key_scale + k[1], 0, SONG_SCALES - 1);
         s->metronome = (uint8_t)clamp(s->metronome + k[2], 0, 2);
     }
-    for (unsigned t = 0; t < SONG_TRACKS && song_setup_page != 2; ++t)
+    for (unsigned t = 0; t < SONG_TRACKS && song_setup_page < 2; ++t)
         if ((key_down & ~blocked_keys) & (1U << white_keys[t])) s->swing_tracks ^= (uint8_t)(1U << t);
     blocked_keys |= key_down; /* these keys are switches here */
     return 1;

@@ -13,6 +13,7 @@ enum { EDGE_TEMPO, EDGE_END, EDGE_LOOP, EDGE_JUMP, CLICK = 37 /* rim */ };
 #define NEVER 0xffffffffU
 #if SONG_UI
 #include "lanes.h"
+#include "glitch.h"
 #define QUIET(p, t, e) ((t) == (p)->mute_track && !((e)->at & SONG_FRESH) && \
     song_event_start(e) >= (p)->mute_from && song_event_start(e) < (p)->mute_to)
 #define PLAY(p, t, e, at) play(p, t, e, at)
@@ -53,25 +54,33 @@ SONG_SMALL static void note_on(struct song_player *p, unsigned t, const struct s
     send(p, t, e->a, e->b);
 }
 #if SONG_UI
+#include "player_glitch.inc" /* chance, repeats, flams and the rest, per note */
 SONG_SMALL static void play(struct song_player *p, unsigned t, const struct song_event *e, uint32_t at)
 {
-    if (!song_is_note(e)) lane_out(p, t, song_event_lane(e), song_event_value(e), 0);
-    else if (!QUIET(p, t, e)) note_on(p, t, e, at);
+    if (song_is_lane(e)) lane_out(p, t, song_event_lane(e), song_event_value(e), 0);
+    else if (song_is_note(e) && !QUIET(p, t, e)) glitch_note(p, t, e, at); /* the FX lane plays in emit */
 }
 #endif
 SONG_SMALL static uint32_t onset(const struct song_player *p, unsigned t, const struct song_event *e)
 {
+#if SONG_UI
+    uint32_t at = song_event_start(e) + song_swing(p->song, t, song_event_start(e));
+    return song_is_note(e) ? glitch_onset(p, t, e, at) : at;
+#else
     return song_event_start(e) + song_swing(p->song, t, song_event_start(e));
+#endif
 }
 /* Everything that starts before clock `end` once swing is applied, in clock
  * order per track. A note-off goes before a note-on on the same clock. A
  * swung off-beat due after `end` waits as a group (all at one clock), so the
- * notes between it and its swung time are not held back. */
+ * notes between it and its swung time are not held back. With glitch, the
+ * repeats still due come in time order too, and a note can come early (a
+ * flam's grace hit, humanize). */
+#if SONG_UI
+#include "player_stutter.inc" /* the emitter with glitch, the stutter and the FX lane */
+#else
 SONG_SMALL static void emit(struct song_player *p, uint32_t end)
 {
-#if SONG_UI
-    clicks(p, end);
-#endif
     for (unsigned t = 0; t < SONG_TRACKS; ++t) {
         unsigned count;
         const struct song_event *e = song_track(p->song, t, &count);
@@ -103,6 +112,7 @@ SONG_SMALL static void emit(struct song_player *p, uint32_t end)
     }
     if (end > p->next) p->next = end;
 }
+#endif
 /* Continue from `clock`, `over` units (at `rate`) after it. */
 SONG_SMALL static void relocate(struct song_player *p, uint32_t clock, uint64_t over, uint32_t rate)
 {
@@ -110,6 +120,15 @@ SONG_SMALL static void relocate(struct song_player *p, uint32_t clock, uint64_t 
     unsigned k = song_tempo_at(s, clock);
     for (unsigned t = 0; t < SONG_TRACKS; ++t) p->cursor[t] = (uint16_t)song_find(s, t, clock);
     memset(p->late_count, 0, sizeof p->late_count); /* swung past an edge: dropped */
+#if SONG_UI
+    memset(p->hits, 0, sizeof p->hits);
+    ++p->pass; /* each pass rolls its own chances */
+    if (p->stut_at != NEVER) { /* a loop or jump: a stutter goes on in step */
+        uint32_t delta = clock - p->next;
+        p->stut_at += delta;
+        if (p->stut_to != NEVER) p->stut_to += delta;
+    }
+#endif
     p->next = clock;
     p->revision = s->revision;
     p->segment = (uint8_t)k;
@@ -138,12 +157,16 @@ SONG_SMALL void song_player_init(struct song_player *p, struct song *s, const st
     p->click_off = NEVER;
     p->touch_track = 0xff;
     memset(p->program, 0xff, sizeof p->program);
+    p->stut_at = NEVER;
 #endif
 }
 SONG_SMALL void song_player_start(struct song_player *p, uint64_t frame)
 {
     if (p->playing) return;
     if (p->playhead >= song_end(p->song)) p->playhead = 0;
+#if SONG_UI
+    p->stut_at = NEVER;
+#endif
     relocate(p, p->playhead, 0, 0);
     p->frame = frame;
     p->playing = 1;
@@ -158,6 +181,10 @@ SONG_SMALL void song_player_stop(struct song_player *p)
     p->playhead = song_player_clock(p);
     all_off(p);
     p->playing = p->jumping = 0;
+#if SONG_UI
+    p->stut_at = NEVER;
+    memset(p->hits, 0, sizeof p->hits);
+#endif
 }
 SONG_SMALL void song_player_jump(struct song_player *p, uint32_t clock)
 {

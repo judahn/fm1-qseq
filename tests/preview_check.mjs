@@ -10,7 +10,9 @@
 // bars, an overdub with count-in and requantize, and a loop take. Saves
 // docs/phase3-select.png, docs/phase3-rec.png and docs/phase3-recording.png.
 // Phase 4: a recorded knob sweep played back at exact blocks, chase, the
-// conductor lane and program changes. Saves docs/phase4-*.png.
+// conductor lane and program changes. Saves docs/phase4-*.png. Phase 4b:
+// repeats from step entry at exact blocks, a held stutter that rejoins in
+// time, and the FX lane playing back a recorded one. Saves docs/phase4b-*.png.
 // Needs Playwright with a cached Chromium:
 //   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright node tests/preview_check.mjs
 import { createRequire } from 'node:module';
@@ -770,6 +772,173 @@ const phase4 = await page.evaluate(() => {
   out.clearUndone = lane(1, 74).length === recorded.length;
   return out;
 });
+// Phase 4b: glitch. Repeats entered in step entry on a synth track, a held
+// stutter, and a stutter recorded on the FX lane and played back.
+const phase4b = await page.evaluate(() => {
+  const wasm = Uint8Array.from(atob(FM1_SIMULATOR.data), ch => ch.charCodeAt(0));
+  const c = new FM1SimulatorCore(wasm, null, null).c;
+  const B = { FX: 2, SCL: 3, ENV: 4, LFO: 5, GLO: 7, HOME: 8, SAVE: 9, ARP: 10, SEQ: 11, PLAY: 12, REC: 13 };
+  const tap = b => { c.sim_control(0, b, 1); c.sim_control(0, b, 0); };
+  const key = k => { c.sim_control(1, k, 1); c.sim_control(1, k, 0); };
+  const held = (b, fn) => { c.sim_control(0, b, 1); fn(); c.sim_control(0, b, 0); };
+  const turn = (encoder, delta) => c.sim_control(2, encoder, delta);
+  const render = n => { for (let i = 0; i < n; i++) c.sim_render(); };
+  const info = (what, track = 0, index = 0) => c.sim_song_info(what, track, index) >>> 0;
+  const pageNow = () => new Uint8Array(c.memory.buffer, c.sim_state(), 8)[1];
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const png = () => {
+    const pixels = new Uint16Array(c.memory.buffer, c.sim_pixels(), 240 * 240);
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 480;
+    const image = canvas.getContext('2d').createImageData(480, 480);
+    for (let y = 0; y < 480; y++)
+      for (let x = 0; x < 480; x++) {
+        const v = pixels[(y >> 1) * 240 + (x >> 1)], at = (y * 480 + x) * 4;
+        image.data[at] = (v >> 11) * 255 / 31; image.data[at + 1] = ((v >> 5) & 63) * 255 / 63;
+        image.data[at + 2] = (v & 31) * 255 / 31; image.data[at + 3] = 255;
+      }
+    canvas.getContext('2d').putImageData(image, 0, 0);
+    return canvas.toDataURL('image/png').split(',')[1];
+  };
+  const heard = () => {
+    const n = c.sim_song_heard_count(), at = c.sim_song_heard();
+    const bytes = new Uint8Array(c.memory.buffer, at, n * 8), words = new Uint32Array(c.memory.buffer, at, n * 2);
+    return Array.from({ length: n }, (_, i) => ({ block: words[i * 2], track: bytes[i * 8 + 4], pitch: bytes[i * 8 + 5],
+      velocity: bytes[i * 8 + 6], kind: bytes[i * 8 + 7] })).filter(h => !h.kind);
+  };
+  const balanced = list => {
+    const on = new Map();
+    for (const n of list) { const k = n.track * 128 + n.pitch; if (!!on.get(k) === !!n.velocity) return false; on.set(k, !!n.velocity); }
+    return [...on.values()].every(v => !v);
+  };
+  const timing = () => {
+    const tempos = Array.from({ length: info(4) }, (_, k) => ({ clock: info(5, 0, k), bpm100: BigInt(info(6, 0, k)) }));
+    const den = tempos.reduce((d, t) => { let x = d, y = t.bpm100; while (y) [x, y] = [y, x % y]; return d / x * t.bpm100; }, 1n);
+    const frameNum = clock => { let num = 0n; tempos.forEach((t, k) => {
+      const to = Math.min(clock, k + 1 < tempos.length ? tempos[k + 1].clock : clock);
+      if (to > t.clock) num += BigInt(to - t.clock) * 551250n * (den / t.bpm100); }); return num; };
+    return (start, from, clock) => start + Number((frameNum(clock) - frameNum(from)) / (den * 128n));
+  };
+  const notes = t => Array.from({ length: info(0, t) }, (_, i) => i).filter(i => info(30, t, i) === 0)
+    .map(i => ({ clock: info(1, t, i), pitch: info(2, t, i), length: info(3, t, i), glitch: info(35, t, i) }));
+  const out = { step: {}, stutter: {}, lane: {} };
+  render(32);
+  tap(B.SEQ);
+
+  // 1. Step entry on track 1 (DX7) at the song end: the glitch layer, 4
+  // repeats on a quarter C4, then 3 repeats (a triplet ratchet) on D4.
+  const st = out.step;
+  turn(2, 12);
+  const at = info(8);
+  tap(B.REC); tap(B.REC);
+  tap(B.ARP);
+  held(B.FX, () => key(7));                      // SHIFT+C4: quarter notes
+  turn(2, 3);                                    // REPEATS x4
+  key(7);
+  turn(2, -1);                                   // x3
+  key(9);
+  render(4);
+  st.png = png();
+  tap(B.ARP);
+  tap(B.REC);
+  st.entered = notes(0).filter(n => n.clock >= at);
+  st.repeats = st.entered.map(n => [3, 2].indexOf(n.glitch & 7) >= 0 ? (n.glitch & 7) === 3 ? 4 : 3 : 0);
+  turn(2, -1);                                   // back to the bar line where they start
+  c.sim_song_capture(1);
+  tap(B.PLAY);
+  render(700);
+  const ons = heard().filter(h => h.velocity && h.track === 0), block = timing(), start = info(9);
+  if (info(7)) tap(B.PLAY);                      // it may have reached the song's end
+  const want = [];
+  st.entered.forEach((n, i) => { const r = st.repeats[i]; for (let k = 0; k < r; k++) want.push(block(start, at, n.clock + Math.floor((k * n.length + Math.floor(r / 2)) / r)) + ':' + n.pitch); });
+  st.got = ons.map(h => h.block + ':' + h.pitch);
+  st.ok = st.entered.length === 2 && same(st.repeats, [4, 3]) && same(st.got, want);
+
+  // 2. A held stutter from bar 3 (marker 2): GLITCH down about 0.8 s in,
+  // K1 drifts each repeat up 2 semitones, released 1.1 s later.
+  const su = out.stutter;
+  held(B.FX, () => key(14));                     // SHIFT+G4: marker 2
+  const origin = info(8);
+  c.sim_song_capture(1);
+  tap(B.PLAY);
+  render(300);
+  c.sim_control(0, B.ARP, 1);
+  turn(2, 2);
+  su.at = info(36, 0, 0);
+  render(400);
+  su.png = png();
+  c.sim_control(0, B.ARP, 0);
+  su.to = info(36, 0, 1);
+  render(600);
+  const list = heard();
+  tap(B.PLAY);
+  const start2 = info(9), map = timing(), block2 = (s, f, clock) => map(s, origin, clock), slice = 240, from = su.at - slice;
+  const engines = [0, 1, 2, 3, 4, 5, 6, 7].map(t => info(34, t));
+  const lo = block2(start2, 0, su.at), hi = block2(start2, 0, su.to), endBlock = start2 + 1290;
+  const wantRep = [], wantAfter = [];
+  for (let t = 0; t < 8; t++) {
+    const src = notes(t).filter(n => n.clock >= from && n.clock < su.at);
+    for (let k = 0; src.length; k++) {
+      const first = su.at + k * slice;
+      if (first >= su.to) break;
+      for (const n of src) {
+        const when = first + n.clock - from;
+        if (when < su.to) wantRep.push(block2(start2, 0, when) + ':' + t + ':' + (engines[t] === 2 || engines[t] === 5 ? n.pitch : n.pitch + 2 * k));
+      }
+    }
+    for (const n of notes(t)) if (n.clock >= su.to && block2(start2, 0, n.clock) < endBlock) wantAfter.push(block2(start2, 0, n.clock) + ':' + t + ':' + n.pitch);
+  }
+  const gotRep = list.filter(h => h.velocity && h.block >= lo && h.block < hi).map(h => h.block + ':' + h.track + ':' + h.pitch);
+  const gotAfter = list.filter(h => h.velocity && h.block >= hi && h.block < endBlock).map(h => h.block + ':' + h.track + ':' + h.pitch);
+  su.replays = { expected: wantRep.length, got: gotRep.length, ok: same([...wantRep].sort(), [...gotRep].sort()) };
+  su.rejoined = { expected: wantAfter.length, got: gotAfter.length, ok: same([...wantAfter].sort(), [...gotAfter].sort()) };
+  su.balanced = balanced(heard());
+  su.ok = su.at % slice === 0 && su.to > su.at && su.replays.ok && su.replays.expected > 20 && su.rejoined.ok &&
+    su.rejoined.expected > 20 && su.balanced;
+
+  // 3. The same during an overdub take, no count-in: it lands on the FX
+  // lane, and playing the song back sounds the same as the take did.
+  const la = out.lane;
+  held(B.FX, () => key(14));
+  tap(B.REC); turn(2, 2); turn(3, -1);
+  c.sim_song_capture(1);
+  tap(B.REC);
+  render(300);
+  c.sim_control(0, B.ARP, 1);                    // the drift stays at +2
+  render(400);
+  c.sim_control(0, B.ARP, 0);
+  render(600);
+  const take = heard().filter(h => !(h.track === 7 && h.pitch === 37)).map(h => [h.block - info(9), h.track, h.pitch, h.velocity]);
+  tap(B.PLAY);
+  la.fx = Array.from({ length: info(0, 0) }, (_, i) => i).filter(i => info(30, 0, i) === 3)
+    .map(i => ({ clock: info(1, 0, i), slice: info(2, 0, i), drift: info(18, 0, i) - 64, length: info(3, 0, i) }));
+  held(B.FX, () => key(14));
+  c.sim_song_capture(1);
+  tap(B.PLAY);
+  render(1300);
+  const back = heard().map(h => [h.block - info(9), h.track, h.pitch, h.velocity]);
+  tap(B.PLAY);
+  const window = take.filter(h => h[0] < 1290), again = back.filter(h => h[0] < 1290);
+  la.compared = window.length;
+  la.ok = la.fx.length === 1 && la.fx[0].slice === 1 && la.fx[0].drift === 2 && la.fx[0].clock === su.at &&
+    same(window, again) && window.length > 100;
+  // The FX lane in the automation view: the conductor row, PRESETS to FX.
+  held(B.FX, () => tap(B.LFO));
+  turn(0, -1); turn(6, 2);
+  turn(5, 2);
+  render(4);
+  out.lanePng = png();
+  turn(5, -2);
+  held(B.FX, () => tap(B.LFO));
+  // 4. Mangle from the song view: SHIFT+F#3 scrambles bars 3 to 6 of track
+  // 1, and undo puts them back.
+  const before = notes(0).map(n => n.clock + ':' + n.pitch).join();
+  held(B.FX, () => key(1));
+  const after = notes(0).map(n => n.clock + ':' + n.pitch).join();
+  c.sim_control(0, B.HOME, 1); c.sim_control(0, B.SAVE, 1); c.sim_control(0, B.SAVE, 0); c.sim_control(0, B.HOME, 0);
+  out.mangle = { changed: after !== before, undone: notes(0).map(n => n.clock + ':' + n.pitch).join() === before };
+  out.page = pageNow();
+  return out;
+});
 await browser.close();
 fs.writeFileSync(path.join(root, 'docs/hw-diag.png'), Buffer.from(hwdiag.png, 'base64'));
 delete hwdiag.png;
@@ -816,11 +985,17 @@ const p4ok = same3(phase4.engines, [0, 1, 3, 4, 5, 0, 1, 2]) && k4.page === 21 &
   s4.playback.ok && c4.ok && o4.page === 24 && same3(o4.tempos, [[0, 12000], [3840, 14000], [15360, 13300]]) &&
   same3(o4.meters, [[0, 4, 4], [3, 3, 4]]) && o4.notes.ok && o4.notes.expected > 100 && o4.after > 20 &&
   p4.ok && p4.undone && o4.meterUndone && o4.tempoUndone && phase4.cleared && phase4.clearUndone;
+fs.writeFileSync(path.join(root, 'docs/phase4b-step-glitch.png'), Buffer.from(phase4b.step.png, 'base64'));
+fs.writeFileSync(path.join(root, 'docs/phase4b-stutter.png'), Buffer.from(phase4b.stutter.png, 'base64'));
+fs.writeFileSync(path.join(root, 'docs/phase4b-fx-lane.png'), Buffer.from(phase4b.lanePng, 'base64'));
+delete phase4b.step.png; delete phase4b.stutter.png; delete phase4b.lanePng;
+result.phase4b = phase4b;
+const p4b = phase4b.step.ok && phase4b.stutter.ok && phase4b.lane.ok && phase4b.mangle.changed && phase4b.mangle.undone;
 console.log(JSON.stringify(result, null, 1));
 const k = result.controls;
 const ok = result.whole.notes.ok && result.whole.balanced && result.whole.stoppedAtEnd && result.whole.songPage === 19 &&
   result.loop.notes.ok && result.loop.balancedAfterStop && result.whole.rms > 0.001 && result.loop.rmsAfterStop < 1e-4 &&
   k.rewindToLoopStart && k.loopOff && k.k1MovesBySnap && k.shiftK1NextMarker && k.loopEdgesOk &&
-  k.pendingAfterRequest && k.jumpLandsOnBarLine && k.afterJump.ok && k.balancedAfterStop && k.seqOk && p2 && hw && p3 && p4ok;
+  k.pendingAfterRequest && k.jumpLandsOnBarLine && k.afterJump.ok && k.balancedAfterStop && k.seqOk && p2 && hw && p3 && p4ok && p4b;
 console.log(ok ? 'preview_check: passed' : 'preview_check: FAILED');
 process.exit(ok ? 0 : 1);

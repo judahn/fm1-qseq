@@ -5,6 +5,12 @@
  * Everything here changes only on input, so no frame snapshot is needed. */
 
 enum { STEP_GX = 8, STEP_GW = 224, STEP_GY = 50, STEP_GH = 108, STEP_SHADE = 0x0861 };
+/* The glitch layer: ARP toggles it, ALGO turns its three pages, and K1 to
+ * K3 set the selected notes' glitch (or the entry's), K4 still moving. */
+static uint8_t song_glitch_layer;
+static const uint8_t song_glitch_pages[3][3] = {
+    {GLITCH_REPEATS, GLITCH_DRIFT, GLITCH_FADE}, {GLITCH_CHANCE, GLITCH_OCTAVE, GLITCH_RANGE},
+    {GLITCH_ACCENT, GLITCH_FLAM, GLITCH_SWAP}};
 
 static unsigned step_x(uint32_t clock, uint32_t start, uint32_t length)
 {
@@ -64,6 +70,8 @@ static void step_grid(const struct song_step *st)
         for (unsigned k = 0; k < selected; ++k) chosen |= index[k] == s->first[st->track] + i;
         paint_fill(x, STEP_GY + (high - e[i].a) * STEP_GH / rows, w > 1 ? w : 1, tall,
                    chosen ? TEXT : frame_views[st->track].audible ? colors[st->track] : DIM);
+        if (song_event_glitch(&e[i])) /* glitched: a mark on its start */
+            paint_fill(x, STEP_GY + (high - e[i].a) * STEP_GH / rows - 2, 2, 2, AMBER);
     }
     unsigned x = step_x(st->pointer, start, length);
     paint_fill(x, STEP_GY - 2, 1, STEP_GH + 2, AMBER);
@@ -129,12 +137,24 @@ static void song_step_draw(void)
     else { decimal(velocity, st->velocity, 1); strcat(velocity, " "); strcat(velocity, step_velocity_name(st->velocity)); }
     decimal(gate, step_gate_percent[st->gate], 1);
     strcat(gate, "%");
-    knob(0, "LENGTH", length, colors[0]);
-    knob(1, "VELOCITY", velocity, colors[1]);
-    knob(2, "GATE", gate, colors[2]);
+    if (song_glitch_layer)
+        for (unsigned k = 0; k < 3; ++k) {
+            unsigned field = song_glitch_pages[song_glitch_layer - 1][k];
+            char value[12];
+            song_glitch_value(st->glitch, field, value);
+            knob(k, song_glitch_names[field], value, AMBER);
+        }
+    else {
+        knob(0, "LENGTH", length, colors[0]);
+        knob(1, "VELOCITY", velocity, colors[1]);
+        knob(2, "GATE", gate, colors[2]);
+    }
     knob(3, shift ? "NOTE JUMP" : "MOVE", "< >", colors[3]);
     if (notice && (int32_t)(frame_time - notice_until) >= 0) notice = NULL;
-    const char *hint = notice ? notice : shift ? "SHIFT: F3-E4 LENGTH F#3 TRIP G#3 DOT"
+    char page_hint[40] = "GLITCH 1/3  ALGO PAGE  ARP BACK";
+    page_hint[7] = (char)('0' + song_glitch_layer);
+    if (song_glitch_layer == 1) strcpy(page_hint, "GLITCH 1/3  SHIFT+K2 SCALE  ARP BACK");
+    const char *hint = notice ? notice : song_glitch_layer ? page_hint : shift ? "SHIFT: F3-E4 LENGTH F#3 TRIP G#3 DOT"
         : (previous_buttons & BUTTON(LFO)) ? "HOLD LFO, PRESS KEYS TO PICK NOTES" : "REC OR PLAY TO LEAVE  PRESETS PITCH";
     uint32_t sig = signature(0, hint, (unsigned)strlen(hint));
     if (sig == cache->hint_cache) return;
@@ -181,13 +201,26 @@ static int song_step_input(const struct fm1_controls *c, uint32_t *pressed, uint
     }
     if (*pressed & BUTTON(SCL)) step_delete(st);
     if (*pressed & BUTTON(ENV)) step_back_delete(st);
+    if (*pressed & BUTTON(ARP)) song_glitch_layer = song_glitch_layer ? 0 : 1;
     *pressed &= ~(BUTTON(FX) | BUTTON(SCL) | BUTTON(ENV) | BUTTON(LFO) | BUTTON(ARP));
     if (*pressed & (BUTTON(HOME) | BUTTON(EDIT) | BUTTON(GLO) | BUTTON(SAVE))) { step_preview_stop(st); return 0; }
     octave = clamp(octave + !!(*pressed & BUTTON(OCT_UP)) - !!(*pressed & BUTTON(OCT_DOWN)), -2, 2);
     if (c->encoders[0]) { select_track(c->encoders[0]); step_begin(st, track, st->pointer); step_held = 0; }
-    if (c->encoders[2]) step_set_length(st, c->encoders[2]);
-    if (c->encoders[3]) step_set_velocity(st, c->encoders[3]);
-    if (c->encoders[4]) step_set_gate(st, c->encoders[4]);
+    if (song_glitch_layer) {
+        song_glitch_layer = (uint8_t)clamp(song_glitch_layer + c->encoders[1], 1, 3);
+        for (unsigned k = 0; k < 3; ++k) {
+            unsigned field = song_glitch_pages[song_glitch_layer - 1][k];
+            if (field == GLITCH_DRIFT && shift) field = GLITCH_SCALE;
+            if (c->encoders[2 + k] && step_set_glitch(st, field, c->encoders[2 + k])) {
+                notice = "GLITCH TABLE FULL";
+                notice_until = now + 1500U;
+            }
+        }
+    } else {
+        if (c->encoders[2]) step_set_length(st, c->encoders[2]);
+        if (c->encoders[3]) step_set_velocity(st, c->encoders[3]);
+        if (c->encoders[4]) step_set_gate(st, c->encoders[4]);
+    }
     if (c->encoders[5]) {
         if (shift) step_jump(st, c->encoders[5] > 0 ? 1 : -1);
         else step_move(st, c->encoders[5]);

@@ -170,6 +170,8 @@ SONG_SMALL void song_port_stop(void)
 #endif
 }
 #if SONG_UI
+uint32_t song_port_lock(void) { return lock(); }
+void song_port_unlock(uint32_t state) { unlock(state); }
 /* Around an edit that may move the tempo map while playing. */
 SONG_SMALL uint32_t song_port_hold(struct song_place *place)
 {
