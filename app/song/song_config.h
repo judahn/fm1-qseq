@@ -19,6 +19,19 @@
 #if SONG_HW_TEST && !defined(FM1_OPEN_WEB) && !defined(SONG_TRIM)
 #define SONG_TRIM 1
 #endif
+/* The storage pool (pool.h): user-partition sectors [SONG_POOL_FIRST,
+ * SONG_POOL_END), less [SONG_POOL_SKIP_FIRST, SONG_POOL_SKIP_END). Today
+ * that is the stock project area and the sample area, sectors 0 to 125,
+ * 496 KB. Sectors 15 and 16 stay with the stock code: the device settings,
+ * and the staging sector the DX7 banks and the tuning journal go through.
+ * The DX7 banks (126 to 129) and the tuning and session sector (130) are
+ * past the end. With the project area given to code: first 17, end 126. */
+#ifndef SONG_POOL_FIRST
+#define SONG_POOL_FIRST 0
+#define SONG_POOL_END 126
+#define SONG_POOL_SKIP_FIRST 15
+#define SONG_POOL_SKIP_END 17
+#endif
 #ifndef SONG_UI
 #ifdef FM1_OPEN_WEB
 #define SONG_UI 1

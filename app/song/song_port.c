@@ -123,6 +123,7 @@ SONG_SMALL void song_port_poll(void)
         song_rec_follow(&recorder, clock);
     }
     song_knobs_poll(fm1_millis());
+    song_store_poll(fm1_millis());
 #endif
 }
 

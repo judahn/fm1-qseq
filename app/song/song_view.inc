@@ -9,8 +9,8 @@
  * song_auto.inc and input in song_panel.inc. */
 #include "song_port.h"
 
-enum { SONG = STARTUP + 1, SONG_STEP, SONG_SETUP, SONG_DIAG, SONG_REC, SONG_AUTO }; /* song view, step entry, settings,
-                                                                                      diagnostics, REC, automation */
+enum { SONG = STARTUP + 1, SONG_STEP, SONG_SETUP, SONG_DIAG, SONG_REC, SONG_AUTO, SONG_LIST }; /* song view, step entry,
+                                                              settings, diagnostics, REC, automation, songs */
 enum {
     SONG_X = 22, SONG_W = 214, SONG_RULER = 32, SONG_ROWS = 48, SONG_ROW = 18,
     SONG_BOTTOM = SONG_ROWS + 8 * SONG_ROW - 2,
@@ -152,6 +152,7 @@ static void song_draw(void)
     struct song *s = song_port_song();
     if (!paint_rendering) song_now_read(s);
     song_header(s);
+    song_memory_bars();
     song_ruler(s);
     for (unsigned t = 0; t < SONG_TRACKS; ++t) song_row(s, t);
     song_playhead_line();
@@ -190,6 +191,7 @@ static void song_draw(void)
 #include "song_setup.inc"
 #include "song_rec.inc"
 #include "song_auto.inc"
+#include "song_list.inc"
 #endif
 #if SONG_HW_TEST
 #include "song_diag.inc"
@@ -204,6 +206,7 @@ static void song_page_draw(unsigned visible)
     else if (visible == SONG_SETUP) song_setup_draw();
     else if (visible == SONG_REC) song_rec_draw();
     else if (visible == SONG_AUTO) song_auto_draw();
+    else if (visible == SONG_LIST) song_list_draw();
     else song_draw();
 #endif
     (void)visible;

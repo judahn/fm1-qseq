@@ -102,6 +102,12 @@ SONG_SMALL void song_chase(const struct song *s, unsigned track, uint32_t clock,
             }
         }
     }
+    /* Before a track's first program change: the program the song was saved with. */
+    unsigned bit = 1U << (SONG_LANE_PROGRAM & 31U), base = s->base_program[track];
+    if ((seen[SONG_LANE_PROGRAM >> 5] & bit) && !(send[SONG_LANE_PROGRAM >> 5] & bit) && base) {
+        value[SONG_LANE_PROGRAM] = (uint8_t)(base - 1U);
+        send[SONG_LANE_PROGRAM >> 5] |= bit;
+    }
     for (unsigned lane = 0; lane < SONG_LANES; ++lane)
         if (send[lane >> 5] >> (lane & 31U) & 1U) fn(context, track, lane, value[lane]);
 }

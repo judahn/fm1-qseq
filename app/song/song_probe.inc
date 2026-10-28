@@ -9,6 +9,8 @@
 #endif
 /* kind: 0 for a note, else the status of a controller (pitch is its number,
  * velocity its value) or program change (pitch is the program). */
+uint32_t song_store_probe(unsigned what); /* song_store_list.inc */
+int sim_song_kit_copy_run(void);
 struct song_heard { uint32_t block; uint8_t track, pitch, velocity, kind; };
 enum { HEARD = 8192 };
 static struct song_heard heard[HEARD];
@@ -63,6 +65,7 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     case 35: return index < count ? song_glitch_word(&song, &e[index]) : 0;
     case 36: return index ? player.stut_to : player.stut_at;
     case 37: return song.humanize_time[track & 7U] | (uint32_t)song.humanize_velocity[track & 7U] << 8;
+    case 38: return song_store_probe(index);
 #endif
     case 18: return index < count ? e[index].b : 0;
     case 19: return song.swing | (uint32_t)song.swing_grid << 8 | (uint32_t)song.swing_tracks << 16;
@@ -77,3 +80,4 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     default: return 0;
     }
 }
+SONG_EXPORT("sim_song_kit_copy") int sim_song_kit_copy(void) { return sim_song_kit_copy_run(); }

@@ -5,6 +5,8 @@
 #include "sampledrum.h"
 #include "fm_patch.h"
 #include <string.h>
+#include "song/song_config.h" /* song-mode */
+#if !SONG_UI /* song-mode: the kit library replaces this bank (song/song_store.c) */
 
 /* Single bank, no hidden second copy. CRC and a last-written commit word make
  * an interrupted import visibly incomplete. Projects occupy separate sectors.
@@ -239,3 +241,4 @@ int groove_samples_read(unsigned offset, uint8_t *data, unsigned bytes)
         return GROOVE_PROJECT_INVALID;
     return fm1_flash_read(GROOVE_SAMPLE_OFFSET + offset, data, bytes);
 }
+#endif /* song-mode */

@@ -92,6 +92,13 @@ static void test_reading(void)
     CHECK_EQ(cc_count, 2);
     CHECK(ccs[0].status == 7 && ccs[0].a == 90);
     CHECK(ccs[1].status == 74 && ccs[1].a == 10);
+    /* With the program the song was saved with, chase puts it back before
+     * the first program change. */
+    song.base_program[0] = 7 + 1;
+    cc_count = 0;
+    song_chase(&song, 0, 480, chased_lane, NULL);
+    CHECK(cc_count == 2 && ccs[1].status == SONG_LANE_PROGRAM && ccs[1].a == 7); /* and volume, first value */
+    song.base_program[0] = 0;
     CHECK_EQ(song_lane_set(&song, 0, 74, 960, 25, 0), 0);
     CHECK_EQ(song_lane_at(&song, 0, 74, 960), 25);
     CHECK_EQ(lane_count(0, 74), 3);

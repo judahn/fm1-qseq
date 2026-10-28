@@ -22,6 +22,11 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
     unsigned shift = (c->buttons & BUTTON(FX)) != 0;
     unsigned picking = (c->buttons & BUTTON(LFO)) != 0;
     unsigned glitching = song_stutter_input(c, *pressed, key_down, now);
+    if (*pressed & BUTTON(SAVE)) { /* SAVE saves the song, SHIFT+SAVE opens the list */
+        *pressed &= ~BUTTON(SAVE);
+        if (shift) { song_list_open(); return 1; }
+        song_save_key(now);
+    }
     if (song_port_recorder()->active && (*pressed & (BUTTON(PLAY) | BUTTON(REC)))) {
         song_port_record_stop(); /* PLAY or REC ends the take */
         *pressed &= ~(BUTTON(PLAY) | BUTTON(REC));
@@ -139,6 +144,10 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
         if (page != SONG_HOME) { page = music_page = SONG_HOME; writing = 0; }
         else { page = music_page = STEPS; seq_page = 0; step_follow = 1; }
         cache->shown_page = ~0U;
+#if SONG_UI
+        static uint8_t offered; /* a recovery copy from before: the list offers it, once */
+        if (page == SONG && song_store_recovery() && !offered) { offered = 1; song_list_at = 0; song_list_open(); }
+#endif
         return 1;
     }
     if (song_seq_on_steps && !(c->buttons & BUTTON(SEQ))) {
@@ -171,6 +180,16 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
 #endif
     if (page < SONG) {
         if ((*pressed & BUTTON(PLAY)) && song_port_player()->playing) { song_port_stop(); *pressed &= ~BUTTON(PLAY); }
+#if SONG_UI
+        /* SAVE on the stock pages saves the song too, never a stock project
+         * slot, which now lies in the song pool. */
+        if ((*pressed & BUTTON(SAVE)) && page != PROJECT && page != BLE && page != SOURCE && page != ACTIONS) {
+            *pressed &= ~BUTTON(SAVE);
+            if (c->buttons & BUTTON(FX)) song_list_open();
+            else song_save_key(now);
+            return 1;
+        }
+#endif
         return 0;
     }
     music_page = page;
@@ -183,6 +202,7 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
     if (page == SONG_SETUP) return song_setup_input(c, pressed, key_down, now);
     if (page == SONG_REC) return song_rec_input(c, pressed, key_down, now);
     if (page == SONG_AUTO) return song_auto_input(c, pressed, key_down, now);
+    if (page == SONG_LIST) return song_list_input(c, pressed, key_down, now);
     return song_view_input(c, pressed, key_down, now);
 #else
     return 0;

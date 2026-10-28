@@ -68,5 +68,31 @@ void song_stutter_hold(unsigned slice, int drift);   /* starts, or a new slice *
 void song_stutter_drift(int drift);
 void song_stutter_release(void);
 unsigned song_stuttering(void);
+/* Storage (song_store.c, phase 5a): songs, kits and the recovery copy in
+ * the flash pool. Writes happen only while stopped. 0, or an error. */
+enum { SONG_STORE_FULL = -20, SONG_STORE_PLAYING = -21 };
+void song_store_init(void);
+void song_store_poll(uint32_t now);          /* a recovery copy after playback stops */
+int song_store_save(unsigned as_new);        /* the working song, to its slot or a new one */
+int song_store_load(unsigned id);
+int song_store_new(int factory);             /* blank (-1) or a factory sound set */
+int song_store_rename(unsigned id, const char name[12]);
+int song_store_duplicate(unsigned id);
+int song_store_delete(unsigned id);
+unsigned song_store_count(void);
+unsigned song_store_id(unsigned index);
+void song_store_name(unsigned id, char out[17]);
+uint32_t song_store_bytes(unsigned id);
+unsigned song_store_kits(void);
+unsigned song_store_kit_id(unsigned index);
+unsigned song_store_kit(void);               /* the one bound to the pads */
+void song_store_kit_name(unsigned id, char out[17]);
+int song_store_use_kit(unsigned id);         /* rebinds the pads, nothing written */
+int song_store_delete_kit(unsigned id);
+unsigned song_store_recovery(void);          /* 1 while a recovery copy waits at boot */
+int song_store_restore(void);
+void song_store_skip_recovery(void);
+struct song_gauge { uint32_t pool, songs, samples, free; unsigned events; };
+void song_store_gauge(struct song_gauge *g);
 #endif
 #endif

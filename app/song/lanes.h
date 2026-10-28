@@ -42,9 +42,8 @@ int song_lane_find(const struct song *s, unsigned track, unsigned lane, uint32_t
 int song_lane_set(struct song *s, unsigned track, unsigned lane, uint32_t clock, unsigned value, unsigned fresh);
 /* Chase: every lane's value as of `clock`, skipping changes exactly at
  * `clock`, which play anyway. A controller with nothing before uses its
- * first value. A program change only counts from where it is. Program
- * changes chase from the song's own lanes only, until songs keep their
- * sounds (phase 5): before the first one the track stays as it is. */
+ * first value. A program change only counts from where it is, and before
+ * a track's first one the song's saved program (song.h) is sent, when known. */
 typedef void (*song_lane_fn)(void *context, unsigned track, unsigned lane, unsigned value);
 void song_chase(const struct song *s, unsigned track, uint32_t clock, song_lane_fn fn, void *context);
 /* Removes a lane's changes in [from, to) on the tracks in the mask. */

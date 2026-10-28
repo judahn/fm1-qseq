@@ -117,3 +117,20 @@ static void song_footer(const struct song *s, const char *shift_k1)
     knob(2, "LOOP OUT", end, colors[2]);
     knob(3, "ZOOM", song_spans[song_zoom], colors[3]);
 }
+/* Memory, compact: flash (songs, then kits) and the song's RAM pool. */
+static void song_memory_bars(void)
+{
+    if (paint_rendering && paint_top >= 30) return;
+    struct song_gauge g;
+    song_store_gauge(&g);
+    uint32_t sig = (uint32_t)((uint64_t)g.songs * 44U / g.pool) | (uint32_t)((uint64_t)g.samples * 44U / g.pool) << 8 |
+                   (uint32_t)(g.events * 34U / SONG_EVENTS) << 16 | 0x80000000U;
+    if (sig == cache->seq_cache) return;
+    cache->seq_cache = sig;
+    unsigned songs = sig & 255U, samples = sig >> 8 & 255U, events = sig >> 16 & 255U;
+    paint_fill(124, 24, 44, 2, PANEL);
+    paint_fill(124, 24, songs, 2, GREEN);
+    paint_fill(124 + songs, 24, samples, 2, AMBER);
+    paint_fill(172, 24, 34, 2, PANEL);
+    paint_fill(172, 24, events, 2, ACCENT);
+}

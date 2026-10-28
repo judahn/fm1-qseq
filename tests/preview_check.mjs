@@ -13,6 +13,8 @@
 // conductor lane and program changes. Saves docs/phase4-*.png. Phase 4b:
 // repeats from step entry at exact blocks, a held stutter that rejoins in
 // time, and the FX lane playing back a recorded one. Saves docs/phase4b-*.png.
+// Phase 5a: songs saved, changed and loaded, a kit through the transfer
+// calls, and the recovery copy across a reboot. Saves docs/phase5a-*.png.
 // Needs Playwright with a cached Chromium:
 //   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright node tests/preview_check.mjs
 import { createRequire } from 'node:module';
@@ -939,6 +941,103 @@ const phase4b = await page.evaluate(() => {
   out.page = pageNow();
   return out;
 });
+// Phase 5a: storage. Save, change, load and compare. A kit made through
+// the transfer calls, switched to and back. A recovery copy after a stop,
+// offered and restored after a reboot on the same flash.
+const phase5a = await page.evaluate(() => {
+  const wasm = Uint8Array.from(atob(FM1_SIMULATOR.data), ch => ch.charCodeAt(0));
+  let c = new FM1SimulatorCore(wasm, null, null).c;
+  const B = { FX: 2, SCL: 3, ENV: 4, LFO: 5, GLO: 7, HOME: 8, SAVE: 9, ARP: 10, SEQ: 11, PLAY: 12, REC: 13 };
+  const tap = b => { c.sim_control(0, b, 1); c.sim_control(0, b, 0); };
+  const key = k => { c.sim_control(1, k, 1); c.sim_control(1, k, 0); };
+  const held = (b, fn) => { c.sim_control(0, b, 1); fn(); c.sim_control(0, b, 0); };
+  const turn = (encoder, delta) => c.sim_control(2, encoder, delta);
+  const render = n => { for (let i = 0; i < n; i++) c.sim_render(); };
+  const info = (what, track = 0, index = 0) => c.sim_song_info(what, track, index) >>> 0;
+  const store = i => info(38, 0, i);
+  const pageNow = () => new Uint8Array(c.memory.buffer, c.sim_state(), 8)[1];
+  const pads = () => [8, 9, 10, 11, 12, 13, 14, 15].map(store);
+  const png = () => {
+    const pixels = new Uint16Array(c.memory.buffer, c.sim_pixels(), 240 * 240);
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 480;
+    const image = canvas.getContext('2d').createImageData(480, 480);
+    for (let y = 0; y < 480; y++)
+      for (let x = 0; x < 480; x++) {
+        const v = pixels[(y >> 1) * 240 + (x >> 1)], at = (y * 480 + x) * 4;
+        image.data[at] = (v >> 11) * 255 / 31; image.data[at + 1] = ((v >> 5) & 63) * 255 / 63;
+        image.data[at + 2] = (v & 31) * 255 / 31; image.data[at + 3] = 255;
+      }
+    canvas.getContext('2d').putImageData(image, 0, 0);
+    return canvas.toDataURL('image/png').split(',')[1];
+  };
+  const dump = () => {
+    const parts = [];
+    for (let t = 0; t < 8; t++)
+      for (let i = 0; i < info(0, t); i++) parts.push([t, info(30, t, i), info(1, t, i), info(2, t, i), info(18, t, i), info(3, t, i)].join(','));
+    for (let i = 0; i < info(12); i++) parts.push('m' + info(13, 0, i));
+    return parts.join(';') + '|' + info(14) + ',' + info(15) + ',' + info(11);
+  };
+  const out = {};
+  render(32);
+  tap(B.SEQ);
+  const bootPads = pads();
+  out.boot = { kits: store(2), kit: store(3), songs: store(0), padsUsed: bootPads.filter(p => p).length };
+
+  // 1. SAVE in the song view: the test song goes to slot 1.
+  const before = dump();
+  tap(B.SAVE);
+  const crc = store(16);                         /* as saved, now with its name and programs */
+  out.saved = { songs: store(0), id: store(1) };
+  // 2. Change it (delete bars 3 to 6), save that as a second song from the list.
+  held(B.FX, () => key(11));
+  out.changed = dump() !== before;
+  held(B.FX, () => tap(B.SAVE));
+  out.listPage = pageNow();
+  key(4);                                        // A3: save as
+  out.songsAfterSaveAs = store(0);
+  // 3. Load song 1 back: F3 asks, F3 again loads.
+  turn(2, -5);
+  key(0); key(0);
+  out.loaded = { id: store(1), sameEvents: dump() === before, sameBytes: store(16) === crc };
+  render(4);
+  out.listPng = png();
+
+  // 4. A kit through the transfer calls: the stock bank with its last pad
+  // changed. Only that sample is stored, the rest are shared. Then K3 back
+  // to the stock bank: the pads rebind and nothing is written.
+  out.kitImport = c.sim_song_kit_copy();
+  const newPads = pads();
+  out.kits = { count: store(2), kit: store(3), samples: store(7),
+    shared: newPads.filter((p, i) => p && p === bootPads[i]).length, changed: newPads.filter((p, i) => p !== bootPads[i]).length };
+  const revision = c.sim_flash_revision();
+  turn(4, -1);
+  out.switched = { kit: store(3), padsBack: pads().join() === bootPads.join(), written: c.sim_flash_revision() !== revision };
+  tap(B.HOME);
+  out.backToSong = pageNow();
+
+  // 5. A change, play and stop: a recovery copy appears.
+  const generation = store(6);
+  tap(B.SCL);                                    // a marker
+  tap(B.PLAY); render(200); tap(B.PLAY); render(8);
+  out.recovery = { before: generation, after: store(6) };
+  const changed = store(16);
+  render(4);
+  out.songPng = png();
+
+  // 6. Reboot on the same flash: SEQ offers the copy, F3 twice restores it.
+  const bytes = 536576, image = new Uint8Array(c.memory.buffer, c.sim_flash(), bytes).slice();
+  c = new FM1SimulatorCore(wasm, null, null).c;
+  new Uint8Array(c.memory.buffer, c.sim_flash(), bytes).set(image);
+  c.sim_boot(0);
+  render(32);
+  tap(B.SEQ);
+  out.reboot = { page: pageNow(), waiting: store(4), songs: store(0) };
+  render(4);
+  out.restorePng = png();
+  key(0); key(0);
+  out.restored = { sameBytes: store(16) === changed, id: store(1), waiting: store(4) };
+  return out;
+});
 await browser.close();
 fs.writeFileSync(path.join(root, 'docs/hw-diag.png'), Buffer.from(hwdiag.png, 'base64'));
 delete hwdiag.png;
@@ -991,11 +1090,23 @@ fs.writeFileSync(path.join(root, 'docs/phase4b-fx-lane.png'), Buffer.from(phase4
 delete phase4b.step.png; delete phase4b.stutter.png; delete phase4b.lanePng;
 result.phase4b = phase4b;
 const p4b = phase4b.step.ok && phase4b.stutter.ok && phase4b.lane.ok && phase4b.mangle.changed && phase4b.mangle.undone;
+fs.writeFileSync(path.join(root, 'docs/phase5a-song-list.png'), Buffer.from(phase5a.listPng, 'base64'));
+fs.writeFileSync(path.join(root, 'docs/phase5a-song-view.png'), Buffer.from(phase5a.songPng, 'base64'));
+fs.writeFileSync(path.join(root, 'docs/phase5a-restore.png'), Buffer.from(phase5a.restorePng, 'base64'));
+delete phase5a.listPng; delete phase5a.songPng; delete phase5a.restorePng;
+result.phase5a = phase5a;
+const q = phase5a;
+const p5a = q.boot.kits === 1 && q.boot.kit === 1 && q.boot.padsUsed > 0 && q.saved.songs === 1 && q.saved.id === 1 &&
+  q.changed && q.listPage === 25 && q.songsAfterSaveAs === 2 && q.loaded.id === 1 && q.loaded.sameEvents && q.loaded.sameBytes &&
+  q.kitImport === 0 && q.kits.count === 2 && q.kits.kit === 2 && q.kits.samples === 1 && q.kits.changed === 1 &&
+  q.kits.shared === q.boot.padsUsed - 1 && q.switched.kit === 1 && q.switched.padsBack && !q.switched.written &&
+  q.backToSong === 19 && q.recovery.after && q.recovery.after !== q.recovery.before && q.reboot.page === 25 &&
+  q.reboot.waiting === 1 && q.reboot.songs === 2 && q.restored.sameBytes && q.restored.waiting === 0;
 console.log(JSON.stringify(result, null, 1));
 const k = result.controls;
 const ok = result.whole.notes.ok && result.whole.balanced && result.whole.stoppedAtEnd && result.whole.songPage === 19 &&
   result.loop.notes.ok && result.loop.balancedAfterStop && result.whole.rms > 0.001 && result.loop.rmsAfterStop < 1e-4 &&
   k.rewindToLoopStart && k.loopOff && k.k1MovesBySnap && k.shiftK1NextMarker && k.loopEdgesOk &&
-  k.pendingAfterRequest && k.jumpLandsOnBarLine && k.afterJump.ok && k.balancedAfterStop && k.seqOk && p2 && hw && p3 && p4ok && p4b;
+  k.pendingAfterRequest && k.jumpLandsOnBarLine && k.afterJump.ok && k.balancedAfterStop && k.seqOk && p2 && hw && p3 && p4ok && p4b && p5a;
 console.log(ok ? 'preview_check: passed' : 'preview_check: FAILED');
 process.exit(ok ? 0 : 1);

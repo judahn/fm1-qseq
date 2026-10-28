@@ -84,6 +84,12 @@ struct song {
     uint32_t glitch[32];
     uint8_t humanize_time[SONG_TRACKS], humanize_velocity[SONG_TRACKS];
     uint32_t seed;
+    /* Storage (song_file.h): the name, the pool slot it came from (0 for
+     * none), its kit, and each track's program as saved plus 1 (0 when not
+     * known), so chase can put a track back before its first program change. */
+    char name[12];
+    uint16_t id, kit;
+    uint8_t base_program[SONG_TRACKS];
 };
 
 /* Editing (song.c). Calls return 0, or -1 when invalid or full. */
