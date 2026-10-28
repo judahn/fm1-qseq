@@ -2,16 +2,17 @@
 /* song-mode: the song view. screen.c includes this file so the view uses its
  * band painter, text, knob footer and draw caches. As on every stock page,
  * the marking pass records damage and the band pass repaints from a frame
- * snapshot. Phase 1: transport, snap and zoom, markers and the loop.
- * Step entry is in song_step.inc, settings in song_setup.inc and input in
- * song_panel.inc. */
+ * snapshot. Transport, snap and zoom, markers, the loop and the selection.
+ * The header is in song_header.inc, step entry in song_step.inc, settings
+ * in song_setup.inc, REC's chooser in song_rec.inc, arranging in
+ * song_select.inc and input in song_panel.inc. */
 #include "song_port.h"
 
-enum { SONG = STARTUP + 1, SONG_STEP, SONG_SETUP }; /* song view, step entry, settings */
+enum { SONG = STARTUP + 1, SONG_STEP, SONG_SETUP, SONG_DIAG, SONG_REC }; /* song view, step entry, settings, diagnostics, REC */
 enum {
     SONG_X = 22, SONG_W = 214, SONG_RULER = 32, SONG_ROWS = 48, SONG_ROW = 18,
     SONG_BOTTOM = SONG_ROWS + 8 * SONG_ROW - 2,
-    SONG_BAR_LINE = 0x4228, SONG_BEAT_LINE = 0x2104, SONG_LOOP = 0x1147
+    SONG_BAR_LINE = 0x4228, SONG_BEAT_LINE = 0x2104, SONG_LOOP = 0x1147, SONG_SELECT = 0x0884
 };
 static const char *const song_snaps[SONG_ZOOMS] = {"1 BAR", "1/2 BAR", "BEAT", "1/8"};
 static const char *const song_spans[SONG_ZOOMS] = {"16 BARS", "8 BARS", "4 BARS", "2 BARS"};
@@ -19,11 +20,13 @@ static unsigned song_zoom;
 static uint32_t song_window = ~0U, song_drawn_x = ~0U, song_ranged = ~0U;
 static uint8_t song_low[SONG_TRACKS], song_high[SONG_TRACKS];
 static struct {
-    uint32_t clock, target;
-    uint8_t playing, jumping, shift;
+    uint32_t clock, target, ghost_from, ghost_to;
+    uint8_t playing, jumping, shift, recording, selected, ghost_tracks;
 } song_now; /* taken by the marking pass, used by every band */
 static void select_track(int delta);
 static void song_start(uint32_t now);
+#if SONG_UI
+#include "song_select.inc"
 
 static uint32_t song_span(void) { return (16U >> song_zoom) * (uint32_t)SONG_WHOLE; }
 static unsigned song_x(uint32_t clock)
@@ -58,62 +61,7 @@ static void song_ranges(const struct song *s)
         song_high[t] = (uint8_t)(count ? high : 60);
     }
 }
-static void song_position(const struct song *s, uint32_t clock, char out[24], unsigned full)
-{
-    unsigned bbc[3];
-    char part[12];
-    song_bbc(s, clock, bbc);
-    decimal(out, (int)bbc[0], full ? 3 : 1);
-    strcat(out, full ? ":" : ".");
-    decimal(part, (int)bbc[1], 1);
-    strcat(out, part);
-    if (!full && !bbc[2]) return;
-    strcat(out, full ? ":" : ".");
-    decimal(part, (int)bbc[2], 3);
-    strcat(out, part);
-}
-
-static void song_header(const struct song *s)
-{
-    if (paint_rendering && paint_top >= 30) return;
-    char position[24];
-    song_position(s, song_now.clock, position, 1);
-    uint32_t sig = signature(0, position, (unsigned)strlen(position));
-    if (sig != cache->middle_cache) {
-        cache->middle_cache = sig;
-        paint_fill(4, 4, 116, 18, BACK);
-        text(6, 6, position, 2, TEXT, BACK);
-    }
-    unsigned bar = song_bar_at(s, song_now.clock, NULL, NULL), bpm = s->tempo[song_tempo_at(s, song_now.clock)].bpm100;
-    const struct song_meter *m = song_meter_at(s, bar);
-    int marker = song_marker_step(s, song_now.clock + 1U, -1);
-    sig = song_now.playing | (s->loop_on << 1) | (song_now.jumping << 2) | ((uint32_t)(marker + 1) << 3) |
-          ((uint32_t)bpm << 8);
-    sig = signature(sig, m, sizeof *m);
-    if (sig == cache->header_cache) return;
-    cache->header_cache = sig;
-    paint_fill(122, 0, 118, 27, BACK);
-    text(124, 5, song_now.playing ? "PLAY" : "STOP", 1, song_now.playing ? GREEN : DIM, BACK);
-    text(124, 16, "LOOP", 1, s->loop_on ? ACCENT : PANEL, BACK);
-    char name[SONG_MARKER_NAME + 1] = {0};
-    if (marker >= 0) memcpy(name, s->marker[marker].name, SONG_MARKER_NAME);
-    text(154, 5, name, 1, song_now.jumping ? DIM : AMBER, BACK);
-    char meter[12], unit[12];
-    decimal(meter, m->beats, 1);
-    decimal(unit, m->unit, 1);
-    strcat(meter, "/");
-    strcat(meter, unit);
-    text(154, 16, meter, 1, DIM, BACK);
-    if (bpm % 100) {
-        char tempo[12], hundredths[12];
-        decimal(tempo, (int)(bpm / 100), 1);
-        decimal(hundredths, (int)(bpm % 100), 2);
-        strcat(tempo, ".");
-        strcat(tempo, hundredths);
-        text(200, 8, tempo, 1, TEXT, BACK);
-    } else number(200, 4, (int)(bpm / 100), 3, 2, TEXT, BACK);
-    text(212, 19, "BPM", 1, DIM, BACK);
-}
+#include "song_header.inc"
 
 /* Bar numbers, marker flags, the loop bracket and a pending jump. */
 static void song_ruler(const struct song *s)
@@ -151,7 +99,9 @@ static void song_row(const struct song *s, unsigned t)
     if (paint_rendering && (y >= paint_top + PAINT_ROWS || y + SONG_ROW <= paint_top)) return;
     uint32_t sig = signature(song_window ^ (song_zoom << 28) ^ ((t == track) << 30) ^
                              ((uint32_t)frame_views[t].audible << 31), &s->revision, sizeof s->revision);
-    sig = signature(sig, &s->loop_start, 8) ^ s->loop_on;
+    unsigned picked = song_now.selected >> t & 1U, ghost = song_now.ghost_tracks >> t & 1U;
+    sig = signature(sig, &s->loop_start, 8) ^ s->loop_on ^ (picked << 1) ^ (ghost << 2);
+    if (ghost) sig = signature(sig, &song_now.ghost_from, 8);
     if (sig == cache->row_cache[t]) return;
     cache->row_cache[t] = sig;
     paint_fill(0, y, 240, SONG_ROW - 1, BACK);
@@ -160,8 +110,9 @@ static void song_row(const struct song *s, unsigned t)
     paint_fill(3, y, 16, SONG_ROW - 2, bg);
     number(8, y + 5, (int)t + 1, 1, 1, t == track ? BACK : colors[t], bg);
     uint32_t end = song_window + song_span();
-    if (s->loop_on && s->loop_end > song_window && s->loop_start < end)
-        paint_fill(song_x(s->loop_start), y, song_x(s->loop_end) - song_x(s->loop_start), SONG_ROW - 2, SONG_LOOP);
+    if (picked && s->loop_end > song_window && s->loop_start < end) /* the selection, brighter when looping */
+        paint_fill(song_x(s->loop_start), y, song_x(s->loop_end) - song_x(s->loop_start), SONG_ROW - 2,
+                   s->loop_on ? SONG_LOOP : SONG_SELECT);
     for (unsigned bar = song_bar_at(s, song_window, NULL, NULL); bar <= s->bars; ++bar) {
         uint32_t at = song_bar_clock(s, bar), beat = SONG_WHOLE / song_meter_at(s, bar)->unit;
         if (at >= end) break;
@@ -184,6 +135,11 @@ static void song_row(const struct song *s, unsigned t)
         unsigned rise = span ? (unsigned)(e[i].a - song_low[t]) * 13U / span : 6U;
         paint_fill(x, y + 14 - rise, w, 2, color);
     }
+    /* Where a paste would land: an outline from the playhead. */
+    if (ghost && song_now.ghost_to > song_window && song_now.ghost_from < end) {
+        unsigned x1 = song_x(song_now.ghost_from), x2 = song_x(song_now.ghost_to);
+        frame(x1, y, x2 > x1 + 1 ? x2 - x1 : 2, SONG_ROW - 2, TEXT);
+    }
 }
 
 static void song_draw(void)
@@ -196,6 +152,13 @@ static void song_draw(void)
         song_now.playing = p->playing;
         song_now.jumping = p->jumping;
         song_now.shift = (previous_buttons & BUTTON(FX)) != 0;
+        song_now.recording = song_port_recorder()->active;
+        song_now.selected = (uint8_t)song_selected();
+        const struct song_clip *c = song_port_clip();
+        unsigned single = c->tracks && !(c->tracks & (c->tracks - 1U));
+        song_now.ghost_tracks = (uint8_t)(c->length && !p->playing ? single ? 1U << track : c->tracks : 0);
+        song_now.ghost_from = p->playhead;
+        song_now.ghost_to = p->playhead + c->length;
         song_follow(s, song_now.clock);
         song_ranges(s);
     }
@@ -219,8 +182,25 @@ static void song_draw(void)
     knob(2, "LOOP OUT", end, colors[2]);
     knob(3, "ZOOM", song_spans[song_zoom], colors[3]);
     if (notice && (int32_t)(frame_time - notice_until) >= 0) notice = NULL;
+    char selection[40], part[12];
+    if (song_now.recording) {
+        strcpy(selection, "REC ");
+        strcat(selection, song_rec_modes[song_port_recorder()->mode]);
+        strcat(selection, "  PLAY OR REC STOPS");
+    } else {
+        uint32_t length = s->loop_end - s->loop_start;
+        strcpy(selection, "SEL ");
+        decimal(part, (int)(length / SONG_WHOLE), 1); strcat(selection, part); strcat(selection, ".");
+        decimal(part, (int)(length % SONG_WHOLE * 10U / SONG_WHOLE), 1); strcat(selection, part);
+        strcat(selection, " BARS:");
+        unsigned picked = song_selected();
+        if (picked == 0xff) strcat(selection, " ALL");
+        else for (unsigned t = 0; t < SONG_TRACKS && strlen(selection) < 34; ++t)
+            if (picked >> t & 1U) { strcat(selection, " T"); decimal(part, (int)t + 1, 1); strcat(selection, part); }
+    }
     const char *hint = notice ? notice : song_now.jumping ? "JUMP WAITS FOR THE NEXT BAR"
-        : song_now.shift ? "SHIFT + F4..G5: MARKERS 1-9" : "FX SHIFT  ENV LOOP  REC STEP  GLO SET";
+        : song_now.shift ? "SHIFT: F3-E4 EDIT  F4-G5 MARKERS"
+        : (previous_buttons & BUTTON(LFO)) ? "LFO + F3-F4 TRACKS  G4 ALL" : selection;
     uint32_t sig = signature(0, hint, (unsigned)strlen(hint));
     if (sig == cache->hint_cache) return;
     cache->hint_cache = sig;
@@ -230,10 +210,22 @@ static void song_draw(void)
 
 #include "song_step.inc"
 #include "song_setup.inc"
+#include "song_rec.inc"
+#endif
+#if SONG_HW_TEST
+#include "song_diag.inc"
+#endif
 static void song_page_draw(unsigned visible)
 {
+#if SONG_HW_TEST
+    if (visible == SONG_DIAG) { song_diag_draw(); return; }
+#endif
+#if SONG_UI
     if (visible == SONG_STEP) song_step_draw();
     else if (visible == SONG_SETUP) song_setup_draw();
+    else if (visible == SONG_REC) song_rec_draw();
     else song_draw();
+#endif
+    (void)visible;
 }
 #include "song_panel.inc"

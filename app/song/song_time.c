@@ -7,14 +7,14 @@
 
 static uint32_t bar_length(const struct song_meter *m) { return m->beats * (uint32_t)(SONG_WHOLE / m->unit); }
 
-const struct song_meter *song_meter_at(const struct song *s, unsigned bar)
+SONG_SMALL const struct song_meter *song_meter_at(const struct song *s, unsigned bar)
 {
     unsigned i = 0;
     while (i + 1U < s->meters && s->meter[i + 1].bar <= bar) ++i;
     return &s->meter[i];
 }
 
-uint32_t song_bar_clock(const struct song *s, unsigned bar)
+SONG_SMALL uint32_t song_bar_clock(const struct song *s, unsigned bar)
 {
     uint32_t clock = 0;
     for (unsigned i = 0; i < s->meters; ++i) {
@@ -25,7 +25,7 @@ uint32_t song_bar_clock(const struct song *s, unsigned bar)
     return clock;
 }
 
-unsigned song_bar_at(const struct song *s, uint32_t clock, uint32_t *start, uint32_t *length)
+SONG_SMALL unsigned song_bar_at(const struct song *s, uint32_t clock, uint32_t *start, uint32_t *length)
 {
     uint32_t at = 0;
     for (unsigned i = 0;; ++i) {
@@ -43,7 +43,7 @@ unsigned song_bar_at(const struct song *s, uint32_t clock, uint32_t *start, uint
 
 uint32_t song_end(const struct song *s) { return song_bar_clock(s, s->bars); }
 
-void song_bbc(const struct song *s, uint32_t clock, unsigned out[3])
+SONG_SMALL void song_bbc(const struct song *s, uint32_t clock, unsigned out[3])
 {
     uint32_t start;
     unsigned bar = song_bar_at(s, clock, &start, NULL);
@@ -54,14 +54,14 @@ void song_bbc(const struct song *s, uint32_t clock, unsigned out[3])
 }
 
 /* Bar, half bar, beat or 8th, never longer than the bar itself. */
-static uint32_t snap_step(const struct song *s, unsigned bar, uint32_t length, unsigned zoom)
+SONG_SMALL static uint32_t snap_step(const struct song *s, unsigned bar, uint32_t length, unsigned zoom)
 {
     uint32_t step = zoom == 0 ? length : zoom == 1 ? length / 2
         : zoom == 2 ? SONG_WHOLE / song_meter_at(s, bar)->unit : SONG_PPQ / 2;
     return step && step < length ? step : length;
 }
 
-uint32_t song_snap_move(const struct song *s, uint32_t clock, unsigned zoom, int steps)
+SONG_SMALL uint32_t song_snap_move(const struct song *s, uint32_t clock, unsigned zoom, int steps)
 {
     uint32_t end = song_end(s), start, length;
     if (clock > end) clock = end;
@@ -78,7 +78,7 @@ uint32_t song_snap_move(const struct song *s, uint32_t clock, unsigned zoom, int
     return clock;
 }
 
-int song_marker_step(const struct song *s, uint32_t clock, int direction)
+SONG_SMALL int song_marker_step(const struct song *s, uint32_t clock, int direction)
 {
     if (direction > 0) {
         for (unsigned i = 0; i < s->markers; ++i)
@@ -89,7 +89,7 @@ int song_marker_step(const struct song *s, uint32_t clock, int direction)
     return -1;
 }
 
-uint32_t song_swing(const struct song *s, unsigned track, uint32_t clock)
+SONG_SMALL uint32_t song_swing(const struct song *s, unsigned track, uint32_t clock)
 {
     if (!s->swing || track >= SONG_TRACKS || !(s->swing_tracks >> track & 1U)) return 0;
     uint32_t grid = s->swing_grid ? SONG_PPQ / 4 : SONG_PPQ / 2, start;
@@ -97,20 +97,20 @@ uint32_t song_swing(const struct song *s, unsigned track, uint32_t clock)
     return (clock - start) % (2U * grid) == grid ? (grid * s->swing + 50U) / 100U : 0;
 }
 
-unsigned song_tempo_at(const struct song *s, uint32_t clock)
+SONG_SMALL unsigned song_tempo_at(const struct song *s, uint32_t clock)
 {
     unsigned k = 0;
     while (k + 1U < s->tempos && s->tempo[k + 1].clock <= clock) ++k;
     return k;
 }
 
-uint64_t song_units(const struct song *s, unsigned segment, uint32_t clock)
+SONG_SMALL uint64_t song_units(const struct song *s, unsigned segment, uint32_t clock)
 {
     return s->tempo_units[segment] + (uint64_t)(clock - s->tempo[segment].clock) * SONG_UNITS_PER_CLOCK;
 }
 
 /* Split the product so neither half can overflow 64 bits. */
-uint64_t song_rescale(uint64_t value, uint32_t to, uint32_t from)
+SONG_SMALL uint64_t song_rescale(uint64_t value, uint32_t to, uint32_t from)
 {
     uint64_t q = value / from, r = value % from;
     return q * to + (r * to + from - 1U) / from;
@@ -119,7 +119,7 @@ uint64_t song_rescale(uint64_t value, uint32_t to, uint32_t from)
 /* Segment k starts at the end of segment k-1, converted to its own units and
  * rounded down. That costs under one unit (1/(480 * bpm100) frame) per tempo
  * change and never grows with song length. */
-void song_tempo_refresh(struct song *s)
+SONG_SMALL void song_tempo_refresh(struct song *s)
 {
     s->tempo[0].clock = 0;
     s->tempo_units[0] = 0;

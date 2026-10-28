@@ -3,6 +3,8 @@
  * bit 0 being the root. Notes outside it snap up to the next scale note, and
  * the pitch knob moves by scale steps. Chromatic has all 12, so nothing moves. */
 #include "song.h"
+#include "song_config.h"
+#if SONG_UI
 
 const char *const song_scale_names[SONG_SCALES] = {
     "CHROMATIC", "MAJOR", "MINOR", "DORIAN", "PHRYGIAN", "LYDIAN", "MIXOLYDIAN",
@@ -24,14 +26,14 @@ static const uint16_t scales[SONG_SCALES] = {
     0x4e9  /* blues: 0 3 5 6 7 10 */
 };
 
-unsigned song_scale_mask(const struct song *s)
+SONG_SMALL unsigned song_scale_mask(const struct song *s)
 {
     unsigned base = scales[s->key_scale < SONG_SCALES ? s->key_scale : 0], root = s->key_root % 12U;
     return ((base << root) | (base >> (12U - root))) & 0xfffU;
 }
 static unsigned in_scale(unsigned mask, unsigned pitch) { return mask >> (pitch % 12U) & 1U; }
 
-unsigned song_scale_snap(const struct song *s, unsigned pitch)
+SONG_SMALL unsigned song_scale_snap(const struct song *s, unsigned pitch)
 {
     unsigned mask = song_scale_mask(s);
     if (pitch > 127) pitch = 127;
@@ -42,7 +44,7 @@ unsigned song_scale_snap(const struct song *s, unsigned pitch)
     return pitch;
 }
 
-unsigned song_scale_step(const struct song *s, unsigned pitch, int steps)
+SONG_SMALL unsigned song_scale_step(const struct song *s, unsigned pitch, int steps)
 {
     unsigned mask = song_scale_mask(s);
     for (; steps > 0; --steps) {
@@ -59,3 +61,4 @@ unsigned song_scale_step(const struct song *s, unsigned pitch, int steps)
     }
     return pitch;
 }
+#endif

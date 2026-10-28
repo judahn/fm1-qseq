@@ -1915,6 +1915,9 @@ static int apply_controls(const struct fm1_controls *controls, uint32_t now,
         page = OVERVIEW;
     if ((controls->buttons & (BUTTON(HOME) | BUTTON(SAVE))) == (BUTTON(HOME) | BUTTON(SAVE)) &&
         (pressed & (BUTTON(HOME) | BUTTON(SAVE)))) {
+#if SONG_UI /* song-mode: multi-level undo on the song pages, redo with SHIFT */
+        if (song_combo_from) { song_undo_key(controls->buttons, now); page = music_page = song_combo_from; goto controls_done; }
+#endif
         int r = groove_edit_undo();
         notice = r ? "NOTHING TO UNDO / STOP REC FIRST" : "UNDO / REDO APPLIED";
         notice_until = now + 2000U;

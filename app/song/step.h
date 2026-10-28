@@ -38,6 +38,8 @@ int step_back_delete(struct song_step *st);
 void step_move(struct song_step *st, int steps);    /* by the step length */
 void step_jump(struct song_step *st, int direction); /* note to note */
 unsigned step_selection(const struct song_step *st, unsigned index[STEP_CHORD]);
+/* Change the note at pool index `at` on the step track, journaled. */
+void step_change(struct song_step *st, unsigned at, const struct song_event *e);
 void step_preview_stop(struct song_step *st);
 
 /* step_edit.c: knobs, length keys, picking and the pitch knob. */

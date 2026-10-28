@@ -3,6 +3,10 @@
 #define FM1_SONG_H
 #include <stdint.h>
 
+/* Song code runs on the control task (or once per block), so it is built
+ * for size, like the stock firmware's control paths. Flash is tight. */
+#define SONG_SMALL __attribute__((minsize))
+
 /* Song model: 480 clocks per quarter, 8 tracks of time-sorted events kept in
  * one shared pool, plus tempo, time signature, marker and loop data. Storage
  * is fixed size. Nothing here allocates. */
@@ -27,6 +31,7 @@ enum {
 static inline uint32_t song_rate(unsigned bpm100) { return 480U * bpm100; }
 
 enum { SONG_NOTE, SONG_CONTROL }; /* event kinds. Controllers come with automation */
+#define SONG_FRESH 0x80000000U /* flag in `at`: recorded in the take that is running */
 /* Start clock in bits 0..23 of `at`, kind in bits 24..31. A note keeps its
  * pitch in a, velocity in b and its length in clocks (1..65535). */
 struct song_event {
@@ -36,11 +41,12 @@ struct song_event {
 };
 _Static_assert(sizeof(struct song_event) == 8, "song event layout");
 static inline uint32_t song_event_start(const struct song_event *e) { return e->at & 0xffffffU; }
-static inline unsigned song_event_kind(const struct song_event *e) { return e->at >> 24; }
+static inline unsigned song_event_kind(const struct song_event *e) { return e->at >> 24 & 0x7fU; }
 
 struct song_tempo { uint32_t clock; uint16_t bpm100; };
 struct song_meter { uint16_t bar; uint8_t beats, unit; }; /* from bar (0-based), beats/unit */
 struct song_marker { uint32_t clock; char name[SONG_MARKER_NAME]; };
+struct song_undo;
 struct song {
     struct song_event event[SONG_EVENTS];
     uint16_t first[SONG_TRACKS], count[SONG_TRACKS];
@@ -55,6 +61,11 @@ struct song {
      * step, 8th or 16th, on the tracks in swing_tracks. Key: root 0..11
      * (C = 0) and scale 0..12, 0 being chromatic. */
     uint8_t swing, swing_grid, swing_tracks, key_root, key_scale;
+    /* Recording settings: mode, count-in bars (0..2), metronome (0 off,
+     * 1 on, 2 while recording), input quantize (0 off, else 1 + 2 * length
+     * + triplet, lengths as in step entry) and its strength in percent. */
+    uint8_t rec_mode, count_in, metronome, quantize, strength;
+    struct song_undo *undo;  /* edit journal, or NULL (undo.c) */
 };
 
 /* Editing (song.c). Calls return 0, or -1 when invalid or full. */
@@ -68,6 +79,11 @@ int song_set_loop(struct song *s, uint32_t start, uint32_t end);
 const struct song_event *song_track(const struct song *s, unsigned track, unsigned *count);
 unsigned song_find(const struct song *s, unsigned track, uint32_t clock); /* first start >= clock */
 int song_remove(struct song *s, unsigned track, unsigned index);
+/* Journaled edits for the editing pages (song_edit.c). Indexes here are
+ * into the whole pool. A shift moves every event at or after `from`. */
+int song_add_event(struct song *s, unsigned track, const struct song_event *e);
+int song_set_event(struct song *s, unsigned track, unsigned index, const struct song_event *e);
+int song_shift(struct song *s, uint32_t from, int32_t delta);
 
 /* Bars, beats and snapping (song_time.c). Bars are 0-based here and 1-based
  * on screen. Zoom 0..3 snaps to a bar, half bar, beat or 8th. */

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 #include "instrument.h"
 #include "fm1_engine_control.h"
+#include "song/song_port.h" /* song-mode */
 #include <string.h>
 #ifdef FM1_HOST_TEST
 #include <stdatomic.h>
@@ -83,7 +84,7 @@ void groove_midi_config_apply(const struct groove_midi_config *c)
     groove_midi_clock_reset();
     fm1_engine_resume();
     if (groove_midi_panel_reset) groove_midi_panel_reset();
-    const uint8_t reset = 0xff; (void)fm1_midi_post(&reset, 1);
+    const uint8_t reset = 0xff; (void)song_midi_post(&reset, 1); /* song-mode */
 }
 void groove_midi_clock_reset(void)
 {
@@ -277,7 +278,7 @@ int groove_midi_local(const uint8_t *m, size_t n)
     if (!m || !n || n > 3 || m[0] < 0x80 || (n > 1 && m[1] >= 128) || (n > 2 && m[2] >= 128)) return -1;
     if (m[0] >= 0xf0) {
         if (m[0] == 0xff) groove_midi_panic();
-        return fm1_midi_post(m, n);
+        return song_midi_post(m, n); /* song-mode */
     }
     unsigned ch = m[0] & 15U, targets = 0;
     if (n != size(m[0])) return -1;
@@ -286,7 +287,7 @@ int groove_midi_local(const uint8_t *m, size_t n)
     /* An Off/unmapped channel is intentionally silent, not a queue failure.
      * The panel interprets failure as a lost key and performs a global reset. */
     if (!targets) return 0;
-    int result = (config.flags & LOCAL_OFF) ? 0 : fm1_midi_post(m, n);
+    int result = (config.flags & LOCAL_OFF) ? 0 : song_midi_post(m, n); /* song-mode */
     if (result) { groove_midi_panic(); return result; }
     if (!(config.flags & LIVE_OUT)) return 0;
     unsigned note = (m[0] & 0xe0U) == 0x80U;

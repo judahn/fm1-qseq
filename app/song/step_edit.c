@@ -4,7 +4,9 @@
  * take the new length, gate or velocity too, so what is shown is what they
  * get. Landing on notes loads their settings, as far as they match. */
 #include "step.h"
+#include "song_config.h"
 #include <string.h>
+#if SONG_UI
 
 /* The QY's ten dynamics. ffff has no published value, so it is 127. */
 static const struct { uint8_t velocity; char name[5]; } dynamics[10] = {
@@ -12,14 +14,14 @@ static const struct { uint8_t velocity; char name[5]; } dynamics[10] = {
     {72, "MF"}, {88, "F"}, {104, "FF"}, {120, "FFF"}, {127, "FFFF"}};
 
 static unsigned distance(unsigned a, unsigned b) { return a > b ? a - b : b - a; }
-const char *step_velocity_name(unsigned velocity)
+SONG_SMALL const char *step_velocity_name(unsigned velocity)
 {
     unsigned best = 0;
     for (unsigned i = 1; i < 10; ++i)
         if (distance(velocity, dynamics[i].velocity) < distance(velocity, dynamics[best].velocity)) best = i;
     return dynamics[best].name;
 }
-void step_length_name(const struct song_step *st, char out[8])
+SONG_SMALL void step_length_name(const struct song_step *st, char out[8])
 {
     static const char names[STEP_LENGTHS][5] = {"1/64", "1/32", "1/16", "1/8", "1/4", "1/2", "1/1"};
     strcpy(out, names[st->length]);
@@ -27,7 +29,7 @@ void step_length_name(const struct song_step *st, char out[8])
     if (st->dots) strcat(out, st->dots == 1 ? "." : "..");
 }
 /* R1 to R4 scatter around 96 by 8, 16, 24 or 32. */
-unsigned step_entry_velocity(struct song_step *st)
+SONG_SMALL unsigned step_entry_velocity(struct song_step *st)
 {
     if (!st->random_level) return st->velocity;
     st->random ^= st->random << 13;
@@ -37,11 +39,11 @@ unsigned step_entry_velocity(struct song_step *st)
     return v > 127 ? 127 : v;
 }
 
-static void fix_dots(struct song_step *st)
+SONG_SMALL static void fix_dots(struct song_step *st)
 {
     if (st->length == STEP_64TH && !st->triplet && st->dots == 2) st->dots = 1;
 }
-static void preview(struct song_step *st)
+SONG_SMALL static void preview(struct song_step *st)
 {
     unsigned index[STEP_CHORD], n = step_selection(st, index);
     step_preview_stop(st);
@@ -54,7 +56,7 @@ static void preview(struct song_step *st)
     if (n) ++st->serial;
 }
 /* The first length and gate that give exactly this note length. */
-static void load(struct song_step *st, const struct song_event *e)
+SONG_SMALL static void load(struct song_step *st, const struct song_event *e)
 {
     static const uint8_t gates[STEP_GATES] = {1, 0, 2, 3};
     struct song_step trial = *st;
@@ -72,7 +74,7 @@ static void load(struct song_step *st, const struct song_event *e)
                 }
     }
 }
-void step_land(struct song_step *st)
+SONG_SMALL void step_land(struct song_step *st)
 {
     unsigned index[STEP_CHORD];
     st->picked = st->tie_ok = 0;
@@ -80,39 +82,42 @@ void step_land(struct song_step *st)
     preview(st);
 }
 
-static void apply_length(struct song_step *st)
+SONG_SMALL static void apply_length(struct song_step *st)
 {
     unsigned index[STEP_CHORD], n = step_selection(st, index);
     uint32_t length = step_gate_clocks(st, step_clocks(st));
-    for (unsigned i = 0; i < n; ++i) st->song->event[index[i]].length = (uint16_t)length;
-    if (n) ++st->song->revision;
+    for (unsigned i = 0; i < n; ++i) {
+        struct song_event e = st->song->event[index[i]];
+        e.length = (uint16_t)length;
+        step_change(st, index[i], &e);
+    }
 }
-void step_set_length(struct song_step *st, int delta)
+SONG_SMALL void step_set_length(struct song_step *st, int delta)
 {
     int length = (int)st->length + delta;
     st->length = (uint8_t)(length < 0 ? 0 : length >= STEP_LENGTHS ? STEP_LENGTHS - 1 : length);
     fix_dots(st);
     apply_length(st);
 }
-void step_pick_length(struct song_step *st, unsigned length)
+SONG_SMALL void step_pick_length(struct song_step *st, unsigned length)
 {
     st->length = (uint8_t)(length < STEP_LENGTHS ? length : STEP_QUARTER);
     fix_dots(st);
     apply_length(st);
 }
-void step_toggle_triplet(struct song_step *st)
+SONG_SMALL void step_toggle_triplet(struct song_step *st)
 {
     st->triplet ^= 1U;
     fix_dots(st);
     apply_length(st);
 }
-void step_cycle_dots(struct song_step *st)
+SONG_SMALL void step_cycle_dots(struct song_step *st)
 {
     st->dots = (uint8_t)((st->dots + 1U) % 3U);
     if (st->length == STEP_64TH && !st->triplet && st->dots == 2) st->dots = 0;
     apply_length(st);
 }
-void step_set_gate(struct song_step *st, int delta)
+SONG_SMALL void step_set_gate(struct song_step *st, int delta)
 {
     int gate = (int)st->gate + delta;
     st->gate = (uint8_t)(gate < 0 ? 0 : gate >= STEP_GATES ? STEP_GATES - 1 : gate);
@@ -120,17 +125,18 @@ void step_set_gate(struct song_step *st, int delta)
 }
 /* On notes: a relative change, so a chord keeps its balance. On an empty
  * position: 1 to 127, then R1 to R4. */
-void step_set_velocity(struct song_step *st, int delta)
+SONG_SMALL void step_set_velocity(struct song_step *st, int delta)
 {
     unsigned index[STEP_CHORD], n = step_selection(st, index);
     if (n) {
         for (unsigned i = 0; i < n; ++i) {
-            int v = st->song->event[index[i]].b + delta;
-            st->song->event[index[i]].b = (uint8_t)(v < 1 ? 1 : v > 127 ? 127 : v);
+            struct song_event e = st->song->event[index[i]];
+            int v = e.b + delta;
+            e.b = (uint8_t)(v < 1 ? 1 : v > 127 ? 127 : v);
+            step_change(st, index[i], &e);
         }
         st->velocity = st->song->event[index[0]].b;
         st->random_level = 0;
-        ++st->song->revision;
         return;
     }
     int v = (st->random_level ? 127 + st->random_level : st->velocity) + delta;
@@ -138,7 +144,7 @@ void step_set_velocity(struct song_step *st, int delta)
     st->random_level = (uint8_t)(v > 127 ? v - 127 : 0);
     if (v <= 127) st->velocity = (uint8_t)v;
 }
-void step_pick(struct song_step *st, unsigned pitch)
+SONG_SMALL void step_pick(struct song_step *st, unsigned pitch)
 {
     if (pitch > 127) return;
     if (!st->picked) memset(st->pick, 0, sizeof st->pick);
@@ -146,7 +152,7 @@ void step_pick(struct song_step *st, unsigned pitch)
     st->pick[pitch / 32U] |= 1U << (pitch % 32U);
 }
 
-static int find_pitch(const struct song_step *st, unsigned pitch)
+SONG_SMALL static int find_pitch(const struct song_step *st, unsigned pitch)
 {
     unsigned count, i = song_find(st->song, st->track, st->pointer);
     const struct song_event *e = song_track(st->song, st->track, &count);
@@ -157,7 +163,7 @@ static int find_pitch(const struct song_step *st, unsigned pitch)
 /* Move each selected note, highest first going up and lowest first going
  * down, so a chord moves without notes bumping into each other. A note that
  * would land on another note's pitch stays put. */
-static unsigned move(struct song_step *st, int steps, unsigned octaves, const uint8_t *pads, unsigned count)
+SONG_SMALL static unsigned move(struct song_step *st, int steps, unsigned octaves, const uint8_t *pads, unsigned count)
 {
     unsigned index[STEP_CHORD], n = step_selection(st, index), moved = 0;
     for (unsigned a = 0; a < n; ++a) /* by pitch */
@@ -166,7 +172,8 @@ static unsigned move(struct song_step *st, int steps, unsigned octaves, const ui
                 unsigned t = index[a]; index[a] = index[b]; index[b] = t;
             }
     for (unsigned k = 0; k < n; ++k) {
-        struct song_event *e = &st->song->event[index[steps > 0 ? n - 1 - k : k]];
+        unsigned at = index[steps > 0 ? n - 1 - k : k];
+        struct song_event changed = st->song->event[at], *e = &changed;
         int to = e->a;
         if (pads) {
             unsigned pad = 0;
@@ -182,16 +189,18 @@ static unsigned move(struct song_step *st, int steps, unsigned octaves, const ui
             st->pick[to / 32] |= 1U << (to % 32);
         }
         e->a = (uint8_t)to;
+        step_change(st, at, e);
         ++moved;
     }
-    if (moved) { ++st->song->revision; preview(st); }
+    if (moved) preview(st);
     return moved;
 }
-unsigned step_transpose(struct song_step *st, int steps, unsigned octaves)
+SONG_SMALL unsigned step_transpose(struct song_step *st, int steps, unsigned octaves)
 {
     return move(st, steps, octaves, NULL, 0);
 }
-unsigned step_transpose_pads(struct song_step *st, const uint8_t *pads, unsigned count, int steps)
+SONG_SMALL unsigned step_transpose_pads(struct song_step *st, const uint8_t *pads, unsigned count, int steps)
 {
     return move(st, steps, 0, pads, count);
 }
+#endif

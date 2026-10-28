@@ -3,6 +3,7 @@
 #include "fm1_gpio.h"
 #include "fm1_engine_control.h"
 #include "audio_output.h"
+#include "song/song_port.h" /* song-mode */
 #include <string.h>
 
 #define DMA_ALIGNED __attribute__((aligned(32)))
@@ -40,12 +41,14 @@ FM1_AUDIO_CODE __attribute__((interrupt(""))) void fm1_audio_irq(void)
     if (interval < block_ticks - (block_ticks >> 3)) { ++statistics.short_intervals; return; }
     if (interval > block_ticks + (block_ticks >> 3)) { ++statistics.overruns; return; }
     half = fm1_audio_free_half();
+    if (song_isr_mode == 2U) song_isr_block(render_count); /* song-mode: delivery method C */
     /* The library renders the instrument; APP mixes external audio. */
     if (fm1_engine_render(rendered, FM1_BLOCK_FRAMES) != 0) {
         ++statistics.overruns;
         return;
     }
     ++render_count; /* song-mode */
+    if (song_isr_mode == 1U) fm1_control_request(); /* song-mode: delivery method B */
     fm1_output_mix(rendered);
     uint32_t flags = fm1_audio_irq_save();
     if (fm1_audio_half_owned(half) &&

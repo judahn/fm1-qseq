@@ -1,24 +1,45 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* Song glue: owns the song and the player, and hands notes to the engine as
- * MIDI on each track's input channel, through the same queue as the keys. */
+/* Song glue: owns the song, the player and step entry, and hands notes to
+ * the engine as MIDI on each track's input channel (song_deliver.c says how). */
 #include "song_port.h"
+#include "diag.h"
 #include "instrument.h"
+#if SONG_UI
+#include "undo.h"
+#include "arrange.h"
+#include "record.h"
+static struct song_undo undo;
+static struct song_clip clip;
+static struct song_recorder recorder;
+static uint8_t loop_before;
+static uint64_t first_frame; /* the take's first beat, after any count-in */
+#endif
 
 _Static_assert(SONG_FRAME_RATE == FM1_SAMPLE_RATE, "song frame rate");
 _Static_assert(SONG_TRACKS == GROOVE_TRACKS, "song tracks");
 
 static struct song song;
 static struct song_player player;
+#if SONG_UI
 static struct song_step step;
-static uint64_t next_frame;           /* first frame of the next block to render */
+#endif
 static uint8_t ready;
+#if SONG_UI
+/* The clock for a key played now, or -1 in the count-in. A key up to 50 ms
+ * early still lands on the first beat. */
+SONG_SMALL static int64_t live_clock(void)
+{
+    uint64_t frame = (uint64_t)song_port_blocks() * FM1_BLOCK_FRAMES;
+    if (frame >= first_frame) return song_player_clock_at(&player, frame);
+    return frame + FM1_SAMPLE_RATE / 20U >= first_frame ? (int64_t)recorder.from : -1;
+}
+#endif
 #ifdef FM1_OPEN_WEB
 static void capture(unsigned track, unsigned pitch, unsigned velocity);
-static uint64_t start_frame;
-static uint32_t start_clock;
+static uint32_t start_block, start_clock;
 #endif
 
-static void deliver(void *context, unsigned track, unsigned pitch, unsigned velocity)
+SONG_SMALL static void deliver(void *context, unsigned track, unsigned pitch, unsigned velocity)
 {
     (void)context;
     unsigned channel = groove_midi_input_channel(track);
@@ -27,120 +48,125 @@ static void deliver(void *context, unsigned track, unsigned pitch, unsigned velo
     if (channel > 15 || (velocity && groove_track_role(track) != GROOVE_TRACK_NORMAL)) return;
     const uint8_t message[3] = {(uint8_t)((velocity ? 0x90U : 0x80U) | channel), (uint8_t)pitch,
                                 (uint8_t)velocity};
-    (void)fm1_midi_post(message, sizeof message);
+    song_deliver_note(message);
 #ifdef FM1_OPEN_WEB
     capture(track, pitch, velocity);
 #endif
 }
-static void ensure(void)
+SONG_SMALL static void ensure(void)
 {
     if (ready) return;
     static const struct song_output output = {deliver, NULL};
     song_build_test(&song);
     song_player_init(&player, &song, &output);
+#if SONG_UI
     step_init(&step, &song, &output);
+#endif
+    song_diag_reset();
+    song_diag.heaviest = -1;
+#if SONG_UI
+    song_undo_init(&undo);
+    song.undo = &undo; /* after the test song, which is not an edit */
+    song.strength = 100; /* recording defaults: full strength, a bar of count-in, clicks while recording */
+    song.count_in = 1;
+    song.metronome = 2;
+#endif
     ready = 1;
 }
 struct song *song_port_song(void) { ensure(); return &song; }
 struct song_player *song_port_player(void) { ensure(); return &player; }
+#if SONG_UI
 struct song_step *song_port_step(void) { ensure(); return &step; }
+#endif
 
-/* DEVICE STUB (song-mode). The engine has no timestamped input: whatever is
- * posted plays at the start of the next block it renders. The plan is to
- * read the render counter on each control poll and post what is due up to
- * the end of the next block, one block ahead of the audio. That waits for
- * the hardware timing test, so device playback stays off until then. */
-#ifndef SONG_DEVICE_DELIVERY
-#define SONG_DEVICE_DELIVERY 0
-#endif
-void song_port_poll(void)
+/* Each control poll: timing for the diagnostics page, then methods A and B. */
+SONG_SMALL void song_port_poll(void)
 {
-#ifndef FM1_OPEN_WEB
-    next_frame = (uint64_t)fm1_audio_render_count() * FM1_BLOCK_FRAMES;
-#if SONG_DEVICE_DELIVERY
-    if (ready && player.playing) song_player_advance(&player, next_frame + FM1_BLOCK_FRAMES);
-#endif
+    ensure();
+    song_diag_poll(song_port_ticks(), fm1_millis(), song_port_blocks());
+    song_deliver_poll();
+#if SONG_UI
+    if (recorder.active && !player.playing) song_port_record_stop(); /* the song ended */
+    else if (recorder.active && live_clock() >= 0) song_rec_follow(&recorder, (uint32_t)live_clock());
 #endif
 }
 
-int song_port_start(void)
+/* Device playback is on in the hardware test build (song_config.h). */
+SONG_SMALL int song_port_start(void)
 {
     ensure();
-#if defined(FM1_OPEN_WEB) || SONG_DEVICE_DELIVERY
+#if defined(FM1_OPEN_WEB) || SONG_HW_TEST
 #ifdef FM1_OPEN_WEB
-    start_frame = next_frame;
+    start_block = song_port_blocks();
     start_clock = player.playhead;
 #endif
-    song_player_start(&player, next_frame);
+    song_diag_reset();
+#if SONG_UI
+    player.click = song.metronome == 1;
+#endif
+    song_deliver_start(0);
     return 0;
 #else
     return -1;
 #endif
 }
-void song_port_stop(void)
-{
-    if (ready) song_player_stop(&player);
-}
 
-#ifdef FM1_OPEN_WEB
-static uint32_t render_block;
-void song_port_render(uint64_t frame)
-{
-    next_frame = frame + FM1_BLOCK_FRAMES;
-    render_block = (uint32_t)(frame / FM1_BLOCK_FRAMES);
-    if (ready && player.playing) song_player_advance(&player, next_frame);
-}
+#if SONG_UI
+struct song_undo *song_port_undo(void) { ensure(); return &undo; }
+struct song_clip *song_port_clip(void) { return &clip; }
+struct song_recorder *song_port_recorder(void) { ensure(); return &recorder; }
 
-/* Headless test hooks: every note the player sends, with its block, and the
- * song itself, so a page script can check the timing on its own. */
-#ifdef __wasm__
-#define SONG_EXPORT(name) __attribute__((export_name(name)))
-#else
-#define SONG_EXPORT(name)
-#endif
-struct song_heard { uint32_t block; uint8_t track, pitch, velocity, unused; };
-enum { HEARD = 8192 };
-static struct song_heard heard[HEARD];
-static unsigned heard_count, heard_on;
-static void capture(unsigned track, unsigned pitch, unsigned velocity)
+/* Live keys on the take track, at the clock playing now. */
+SONG_SMALL void song_port_key(const uint8_t *m, size_t bytes)
 {
-    if (heard_on && heard_count < HEARD)
-        heard[heard_count++] = (struct song_heard){render_block, (uint8_t)track, (uint8_t)pitch, (uint8_t)velocity, 0};
+    int64_t clock = live_clock();
+    if (!recorder.active || bytes != 3 || (m[0] & 0xe0U) != 0x80U || clock < 0 ||
+        (m[0] & 15U) != groove_midi_input_channel(recorder.track)) return;
+    song_rec_note(&recorder, m[1], (m[0] & 0xf0U) == 0x90U ? m[2] : 0, (uint32_t)clock);
 }
-SONG_EXPORT("sim_song_capture") void sim_song_capture(unsigned enable) { heard_on = enable != 0; heard_count = 0; }
-SONG_EXPORT("sim_song_heard") const void *sim_song_heard(void) { return heard; }
-SONG_EXPORT("sim_song_heard_count") unsigned sim_song_heard_count(void) { return heard_count; }
-SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned track, unsigned index)
+/* A take is one undo step. Loop recording starts at the loop and repeats it. */
+SONG_SMALL int song_port_record(unsigned mode, unsigned track)
 {
     ensure();
-    unsigned count;
-    const struct song_event *e = song_track(&song, track, &count);
-    switch (what) {
-    case 0: return count;
-    case 1: return index < count ? song_event_start(&e[index]) : 0;
-    case 2: return index < count ? e[index].a : 0;
-    case 3: return index < count ? e[index].length : 0;
-    case 4: return song.tempos;
-    case 5: return index < song.tempos ? song.tempo[index].clock : 0;
-    case 6: return index < song.tempos ? song.tempo[index].bpm100 : 0;
-    case 7: return player.playing;
-    case 8: return song_player_clock(&player);
-    case 9: return (uint32_t)(start_frame / FM1_BLOCK_FRAMES);
-    case 10: return start_clock;
-    case 11: return song_end(&song);
-    case 12: return song.markers;
-    case 13: return index < song.markers ? song.marker[index].clock : 0;
-    case 14: return song.loop_start;
-    case 15: return song.loop_end;
-    case 16: return song.loop_on | (uint32_t)player.jumping << 1;
-    case 17: return step.pointer;
-    case 18: return index < count ? e[index].b : 0;
-    case 19: return song.swing | (uint32_t)song.swing_grid << 8 | (uint32_t)song.swing_tracks << 16;
-    case 20: return song.key_root | (uint32_t)song.key_scale << 8;
-    case 21: return song.tempo[0].bpm100 | (uint32_t)song.meter[0].beats << 16 | (uint32_t)song.meter[0].unit << 24;
-    default: return 0;
-    }
+    if (player.playing || mode == SONG_REC_STEP || mode >= SONG_REC_MODES) return -1;
+    song_undo_begin(&undo, &song);
+    loop_before = song.loop_on;
+    if (mode == SONG_REC_LOOP) { song.loop_on = 1; player.playhead = song.loop_start; }
+    song_rec_start(&recorder, &song, track, mode, player.playhead);
+    uint32_t from, to;
+    if (song_rec_quiet(&recorder, &from, &to)) { player.mute_track = (uint8_t)track; player.mute_from = from; player.mute_to = to; }
+    player.click = song.metronome != 0;
+#ifdef FM1_OPEN_WEB
+    start_block = song_port_blocks();
+    start_clock = player.playhead;
+#endif
+    song_diag_reset();
+    uint64_t now = (uint64_t)song_port_blocks() * FM1_BLOCK_FRAMES;
+    song_deliver_start(song.count_in);
+    first_frame = song.count_in ? player.frame : now; /* in the count-in the player waits at the first beat */
+    return 0;
 }
+SONG_SMALL void song_port_record_stop(void)
+{
+    if (!recorder.active) return;
+    int64_t now = live_clock();
+    uint32_t clock = player.playing && now >= 0 ? (uint32_t)now : recorder.last;
+    song_port_stop();
+    song_rec_stop(&recorder, clock);
+    player.mute_track = 0xff;
+    player.click = song.metronome == 1;
+    if (recorder.mode == SONG_REC_LOOP) song.loop_on = loop_before;
+    song_undo_end(&undo, &song);
+}
+#endif
+
+#ifdef FM1_OPEN_WEB
+SONG_SMALL void song_port_render(uint64_t frame)
+{
+    if (ready) song_deliver_render((uint32_t)(frame / FM1_BLOCK_FRAMES));
+}
+
+#include "song_probe.inc" /* headless test hooks */
 #else
 void song_port_render(uint64_t frame) { (void)frame; }
 #endif

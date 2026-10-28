@@ -7,9 +7,9 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 OUT="$ROOT/build/host-tests"
 CC="${CC:-cc}"
 mkdir -p "$OUT"
-# Everything in app/song except song_port.c, which needs the instrument.
-SOURCES=$(ls "$ROOT"/app/song/*.c | grep -v /song_port.c)
-FLAGS="-std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fwrapv -fsanitize=address,undefined -fno-sanitize-recover=all"
+# The model and player. The glue, delivery and diagnostics need the instrument.
+SOURCES=$(ls "$ROOT"/app/song/*.c | grep -vE '/(song_port|song_deliver|diag)\.c$')
+FLAGS="-DSONG_UI=1 -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fwrapv -fsanitize=address,undefined -fno-sanitize-recover=all"
 status=0
 for test in "$ROOT"/tests/test_*.c; do
     name=$(basename "$test" .c)

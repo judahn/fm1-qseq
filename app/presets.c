@@ -4,6 +4,8 @@
 #include "drum808.h"
 #include "sampledrum.h"
 #include <string.h>
+#include "song/song_config.h" /* song-mode */
+#if !SONG_TRIM /* song-mode: left out of the hardware test build */
 
 /* FM1 arrangements. Small musical recipes expand into the normal
  * editable project format, avoiding sixteen 4 KiB images in program Flash.
@@ -283,3 +285,7 @@ int groove_factory_build(unsigned index, struct groove_project *p)
     }
     return groove_project_valid(p) ? 0 : GROOVE_PROJECT_INVALID;
 }
+#else /* song-mode */
+const char *groove_factory_name(unsigned index) { (void)index; return NULL; }
+int groove_factory_build(unsigned index, struct groove_project *p) { (void)index; (void)p; return GROOVE_PROJECT_INVALID; }
+#endif /* song-mode */

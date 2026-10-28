@@ -5,13 +5,14 @@
  * 64th run, 32nd fills, chords, five markers and a tempo change at bar 9
  * (120 to 133 BPM), so every timing path gets used. */
 #include "song.h"
+#include "song_config.h"
 
 enum { BAR = 1920, Q = 480, E = 240, S = 120, T8 = 160, T16 = 80, N32 = 60, N64 = 30 };
 enum { LEAD, BASS, PSG, PLUCK, SAMPLER, PAD, COUNTER, DRUMS };
 enum { KICK = 36, SNARE = 38, CLAP = 39, HAT = 42, OPEN_HAT = 46, RIM = 37, TOM_LOW = 47, TOM_HIGH = 48 };
 
 static struct song *song;
-static void n(unsigned track, uint32_t at, unsigned pitch, unsigned velocity, unsigned length)
+SONG_SMALL static void n(unsigned track, uint32_t at, unsigned pitch, unsigned velocity, unsigned length)
 {
     (void)song_add_note(song, track, at, pitch, velocity, length);
 }
@@ -23,12 +24,12 @@ static const uint8_t chords[12][4] = {
 static const uint8_t roots[12] = {33, 33, 33, 29, 36, 31, 33, 28, 33, 29, 31, 33};
 
 /* Lead phrases: pitch and length pairs, played back to back. */
-static void phrase(uint32_t at, const uint8_t (*notes)[2], unsigned count, unsigned unit)
+SONG_SMALL static void phrase(uint32_t at, const uint8_t (*notes)[2], unsigned count, unsigned unit)
 {
     for (unsigned i = 0; i < count; at += notes[i][1] * unit, ++i)
         if (notes[i][0]) n(LEAD, at, notes[i][0], 96, notes[i][1] * unit - 10);
 }
-static void lead(void)
+SONG_SMALL static void lead(void)
 {
     static const uint8_t bar3[][2] = {{69, 2}, {72, 1}, {71, 1}, {69, 2}, {67, 2}};
     static const uint8_t bar4[][2] = {{65, 2}, {69, 1}, {72, 1}, {77, 4}};
@@ -56,7 +57,7 @@ static void lead(void)
     n(LEAD, 11 * BAR, 69, 100, BAR - 30);
 }
 
-static void band(void)
+SONG_SMALL static void band(void)
 {
     for (unsigned bar = 2; bar < 12; ++bar) {
         uint32_t at = bar * BAR;
@@ -87,7 +88,7 @@ static void band(void)
     for (unsigned i = 0; i < 8; ++i) n(SAMPLER, 5 * BAR + 3 * Q + i * N32, i & 1 ? TOM_LOW : TOM_HIGH, 100, N32);
 }
 
-static void drums(void)
+SONG_SMALL static void drums(void)
 {
     for (unsigned bar = 0; bar < 12; ++bar) {
         uint32_t at = bar * BAR;
@@ -114,17 +115,19 @@ static void drums(void)
     for (unsigned i = 0; i < 8; ++i) n(DRUMS, 7 * BAR + 3 * Q + i * N32, SNARE, 60 + i * 8, N32);
 }
 
-void song_build_test(struct song *s)
+SONG_SMALL void song_build_test(struct song *s)
 {
     song = s;
     song_clear(s, 12, 12000);
     (void)song_set_tempo(s, 8 * BAR, 13300);
+#if SONG_UI /* markers and the loop only matter to the song view */
     (void)song_add_marker(s, 0, "INTRO");
     (void)song_add_marker(s, 2 * BAR, "GROOVE");
     (void)song_add_marker(s, 6 * BAR, "BREAK");
     (void)song_add_marker(s, 8 * BAR, "FAST");
     (void)song_add_marker(s, 10 * BAR, "OUTRO");
     (void)song_set_loop(s, 2 * BAR, 6 * BAR);
+#endif
     lead();
     band();
     drums();

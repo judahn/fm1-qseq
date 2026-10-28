@@ -2,9 +2,16 @@
 /* Song storage and editing. Tracks sit back to back in one event pool, each
  * sorted by start clock, so a track is one contiguous run. */
 #include "song.h"
+#include "song_config.h"
 #include <string.h>
+#if SONG_UI /* edits are journaled for undo on the editing pages */
+#include "undo.h"
+#define JOURNAL(s, op, track, e) do { if ((s)->undo) song_undo_record((s)->undo, op, track, e, 0); } while (0)
+#else
+#define JOURNAL(s, op, track, e) ((void)0)
+#endif
 
-void song_clear(struct song *s, unsigned bars, unsigned bpm100)
+SONG_SMALL void song_clear(struct song *s, unsigned bars, unsigned bpm100)
 {
     memset(s, 0, sizeof *s);
     s->bars = (uint16_t)(bars < 1 ? 1 : bars > SONG_MAX_BARS ? SONG_MAX_BARS : bars);
@@ -17,14 +24,14 @@ void song_clear(struct song *s, unsigned bars, unsigned bpm100)
     song_tempo_refresh(s);
 }
 
-const struct song_event *song_track(const struct song *s, unsigned track, unsigned *count)
+SONG_SMALL const struct song_event *song_track(const struct song *s, unsigned track, unsigned *count)
 {
     if (track >= SONG_TRACKS) { *count = 0; return s->event; }
     *count = s->count[track];
     return s->event + s->first[track];
 }
 
-unsigned song_find(const struct song *s, unsigned track, uint32_t clock)
+SONG_SMALL unsigned song_find(const struct song *s, unsigned track, uint32_t clock)
 {
     unsigned count, low = 0, high;
     const struct song_event *e = song_track(s, track, &count);
@@ -37,28 +44,36 @@ unsigned song_find(const struct song *s, unsigned track, uint32_t clock)
     return low;
 }
 
-int song_add_note(struct song *s, unsigned track, uint32_t clock, unsigned pitch,
-                  unsigned velocity, unsigned length)
+SONG_SMALL int song_add_event(struct song *s, unsigned track, const struct song_event *e)
 {
-    if (track >= SONG_TRACKS || clock > SONG_MAX_CLOCK || pitch > 127 || !velocity ||
-        velocity > 127 || !length || length > 0xffff || s->events >= SONG_EVENTS)
-        return -1;
+    if (track >= SONG_TRACKS || s->events >= SONG_EVENTS) return -1;
+    uint32_t clock = song_event_start(e);
     /* After any notes already at this clock, so chords keep their entry order. */
     unsigned at = s->first[track] + song_find(s, track, clock + 1);
     memmove(&s->event[at + 1], &s->event[at], (s->events - at) * sizeof s->event[0]);
-    s->event[at] = (struct song_event){clock | (uint32_t)SONG_NOTE << 24, (uint8_t)pitch,
-                                       (uint8_t)velocity, (uint16_t)length};
+    s->event[at] = *e;
     ++s->count[track];
     ++s->events;
     for (unsigned t = track + 1; t < SONG_TRACKS; ++t) ++s->first[t];
     ++s->revision;
+    JOURNAL(s, SONG_UNDO_ADD, track, e);
     return 0;
 }
+SONG_SMALL int song_add_note(struct song *s, unsigned track, uint32_t clock, unsigned pitch,
+                             unsigned velocity, unsigned length)
+{
+    if (clock > SONG_MAX_CLOCK || pitch > 127 || !velocity || velocity > 127 || !length || length > 0xffff)
+        return -1;
+    const struct song_event e = {clock | (uint32_t)SONG_NOTE << 24, (uint8_t)pitch, (uint8_t)velocity,
+                                 (uint16_t)length};
+    return song_add_event(s, track, &e);
+}
 
-int song_remove(struct song *s, unsigned track, unsigned index)
+SONG_SMALL int song_remove(struct song *s, unsigned track, unsigned index)
 {
     if (track >= SONG_TRACKS || index >= s->count[track]) return -1;
     unsigned at = s->first[track] + index;
+    JOURNAL(s, SONG_UNDO_DEL, track, &s->event[at]);
     memmove(&s->event[at], &s->event[at + 1], (s->events - at - 1U) * sizeof s->event[0]);
     --s->count[track];
     --s->events;
@@ -67,7 +82,7 @@ int song_remove(struct song *s, unsigned track, unsigned index)
     return 0;
 }
 
-int song_set_tempo(struct song *s, uint32_t clock, unsigned bpm100)
+SONG_SMALL int song_set_tempo(struct song *s, uint32_t clock, unsigned bpm100)
 {
     if (clock > SONG_MAX_CLOCK || bpm100 < SONG_TEMPO_MIN || bpm100 > SONG_TEMPO_MAX) return -1;
     unsigned at = 0;
@@ -83,7 +98,7 @@ int song_set_tempo(struct song *s, uint32_t clock, unsigned bpm100)
     return 0;
 }
 
-int song_set_meter(struct song *s, unsigned bar, unsigned beats, unsigned unit)
+SONG_SMALL int song_set_meter(struct song *s, unsigned bar, unsigned beats, unsigned unit)
 {
     /* The QY70's range: 1/16 to 16/16, 1/8 to 16/8, 1/4 to 8/4. */
     if (bar >= SONG_MAX_BARS || !beats || (unit != 4 && unit != 8 && unit != 16) ||
@@ -101,7 +116,7 @@ int song_set_meter(struct song *s, unsigned bar, unsigned beats, unsigned unit)
     return 0;
 }
 
-int song_add_marker(struct song *s, uint32_t clock, const char *name)
+SONG_SMALL int song_add_marker(struct song *s, uint32_t clock, const char *name)
 {
     if (s->markers >= SONG_MARKERS || clock > SONG_MAX_CLOCK) return -1;
     unsigned at = 0;
@@ -116,7 +131,7 @@ int song_add_marker(struct song *s, uint32_t clock, const char *name)
     return 0;
 }
 
-int song_set_loop(struct song *s, uint32_t start, uint32_t end)
+SONG_SMALL int song_set_loop(struct song *s, uint32_t start, uint32_t end)
 {
     if (start >= end || end > song_end(s)) return -1;
     s->loop_start = start;

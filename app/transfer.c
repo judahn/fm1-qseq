@@ -5,6 +5,8 @@
 #include "fm1_engine_control.h"
 #include <stdlib.h>
 #include <string.h>
+#include "song/song_config.h" /* song-mode */
+#if !SONG_TRIM /* song-mode: left out of the hardware test build */
 
 /* Project transfer protocol: F0 7D 'F' 'M' 02 cmd token-lo token-hi packed checksum F7.
  * Packing is an LSB-first stream of 8-bit bytes in 7-bit MIDI data. Checksum
@@ -354,3 +356,8 @@ discard:
     barrier();
     incoming.length = 0;
 }
+#else /* song-mode: application SysEx is ignored in this build */
+void fm1_app_sysex(const uint8_t *m, size_t n) { (void)m; (void)n; }
+void groove_transfer_init(void) {}
+void groove_transfer_poll(void) {}
+#endif /* song-mode */

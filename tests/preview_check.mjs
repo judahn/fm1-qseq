@@ -5,6 +5,10 @@
 // arithmetic, independent of the C player. Phase 2: step-enters a phrase,
 // plays it back the same way, and drives the settings page. Saves
 // docs/phase1-song-view.png, docs/phase2-step-view.png and docs/phase2-settings.png.
+// The hardware diagnostics page gets a run of each delivery method and
+// docs/hw-diag.png. Phase 3: copy, paste inserting, undo and redo, deleting
+// bars, an overdub with count-in and requantize, and a loop take. Saves
+// docs/phase3-select.png, docs/phase3-rec.png and docs/phase3-recording.png.
 // Needs Playwright with a cached Chromium:
 //   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright node tests/preview_check.mjs
 import { createRequire } from 'node:module';
@@ -13,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const require = createRequire(import.meta.url);
+const same3 = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const browser = await chromium.launch();
@@ -217,7 +222,7 @@ const phase2 = await page.evaluate(() => {
   tap(B.SEQ);
   turn(2, 12);                                   // K1: to the song end, bar 13
   const p0 = info(8);
-  tap(B.REC);                                    // step entry on track 1
+  tap(B.REC); tap(B.REC);                        // REC's chooser, then STEP: step entry on track 1
   out.stepPage = state()[1];
   out.pointerAtStart = info(17) === p0;
   // One bar: an 8th, three 8th triplets, a dotted 8th, a 16th tied to an
@@ -291,7 +296,7 @@ const phase2 = await page.evaluate(() => {
   // In step entry an out-of-scale key snaps up: C#4 enters D4. At the song
   // end, where the track is empty.
   turn(2, 20);
-  tap(B.REC);
+  tap(B.REC); tap(B.REC);
   const p1 = info(17), count = info(0, 0);
   key(8);
   out.snapped = info(0, 0) === count + 1 && info(1, 0, count) === p1 && info(2, 0, count) === 62;
@@ -302,7 +307,275 @@ const phase2 = await page.evaluate(() => {
   out.shiftGlo = state()[1];
   return out;
 });
+// Hardware diagnostics: SHIFT+SEQ opens the page. The browser's control
+// loop runs every 10 ms, so method A should show late notes and B and C none.
+const hwdiag = await page.evaluate(() => {
+  const wasm = Uint8Array.from(atob(FM1_SIMULATOR.data), ch => ch.charCodeAt(0));
+  const c = new FM1SimulatorCore(wasm, null, null).c;
+  const B = { FX: 2, ENV: 4, HOME: 8, SEQ: 11, PLAY: 12 };
+  const tap = b => { c.sim_control(0, b, 1); c.sim_control(0, b, 0); };
+  const render = n => { for (let i = 0; i < n; i++) c.sim_render(); };
+  const info = (what, index = 0) => c.sim_song_info(what, 0, index) >>> 0;
+  const out = {};
+  render(32);
+  tap(B.SEQ);
+  c.sim_control(0, B.FX, 1); tap(B.SEQ); c.sim_control(0, B.FX, 0); // SHIFT+SEQ
+  out.page = new Uint8Array(c.memory.buffer, c.sim_state(), 8)[1];
+  out.defaultMethod = info(22);
+  const rewind = () => {                       // HOME, SHIFT+PLAY to the top, SHIFT+SEQ back
+    tap(B.HOME);
+    c.sim_control(0, B.FX, 1); tap(B.PLAY); tap(B.SEQ); c.sim_control(0, B.FX, 0);
+  };
+  const run = method => {
+    rewind();
+    while (info(22) > method) c.sim_control(2, 2, -1);
+    if (info(22) < method) { c.sim_control(0, B.FX, 1); while (info(22) < method) c.sim_control(2, 2, 1); c.sim_control(0, B.FX, 0); }
+    tap(B.PLAY); render(2500); tap(B.PLAY);
+    return { method: 'ABC'[info(22)], late: [0, 1, 2, 3].map(i => info(23, i)), notes: info(23, 4), polls: info(24) };
+  };
+  out.runs = [run(0), run(1), run(2)];
+  out.cNeedsShift = (() => { c.sim_control(2, 2, -1); c.sim_control(2, 2, 1); return info(22); })(); // B, then K1 up without SHIFT stays at B
+  tap(B.ENV);                                    // the factory memory sweep
+  out.heaviest = info(26) | 0;
+  out.largestFree = info(25);
+  run(0); rewind(); tap(B.PLAY); render(900);    // leave it playing on A for the picture
+  out.playingInPicture = info(7) === 1;
+  const pixels = new Uint16Array(c.memory.buffer, c.sim_pixels(), 240 * 240);
+  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 480;
+  const image = canvas.getContext('2d').createImageData(480, 480);
+  for (let y = 0; y < 480; y++)
+    for (let x = 0; x < 480; x++) {
+      const v = pixels[(y >> 1) * 240 + (x >> 1)], at = (y * 480 + x) * 4;
+      image.data[at] = (v >> 11) * 255 / 31; image.data[at + 1] = ((v >> 5) & 63) * 255 / 63;
+      image.data[at + 2] = (v & 31) * 255 / 31; image.data[at + 3] = 255;
+    }
+  canvas.getContext('2d').putImageData(image, 0, 0);
+  out.png = canvas.toDataURL('image/png').split(',')[1];
+  return out;
+});
+// Phase 3: the selection, the clipboard, undo and redo, and real-time
+// takes, on a fresh simulator.
+const phase3 = await page.evaluate(() => {
+  const wasm = Uint8Array.from(atob(FM1_SIMULATOR.data), ch => ch.charCodeAt(0));
+  const c = new FM1SimulatorCore(wasm, null, null).c;
+  const B = { FX: 2, SCL: 3, ENV: 4, LFO: 5, HOME: 8, SAVE: 9, SEQ: 11, PLAY: 12, REC: 13 };
+  const tap = b => { c.sim_control(0, b, 1); c.sim_control(0, b, 0); };
+  const key = k => { c.sim_control(1, k, 1); c.sim_control(1, k, 0); };
+  const held = (b, fn) => { c.sim_control(0, b, 1); fn(); c.sim_control(0, b, 0); };
+  const turn = (encoder, delta) => c.sim_control(2, encoder, delta);
+  const render = n => { for (let i = 0; i < n; i++) c.sim_render(); };
+  const info = (what, track = 0, index = 0) => c.sim_song_info(what, track, index) >>> 0;
+  const state = (i) => info(29, 0, i); // 0 recording 1 taken 2 passes 3 mode 4 count-in 5 quantize 6 strength
+  // 7 metronome 8 clicking 9 undo levels 10 redo levels 11 clip length 12 clip tracks 13 bars 14 quiet track
+  const pageNow = () => new Uint8Array(c.memory.buffer, c.sim_state(), 8)[1];
+  const png = () => {
+    const pixels = new Uint16Array(c.memory.buffer, c.sim_pixels(), 240 * 240);
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 480;
+    const image = canvas.getContext('2d').createImageData(480, 480);
+    for (let y = 0; y < 480; y++)
+      for (let x = 0; x < 480; x++) {
+        const v = pixels[(y >> 1) * 240 + (x >> 1)], at = (y * 480 + x) * 4;
+        image.data[at] = (v >> 11) * 255 / 31; image.data[at + 1] = ((v >> 5) & 63) * 255 / 63;
+        image.data[at + 2] = (v & 31) * 255 / 31; image.data[at + 3] = 255;
+      }
+    canvas.getContext('2d').putImageData(image, 0, 0);
+    return canvas.toDataURL('image/png').split(',')[1];
+  };
+  const heard = () => {
+    const n = c.sim_song_heard_count(), at = c.sim_song_heard();
+    const bytes = new Uint8Array(c.memory.buffer, at, n * 8), words = new Uint32Array(c.memory.buffer, at, n * 2);
+    return Array.from({ length: n }, (_, i) => ({ block: words[i * 2], track: bytes[i * 8 + 4], pitch: bytes[i * 8 + 5], velocity: bytes[i * 8 + 6] }));
+  };
+  const notesOf = t => Array.from({ length: info(0, t) }, (_, i) => ({ clock: info(1, t, i), pitch: info(2, t, i), length: info(3, t, i) }));
+  const song = () => ({
+    tracks: Array.from({ length: 8 }, (_, t) => notesOf(t)),
+    tempos: Array.from({ length: info(4) }, (_, k) => [info(5, 0, k), info(6, 0, k)]),
+    markers: Array.from({ length: info(12) }, (_, k) => info(13, 0, k)),
+    end: info(11), loop: [info(14), info(15)] });
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const byClock = list => list.sort((a, b) => a.clock - b.clock || a.pitch - b.pitch || a.length - b.length);
+  // Inserting `length` at `at` moves everything from there on.
+  const inserted = (s, at, length) => ({ ...s,
+    tracks: s.tracks.map(list => list.map(n => n.clock >= at ? { ...n, clock: n.clock + length } : n)),
+    tempos: s.tempos.map(([clock, bpm], k) => [k && clock >= at ? clock + length : clock, bpm]),
+    markers: s.markers.map(m => m >= at ? m + length : m), end: s.end + length,
+    loop: [s.loop[0] >= at ? s.loop[0] + length : s.loop[0], s.loop[1] > at ? s.loop[1] + length : s.loop[1]] });
+  const undoKey = redo => {                     // HOME, then SAVE with it, SHIFT for redo
+    if (redo) c.sim_control(0, B.FX, 1);
+    c.sim_control(0, B.HOME, 1); c.sim_control(0, B.SAVE, 1);
+    c.sim_control(0, B.SAVE, 0); c.sim_control(0, B.HOME, 0);
+    if (redo) c.sim_control(0, B.FX, 0);
+  };
+  const out = { arrange: {}, take: {}, loopTake: {} };
+  const a = out.arrange, r = out.take, l = out.loopTake;
+  render(32);
+  tap(B.SEQ);
+
+  // 1. Selection: LFO + G3 adds track 2, K3 pulls the loop end in to bars
+  // 3 and 4. SHIFT+F3 copies, K1 moves to bar 5, SHIFT+A3 pastes inserting.
+  held(B.LFO, () => key(2));
+  turn(4, -2);
+  a.loop = [info(14), info(15)];
+  const original = song(), [from, to] = a.loop;
+  held(B.FX, () => key(0));
+  a.clip = [state(11), state(12)];
+  turn(2, 4);
+  a.playhead = info(8);
+  render(4);
+  a.selectPng = png();
+  held(B.FX, () => key(4));
+  const pasted = song(), want = inserted(original, to, to - from);
+  for (const t of [0, 1])
+    want.tracks[t] = byClock([...want.tracks[t], ...original.tracks[t].filter(n => n.clock >= from && n.clock < to)
+      .map(n => ({ ...n, clock: n.clock - from + to, length: Math.min(n.length, to - n.clock) }))]);
+  pasted.tracks = pasted.tracks.map(byClock); want.tracks = want.tracks.map(byClock);
+  a.pasteOk = same(pasted, want);
+  a.pasteDiff = a.pasteOk ? null : { end: [pasted.end, want.end], tempos: [pasted.tempos, want.tempos], markers: [pasted.markers, want.markers],
+    loop: [pasted.loop, want.loop], first: pasted.tracks.map((list, t) => list.findIndex((n, i) => !same(n, want.tracks[t][i])))
+      .map((i, t) => i < 0 ? null : [t, pasted.tracks[t][i], want.tracks[t][i]]).filter(Boolean).slice(0, 3) };
+  a.levelsAfterPaste = state(9);
+  // 2. Undo and redo, then delete those bars again and take that back.
+  undoKey(0);
+  a.undoPage = pageNow();
+  const undone = song(); undone.tracks = undone.tracks.map(byClock);
+  const originalSorted = { ...original, tracks: original.tracks.map(byClock) };
+  a.undoOk = same(undone, originalSorted);
+  a.redoLevels = state(10);
+  undoKey(1);
+  const redone = song(); redone.tracks = redone.tracks.map(byClock);
+  a.redoOk = same(redone, pasted) && state(10) === 0;
+  held(B.FX, () => key(11));                    // SHIFT+E4: delete bars 3 and 4
+  const deleted = song();
+  a.deleteOk = deleted.end === pasted.end - (to - from) && deleted.tempos[1][0] === pasted.tempos[1][0] - (to - from) &&
+    deleted.markers.length === pasted.markers.length - 1 &&
+    deleted.tracks.every((list, t) => list.length === pasted.tracks[t].filter(n => n.clock < from || n.clock >= to).length);
+  undoKey(0);
+  const back = song(); back.tracks = back.tracks.map(byClock);
+  a.deleteUndoOk = same(back, pasted);
+  tap(B.SCL);                                   // a marker at the playhead, then undo it
+  a.markerAdded = info(12) === pasted.markers.length + 1;
+  undoKey(0);
+  a.markerUndone = info(12) === pasted.markers.length;
+  a.stillOnSong = pageNow();
+
+  // 3. An overdub on track 7, from the top, with a bar of count-in and
+  // 16th quantize. REC opens the chooser, REC again goes.
+  held(B.FX, () => tap(B.PLAY));                // to the top
+  turn(0, 6);                                   // track 7
+  tap(B.REC);
+  r.chooserPage = pageNow();
+  turn(2, 2); turn(4, 5);
+  r.settings = [state(3), state(4), state(5), state(6), state(7)];
+  render(4);
+  r.recPng = png();
+  c.sim_song_capture(1);
+  tap(B.REC);
+  r.page = pageNow();
+  r.recording = state(0);
+  r.quiet = state(14);
+  const bpm100 = info(6, 0, 0), beatFrames = 44100 * 60 * 100 / bpm100;
+  render(Math.floor(beatFrames * 1.5 / 128));   // in the count-in
+  const countInClock = info(28) | 0;
+  key(7);
+  render(Math.ceil(beatFrames * 3 / 128));      // past the count-in
+  const played = [];
+  const play = (k, wait, hold) => {
+    render(wait);
+    const on = info(28); c.sim_control(1, k, 1);
+    render(hold);
+    const off = info(28); c.sim_control(1, k, 0);
+    played.push({ on, off });
+  };
+  play(9, 37, 20); play(11, 61, 13); play(12, 45, 50);
+  render(10);
+  r.recordingPng = png();
+  play(7, 29, 30);
+  render(40);
+  tap(B.PLAY);                                  // PLAY ends the take
+  r.stopped = [state(0), info(7), state(8), pageNow()];
+  r.taken = state(1);
+  r.countInClock = countInClock;
+  const quantized = raw => { const bar = Math.floor(raw / 1920) * 1920; return bar + Math.floor((raw - bar + 60) / 120) * 120; };
+  const takeNotes = () => notesOf(6).filter(n => n.clock < 2 * 1920);
+  const got = takeNotes();
+  r.raw = played.map(p => p.on);
+  r.notes = got.map(n => n.clock);
+  r.quantizedOk = got.length === 4 && got.every((n, i) => n.clock === quantized(played[i].on) && n.length === played[i].off - played[i].on);
+  // The clicks: four count-in beats, accented on one, then every beat of
+  // the take in the same block as the hats on those beats.
+  const list = heard(), clicks = list.filter(h => h.track === 7 && h.pitch === 37 && h.velocity);
+  const hats = list.filter(h => h.track === 7 && h.pitch === 42 && h.velocity);
+  r.clickVelocities = clicks.slice(0, 6).map(h => h.velocity);
+  const first = clicks[0]?.block, songStart = hats[0]?.block;
+  r.countInFrames = (songStart - first) * 128;
+  r.countInOk = clicks.length >= 6 && same(r.clickVelocities, [127, 80, 80, 80, 127, 80]) &&
+    Math.abs(r.countInFrames - 4 * beatFrames) < 128 &&
+    [1, 2, 3].every(k => Math.abs((clicks[k].block - first) * 128 - k * beatFrames) < 128);
+  r.clicksOnBeats = clicks.slice(4).every((h, k) => hats[2 * k] && hats[2 * k].block === h.block);
+  // Requantize from the chooser: strength 0 gives back the raw timing, 100
+  // puts it back on the grid. Then three undos take the whole take away,
+  // and three redos bring it back.
+  tap(B.REC);
+  turn(5, -20);
+  r.strength0 = takeNotes().map(n => n.clock);
+  r.rawBack = same(r.strength0, played.map(p => p.on));
+  turn(5, 20);
+  r.regridded = same(takeNotes().map(n => n.clock), r.notes);
+  undoKey(0); undoKey(0); undoKey(0);
+  r.undonePage = pageNow();
+  r.undone = takeNotes().length === 0 && state(6) === 100;
+  undoKey(1); undoKey(1); undoKey(1);
+  r.redone = same(takeNotes().map(n => n.clock), r.notes);
+
+  // 4. Playback: the take plays in exact time with the rest.
+  tap(B.HOME); tap(B.SEQ);
+  r.backToSong = pageNow();
+  held(B.FX, () => tap(B.PLAY));
+  c.sim_song_capture(1);
+  tap(B.PLAY);
+  render(1700);
+  tap(B.PLAY);
+  const start = info(9), heard2 = heard().filter(h => h.track === 6);
+  const tempos = Array.from({ length: info(4) }, (_, k) => ({ clock: info(5, 0, k), bpm100: BigInt(info(6, 0, k)) }));
+  const den = tempos.reduce((d, t) => { let x = d, y = t.bpm100; while (y) [x, y] = [y, x % y]; return d / x * t.bpm100; }, 1n);
+  const frameNum = clock => { let num = 0n; tempos.forEach((t, k) => {
+    const to = Math.min(clock, k + 1 < tempos.length ? tempos[k + 1].clock : clock);
+    if (to > t.clock) num += BigInt(to - t.clock) * 551250n * (den / t.bpm100); }); return num; };
+  const block = clock => start + Number(frameNum(clock) / (den * 128n));
+  const expected = [];
+  for (const n of takeNotes()) { expected.push(block(n.clock) + ':' + n.pitch + ':on'); expected.push(block(n.clock + n.length) + ':' + n.pitch + ':off'); }
+  const gotBlocks = heard2.map(h => h.block + ':' + h.pitch + ':' + (h.velocity ? 'on' : 'off'));
+  r.playbackOk = same([...expected].sort(), [...gotBlocks].sort());
+  r.noClicksAfter = heard().every(h => !(h.track === 7 && h.pitch === 37));
+
+  // 5. Loop recording over bars 3 and 4, no count-in: each pass adds, and
+  // the loop goes back off afterwards.
+  tap(B.REC);
+  turn(2, 2); turn(3, -1);
+  l.settings = [state(3), state(4)];
+  const before = notesOf(6).filter(n => n.clock >= from && n.clock < to).length;
+  tap(B.REC);
+  l.loopOn = info(16) & 1;
+  l.startClock = info(10);
+  const passFrames = Number(frameNum(to) - frameNum(from)) / Number(den);
+  render(50); key(7);
+  render(Math.ceil(passFrames / 128));
+  l.passes = state(2);
+  key(9);
+  render(30);
+  tap(B.PLAY);
+  l.after = [state(0), info(16) & 1, state(2)];
+  l.added = notesOf(6).filter(n => n.clock >= from && n.clock < to).length - before;
+  return out;
+});
 await browser.close();
+fs.writeFileSync(path.join(root, 'docs/hw-diag.png'), Buffer.from(hwdiag.png, 'base64'));
+delete hwdiag.png;
+result.hwdiag = hwdiag;
+const [runA, runB, runC] = hwdiag.runs;
+const hw = hwdiag.page === 22 && hwdiag.defaultMethod === 2 && runA.notes > 100 && runA.late[1] + runA.late[2] + runA.late[3] > 0 &&
+  runB.notes > 100 && runB.late[0] === runB.notes && runC.notes > 100 && runC.late[0] === runC.notes &&
+  hwdiag.cNeedsShift === 1 && hwdiag.heaviest >= 0 && hwdiag.playingInPicture;
 fs.writeFileSync(path.join(root, 'docs/phase2-step-view.png'), Buffer.from(phase2.stepPng, 'base64'));
 fs.writeFileSync(path.join(root, 'docs/phase2-settings.png'), Buffer.from(phase2.settingsPng, 'base64'));
 delete phase2.stepPng; delete phase2.settingsPng;
@@ -314,11 +587,26 @@ const p2 = phase2.stepPage === 20 && phase2.pointerAtStart && phase2.chordWaited
   phase2.snapped && phase2.backDeleted && phase2.shiftGlo === 7;
 fs.writeFileSync(path.join(root, 'docs/phase1-song-view.png'), Buffer.from(result.png, 'base64'));
 delete result.png;
+for (const [name, key] of [['select', 'selectPng'], ['rec', 'recPng'], ['recording', 'recordingPng']]) {
+  const from = name === 'select' ? phase3.arrange : phase3.take;
+  fs.writeFileSync(path.join(root, `docs/phase3-${name}.png`), Buffer.from(from[key], 'base64'));
+  delete from[key];
+}
+result.phase3 = phase3;
+const { arrange: a3, take: t3, loopTake: l3 } = phase3;
+const p3 = same3(a3.loop, [3840, 7680]) && same3(a3.clip, [3840, 3]) && a3.playhead === 7680 && a3.pasteOk && a3.levelsAfterPaste === 1 && a3.stillOnSong === 19 &&
+  a3.undoPage === 19 && a3.undoOk && a3.redoLevels === 1 && a3.redoOk && a3.deleteOk && a3.deleteUndoOk &&
+  a3.markerAdded && a3.markerUndone && t3.chooserPage === 23 && same3(t3.settings, [2, 1, 5, 100, 2]) &&
+  t3.page === 19 && t3.recording === 1 && t3.quiet === 255 && same3(t3.stopped, [0, 0, 0, 19]) && t3.taken === 4 &&
+  t3.quantizedOk && t3.countInOk && t3.clicksOnBeats && t3.rawBack && t3.regridded && t3.undonePage === 23 &&
+  t3.undone && t3.redone && t3.backToSong === 19 && t3.playbackOk && t3.noClicksAfter &&
+  same3(l3.settings, [4, 0]) && l3.loopOn === 1 && l3.startClock === 3840 && l3.passes === 1 &&
+  same3(l3.after, [0, 0, 1]) && l3.added === 2;
 console.log(JSON.stringify(result, null, 1));
 const k = result.controls;
 const ok = result.whole.notes.ok && result.whole.balanced && result.whole.stoppedAtEnd && result.whole.songPage === 19 &&
   result.loop.notes.ok && result.loop.balancedAfterStop && result.whole.rms > 0.001 && result.loop.rmsAfterStop < 1e-4 &&
   k.rewindToLoopStart && k.loopOff && k.k1MovesBySnap && k.shiftK1NextMarker && k.loopEdgesOk &&
-  k.pendingAfterRequest && k.jumpLandsOnBarLine && k.afterJump.ok && k.balancedAfterStop && k.seqOk && p2;
+  k.pendingAfterRequest && k.jumpLandsOnBarLine && k.afterJump.ok && k.balancedAfterStop && k.seqOk && p2 && hw && p3;
 console.log(ok ? 'preview_check: passed' : 'preview_check: FAILED');
 process.exit(ok ? 0 : 1);

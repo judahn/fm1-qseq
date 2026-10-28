@@ -3,12 +3,14 @@
  * Every length is a whole number of clocks: 64th to whole, triplet on any
  * of them, dot or double dot, except a double-dotted plain 64th (52.5). */
 #include "step.h"
+#include "song_config.h"
 #include <string.h>
+#if SONG_UI
 
 const uint8_t step_gate_percent[STEP_GATES] = {50, 90, 99, 100};
 static const uint16_t base_clocks[STEP_LENGTHS] = {30, 60, 120, 240, 480, 960, 1920};
 
-void step_init(struct song_step *st, struct song *s, const struct song_output *out)
+SONG_SMALL void step_init(struct song_step *st, struct song *s, const struct song_output *out)
 {
     memset(st, 0, sizeof *st);
     st->song = s;
@@ -18,33 +20,33 @@ void step_init(struct song_step *st, struct song *s, const struct song_output *o
     st->velocity = 100;
     st->random = 0x9e3779b9U;
 }
-void step_begin(struct song_step *st, unsigned track, uint32_t pointer)
+SONG_SMALL void step_begin(struct song_step *st, unsigned track, uint32_t pointer)
 {
     step_preview_stop(st);
     st->track = (uint8_t)(track < SONG_TRACKS ? track : 0);
     st->pointer = pointer;
     st->chord_count = st->last_count = st->tie_ok = st->picked = 0;
 }
-uint32_t step_clocks(const struct song_step *st)
+SONG_SMALL uint32_t step_clocks(const struct song_step *st)
 {
     static const uint8_t dotted[3] = {4, 6, 7}; /* plain, dot, double dot, in quarters */
     return base_clocks[st->length] * (st->triplet ? 2U : 3U) * dotted[st->dots % 3U] / 12U;
 }
-uint32_t step_gate_clocks(const struct song_step *st, uint32_t step)
+SONG_SMALL uint32_t step_gate_clocks(const struct song_step *st, uint32_t step)
 {
     uint32_t length = (step * step_gate_percent[st->gate] + 50U) / 100U;
     return length ? length : 1;
 }
 
 /* Notes at a clock on the step track: [first, end) as track indices. */
-static unsigned at_clock(const struct song_step *st, uint32_t clock, unsigned *end)
+SONG_SMALL static unsigned at_clock(const struct song_step *st, uint32_t clock, unsigned *end)
 {
     unsigned count, i = song_find(st->song, st->track, clock);
     const struct song_event *e = song_track(st->song, st->track, &count);
     for (*end = i; *end < count && song_event_start(&e[*end]) == clock; ++*end) {}
     return i;
 }
-static int find_note(const struct song_step *st, uint32_t clock, unsigned pitch)
+SONG_SMALL static int find_note(const struct song_step *st, uint32_t clock, unsigned pitch)
 {
     unsigned end, i = at_clock(st, clock, &end);
     const struct song_event *e = st->song->event + st->song->first[st->track];
@@ -52,7 +54,7 @@ static int find_note(const struct song_step *st, uint32_t clock, unsigned pitch)
         if (e[i].a == pitch) return (int)(st->song->first[st->track] + i);
     return -1;
 }
-unsigned step_selection(const struct song_step *st, unsigned index[STEP_CHORD])
+SONG_SMALL unsigned step_selection(const struct song_step *st, unsigned index[STEP_CHORD])
 {
     unsigned end, n = 0, i = at_clock(st, st->pointer, &end), first = st->song->first[st->track];
     for (; i < end && n < STEP_CHORD; ++i) {
@@ -62,6 +64,16 @@ unsigned step_selection(const struct song_step *st, unsigned index[STEP_CHORD])
     return n;
 }
 
+SONG_SMALL SONG_SMALL void step_change(struct song_step *st, unsigned at, const struct song_event *e)
+{
+    (void)song_set_event(st->song, st->track, at - st->song->first[st->track], e);
+}
+SONG_SMALL static void set_length(struct song_step *st, unsigned at, uint32_t length)
+{
+    struct song_event e = st->song->event[at];
+    e.length = (uint16_t)(length < 0xffff ? length : 0xffff);
+    step_change(st, at, &e);
+}
 static void advance(struct song_step *st, uint32_t clocks)
 {
     struct song *s = st->song;
@@ -72,7 +84,7 @@ static void advance(struct song_step *st, uint32_t clocks)
     if (st->pointer > song_end(s)) st->pointer = song_end(s);
 }
 /* All or nothing: a chord that doesn't fit leaves the song as it was. */
-static int enter(struct song_step *st, const uint8_t *pitches, unsigned count)
+SONG_SMALL static int enter(struct song_step *st, const uint8_t *pitches, unsigned count)
 {
     struct song *s = st->song;
     uint32_t step = step_clocks(st), length = step_gate_clocks(st, step);
@@ -84,9 +96,10 @@ static int enter(struct song_step *st, const uint8_t *pitches, unsigned count)
         int at = find_note(st, st->pointer, pitches[i]);
         if (at < 0) (void)song_add_note(s, st->track, st->pointer, pitches[i], velocity, length);
         else {
-            s->event[at].b = (uint8_t)velocity; /* the same pitch again replaces it */
-            s->event[at].length = (uint16_t)length;
-            ++s->revision;
+            struct song_event e = s->event[at]; /* the same pitch again replaces it */
+            e.b = (uint8_t)velocity;
+            e.length = (uint16_t)length;
+            step_change(st, (unsigned)at, &e);
         }
     }
     if (pitches != st->last) memcpy(st->last, pitches, count);
@@ -96,25 +109,25 @@ static int enter(struct song_step *st, const uint8_t *pitches, unsigned count)
     advance(st, step);
     return 0;
 }
-void step_key(struct song_step *st, unsigned pitch)
+SONG_SMALL void step_key(struct song_step *st, unsigned pitch)
 {
     if (pitch > 127 || st->chord_count >= STEP_CHORD) return;
     for (unsigned i = 0; i < st->chord_count; ++i)
         if (st->chord[i] == pitch) return;
     st->chord[st->chord_count++] = (uint8_t)pitch;
 }
-int step_commit(struct song_step *st)
+SONG_SMALL int step_commit(struct song_step *st)
 {
     if (!st->chord_count) return -1;
     int result = enter(st, st->chord, st->chord_count);
     st->chord_count = 0;
     return result;
 }
-int step_repeat(struct song_step *st)
+SONG_SMALL int step_repeat(struct song_step *st)
 {
     return st->last_count ? enter(st, st->last, st->last_count) : -1;
 }
-int step_rest(struct song_step *st)
+SONG_SMALL int step_rest(struct song_step *st)
 {
     st->tie_ok = 0;
     advance(st, step_clocks(st));
@@ -122,19 +135,19 @@ int step_rest(struct song_step *st)
 }
 /* Lengthen the last entry by one more step, which may be a different
  * length: it sounds through to the new step and ends with its gate. */
-int step_tie(struct song_step *st)
+SONG_SMALL int step_tie(struct song_step *st)
 {
     if (!st->tie_ok || !st->last_count) return -1;
     uint32_t step = step_clocks(st), span = st->pointer - st->last_at + step_gate_clocks(st, step);
     for (unsigned i = 0; i < st->last_count; ++i) {
         int at = find_note(st, st->last_at, st->last[i]);
-        if (at >= 0) st->song->event[at].length = (uint16_t)(span < 0xffff ? span : 0xffff);
+        if (at >= 0) set_length(st, (unsigned)at, span);
     }
     ++st->song->revision;
     advance(st, step);
     return 0;
 }
-int step_delete(struct song_step *st)
+SONG_SMALL int step_delete(struct song_step *st)
 {
     unsigned index[STEP_CHORD], n = step_selection(st, index);
     while (n--) (void)song_remove(st->song, st->track, index[n] - st->song->first[st->track]);
@@ -142,7 +155,7 @@ int step_delete(struct song_step *st)
     return 0;
 }
 /* Back one step, deleting whatever starts in the step backed over. */
-int step_back_delete(struct song_step *st)
+SONG_SMALL int step_back_delete(struct song_step *st)
 {
     uint32_t step = step_clocks(st), to = st->pointer > step ? st->pointer - step : 0;
     unsigned from = song_find(st->song, st->track, to), end = song_find(st->song, st->track, st->pointer);
@@ -151,14 +164,14 @@ int step_back_delete(struct song_step *st)
     st->tie_ok = st->picked = 0;
     return 0;
 }
-void step_move(struct song_step *st, int steps)
+SONG_SMALL void step_move(struct song_step *st, int steps)
 {
     int64_t to = (int64_t)st->pointer + (int64_t)steps * step_clocks(st);
     uint32_t end = song_end(st->song);
     st->pointer = to < 0 ? 0 : to > end ? end : (uint32_t)to;
     step_land(st);
 }
-void step_jump(struct song_step *st, int direction)
+SONG_SMALL void step_jump(struct song_step *st, int direction)
 {
     unsigned count, i;
     const struct song_event *e = song_track(st->song, st->track, &count);
@@ -168,9 +181,10 @@ void step_jump(struct song_step *st, int direction)
         st->pointer = song_event_start(&e[i - 1]);
     step_land(st);
 }
-void step_preview_stop(struct song_step *st)
+SONG_SMALL void step_preview_stop(struct song_step *st)
 {
     for (unsigned i = 0; i < st->preview_count; ++i)
         st->out.note(st->out.context, st->preview_track, st->preview[i], 0);
     st->preview_count = 0;
 }
+#endif

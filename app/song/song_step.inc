@@ -165,7 +165,7 @@ static void song_step_leave(unsigned play, uint32_t now)
     uint32_t start;
     step_preview_stop(st);
     song_bar_at(st->song, st->pointer, &start, NULL);
-    song_player_jump(song_port_player(), play ? start : st->pointer);
+    song_port_jump(play ? start : st->pointer);
     page = music_page = SONG;
     cache->shown_page = ~0U;
     if (play) song_start(now);

@@ -27,6 +27,13 @@ struct song_player {
     uint16_t cursor[SONG_TRACKS];
     uint16_t late_first[SONG_TRACKS], late_count[SONG_TRACKS]; /* swung notes not yet due */
     struct song_held held[SONG_TRACKS][SONG_HELD];
+    /* Recording support on the editing pages: older notes on the take track
+     * stay quiet in [mute_from, mute_to), the metronome, and the count-in
+     * (clicks before the song starts, at exact frames). */
+    uint64_t pre_origin, pre_units;
+    uint32_t mute_from, mute_to, click_next, click_off, pre_rate;
+    uint16_t pre_left, pre_done;
+    uint8_t mute_track, click, click_track, pre_beats;
 };
 void song_player_init(struct song_player *p, struct song *s, const struct song_output *out);
 /* Start at the playhead. The first event lands in the block starting at frame. */
@@ -42,4 +49,8 @@ int song_player_set_tempo(struct song_player *p, uint32_t clock, unsigned bpm100
 /* Where a jump requested now would leave from (the next bar line), or the
  * pending target. Stopped: the playhead. */
 uint32_t song_player_target(const struct song_player *p);
+/* Start with a count-in of `bars` bars of clicks before the playhead. */
+void song_player_count_in(struct song_player *p, uint64_t frame, unsigned bars);
+/* The clock playing at an audio frame up to the last advance. */
+uint32_t song_player_clock_at(const struct song_player *p, uint64_t frame);
 #endif
