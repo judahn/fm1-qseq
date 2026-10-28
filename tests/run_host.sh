@@ -14,9 +14,19 @@ FLAGS="-DSONG_UI=1 -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -f
 status=0
 for test in "$ROOT"/tests/test_*.c; do
     name=$(basename "$test" .c)
+    [ "$name" = test_flash_map ] && continue # full layout only, below
     # shellcheck disable=SC2086
     $CC $FLAGS -I"$ROOT/app/song" "$test" $SOURCES -o "$OUT/$name"
     "$OUT/$name" || status=1
+done
+# The full device build's layout: its flash map (song_flash.h), and the
+# storage tests again with the pool on logical sectors 25 to 125 through it
+# (tests/ram_flash.h), every file built with the device's configuration.
+FULL="-DSONG_DEVICE_FULL=1 -DTEST_FULL_LAYOUT -I$ROOT/sdk/include"
+for name in test_flash_map test_store test_corrupt test_corrupt_kits; do
+    # shellcheck disable=SC2086
+    $CC $FLAGS $FULL -I"$ROOT/app/song" "$ROOT/tests/$name.c" $SOURCES -o "$OUT/${name}_full"
+    "$OUT/${name}_full" || status=1
 done
 # The workbench's file codecs and MIDI (web/workbench), in Node.
 if command -v node >/dev/null 2>&1; then node "$ROOT/tests/workbench_test.mjs" || status=1

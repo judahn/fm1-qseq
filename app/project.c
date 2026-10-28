@@ -281,6 +281,7 @@ static int tuning_blocked(void)
     uint32_t bank[3];
     if (fm1_flash_size() < GROOVE_FLASH_BYTES)
         return 1;
+    if (SONG_DROP_SAMPLE_BANK) return 0; /* song-mode: no stock bank, its first sectors are code */
     int r = fm1_flash_read(GROOVE_SAMPLE_OFFSET, bank, sizeof bank);
     if (r)
         return r;

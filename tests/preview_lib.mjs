@@ -104,6 +104,18 @@ export function savePng(root, name, from, key) {
   delete from[key];
 }
 
+/* A screenshot of a page element that comes out the same every run: the
+ * element in view, the pointer parked where nothing hovers, no focus, fonts
+ * loaded, and transitions finished (a button's hover fade lasts 0.12 s, and
+ * every screenshot follows a click). */
+export async function shot(locator, file) {
+  const page = locator.page();
+  await locator.scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
+  await page.evaluate(() => { document.activeElement?.blur?.(); return document.fonts.ready.then(() => undefined); });
+  await locator.screenshot({ path: file, animations: 'disabled' });
+}
+
 /* Named checks for one phase. Each records its name, the actual value, what
  * was expected, and how they compare when it isn't equality. `yes` and `no`
  * take a detail to print on failure. */

@@ -89,6 +89,7 @@ static int conflict(void)
 {
     uint32_t header[3];
     if (fm1_flash_size()<GROOVE_FLASH_BYTES) return FM1_FLASH_UNAVAILABLE;
+    if (SONG_DROP_SAMPLE_BANK) return 0; /* song-mode: no stock bank, its first sectors are code */
     int r=fm1_flash_read(GROOVE_SAMPLE_OFFSET,header,sizeof header);
     if (r) return r;
     return header[0]==0x53314d46U && header[2]>GROOVE_SAMPLE_LIMIT ? GROOVE_PROJECT_TUNING_SPACE : 0;

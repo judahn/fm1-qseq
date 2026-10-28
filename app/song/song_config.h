@@ -17,10 +17,14 @@
  * out (option 1): (a) the stock step and pattern pages, the MIDI and sync
  * pages staying in the device settings (SHIFT+GLO), (b) the stock project
  * pages, (c) the demo projects and (d) the FM factory voices, which the V15
- * restore puts in the DX7 library. The stock project area goes to code:
- * the user partition starts at logical sector 15 (the settings, then the
- * staging sector at 16), and the pool is sectors 17 to 125. Stock offsets
- * stay logical, song_flash.h moves them. */
+ * restore puts in the DX7 library. Code takes 23 sectors of the user
+ * partition: the stock project area (logical sectors 0 to 14) and the first
+ * 8 of the sample area (17 to 24). The partition holds logical 15 and 16
+ * (the settings and the staging sector), then 25 to 130: the pool is 25 to
+ * 125, then the DX7 banks and the tuning sector. Stock offsets stay
+ * logical, and song_flash.h maps them in those two pieces. With no stock
+ * sample bank (it started at 17), the checks for one reaching the tuning
+ * sector find none (SONG_DROP_SAMPLE_BANK). */
 #ifndef SONG_DEVICE_FULL
 #define SONG_DEVICE_FULL 0
 #endif
@@ -31,17 +35,20 @@
 #define SONG_DROP_PROJECTS 1
 #define SONG_DROP_DEMOS 1
 #define SONG_DROP_FM_FACTORY 1
-#define SONG_USER_BASE (15U * 4096U)
-#define SONG_POOL_FIRST 17
+#define SONG_DROP_SAMPLE_BANK 1
+#define SONG_FLASH_LOW 15U  /* logical 15 and 16 start the partition */
+#define SONG_FLASH_GAP 17U  /* 17 to 24 are code */
+#define SONG_FLASH_HIGH 25U /* 25 on follow right after */
+#define SONG_POOL_FIRST 25
 #define SONG_POOL_END 126
-#define SONG_POOL_SKIP_FIRST 17
-#define SONG_POOL_SKIP_END 17
+#define SONG_POOL_SKIP_FIRST 25
+#define SONG_POOL_SKIP_END 25
 #else
 #define SONG_DROP_STEPS 0
 #define SONG_DROP_PROJECTS 0
 #define SONG_DROP_DEMOS 0
 #define SONG_DROP_FM_FACTORY 0
-#define SONG_USER_BASE 0U
+#define SONG_DROP_SAMPLE_BANK 0
 #endif
 /* Room for the hardware test on the device: the stock factory projects
  * (presets.c) and workbench project, sample and voice transfers
@@ -56,7 +63,7 @@
  * 496 KB. Sectors 15 and 16 stay with the stock code: the device settings,
  * and the staging sector the DX7 banks and the tuning journal go through.
  * The DX7 banks (126 to 129) and the tuning and session sector (130) are
- * past the end. With the project area given to code: first 17, end 126. */
+ * past the end. SONG_DEVICE_FULL's pool, past what code took: 25 to 125. */
 #ifndef SONG_POOL_FIRST
 #define SONG_POOL_FIRST 0
 #define SONG_POOL_END 126

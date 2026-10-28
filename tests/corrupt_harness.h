@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* Shared by the corrupt-data tests (test_corrupt.c, test_corrupt_kits.c): a
- * RAM flash and pool, a seeded random, a song with something of everything a
- * file holds, the device's load path, what a loaded song promises, and a
- * stock bank with the transfer path's import. */
+ * RAM flash and pool (ram_flash.h, so they run on the full device build's
+ * layout too), a seeded random, a song with something of everything a file
+ * holds, the device's load path, what a loaded song promises, and a stock
+ * bank with the transfer path's import. */
 #ifndef FM1_TEST_CORRUPT_HARNESS_H
 #define FM1_TEST_CORRUPT_HARNESS_H
 #include "harness.h"
@@ -18,16 +19,12 @@
 static uint32_t seed = 0x5eed7a11U;
 static uint32_t rnd(void) { seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5; return seed; }
 
-enum { SECTORS = 48, BYTES = SECTORS * POOL_SECTOR, SKIP = 15, SKIP_END = 17, LEGACY = 17 };
-static uint8_t flash[BYTES], good[BYTES];
-static int f_read(uint32_t at, void *data, size_t n) { if (at > BYTES || n > BYTES - at) return -1; memcpy(data, flash + at, n); return 0; }
-static int f_write(uint32_t at, const void *data, size_t n) { if (at > BYTES || n > BYTES - at) return -1; memcpy(flash + at, data, n); return 0; }
-static int f_erase(uint32_t at) { if (at % POOL_SECTOR || at >= BYTES) return -1; memset(flash + at, 0xff, POOL_SECTOR); return 0; }
-static const uint8_t *f_map(uint32_t at, size_t n) { return at <= BYTES && n <= BYTES - at ? flash + at : NULL; }
-static const struct song_flash ram = {f_read, f_write, f_erase, f_map};
-static struct song_pool pool;
-static void scan(void) { pool_scan(&pool, &ram, 0, SECTORS, SKIP, SKIP_END); }
+#include "ram_flash.h" /* the stock layout, or with TEST_FULL_LAYOUT the full device build's */
+enum { LEGACY = 17 };         /* where the stock firmware kept its sample bank */
+static uint8_t good[BYTES];
 static void flip(uint8_t *at, unsigned bit) { at[bit / 8U] ^= (uint8_t)(1U << bit % 8U); }
+/* The same place in `good` as raw(at) is in the flash. */
+static uint8_t *good_at(uint32_t at) { return good + (raw(at) - flash); }
 
 static struct song song, target, before;
 static uint8_t sounds[64];

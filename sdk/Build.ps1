@@ -369,7 +369,7 @@ foreach ($file in Get-ChildItem -LiteralPath $sdk -Recurse -Force -File) {
 }
 $variantName = 'release'
 $variant = [pscustomobject]@{user_bytes=536576; frozen='sdk/lib/libfm1_engine.a'; update_family=7}
-if ($deviceFull) { $variant.user_bytes = 536576 - 15 * 4096 } # song-mode: the stock project slots go to code
+if ($deviceFull) { $variant.user_bytes = 536576 - 23 * 4096 } # song-mode: the stock project slots and 8 sample sectors go to code (song_flash.h)
 $include = @('sdk/include','sdk/include/libc','app/synth','sdk/config','app','app/board')
 $sources = @(Get-ChildItem -LiteralPath (Join-Path $root 'app') -Recurse -File |
     Where-Object { $_.Extension -in @('.c','.S') -and !$_.FullName.StartsWith(([IO.Path]::GetFullPath((Join-Path $root 'app/synth'))+[IO.Path]::DirectorySeparatorChar),[StringComparison]::OrdinalIgnoreCase) } | Sort-Object FullName | ForEach-Object { $_.FullName.Substring($root.Length+1).Replace('\','/') })

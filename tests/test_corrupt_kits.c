@@ -47,9 +47,9 @@ static void test_kit_table(void)
     const uint32_t payload_bits = table->length * 8U, header = table->sector * POOL_SECTOR;
     for (unsigned bit = 0; bit < payload_bits + 256U + POOL_HEADER * 8U; ++bit, ++flips) {
         memcpy(flash, good, sizeof flash);
-        if (bit < payload_bits) flip(flash + pool_address(table), bit); /* every bit of the table */
-        else if (bit < payload_bits + 256U) flash[pool_address(table)] = (uint8_t)(bit - payload_bits); /* every kit count */
-        else flip(flash + header, bit - payload_bits - 256U); /* every bit of its header */
+        if (bit < payload_bits) flip(raw(pool_address(table)), bit); /* every bit of the table */
+        else if (bit < payload_bits + 256U) *raw(pool_address(table)) = (uint8_t)(bit - payload_bits); /* every kit count */
+        else flip(raw(header), bit - payload_bits - 256U); /* every bit of its header */
         scan();
         read_all();
         kits_lost += kit_count(&pool) != 2;
@@ -115,12 +115,13 @@ static void test_banks(void)
     CHECK_EQ(wrong, 0);
     const unsigned in_refused = refused_banks, in_accepted = accepted_banks;
     /* A stock bank in place, its header damaged bit by bit: a kit only from a
-     * bank that checks out, its samples inside the bank, read back whole. */
-    unsigned made = 0;
-    for (unsigned bit = 0; bit < KIT_BANK_HEADER * 8U; ++bit) {
+     * bank that checks out, its samples inside the bank, read back whole. The
+     * full device build has no place for one: its first sectors are code. */
+    unsigned made = 0, in_place = 0;
+    for (unsigned bit = 0; raw(LEGACY * POOL_SECTOR) && bit < KIT_BANK_HEADER * 8U; ++bit, ++in_place) {
         memset(flash, 0xff, sizeof flash);
-        memcpy(flash + LEGACY * POOL_SECTOR, original, bytes);
-        flip(flash + LEGACY * POOL_SECTOR, bit);
+        memcpy(raw(LEGACY * POOL_SECTOR), original, bytes);
+        flip(raw(LEGACY * POOL_SECTOR), bit);
         scan();
         unsigned id = kit_tidy(&pool, "STOCK BANK");
         struct kit k;
@@ -130,19 +131,23 @@ static void test_banks(void)
         for (unsigned pad = 0; ok && pad < KIT_PADS; ++pad) {
             struct kit_sample s;
             if (!k.sample[pad] || kit_sample(&pool, k.sample[pad], &s)) continue;
-            ok = s.data >= flash + LEGACY * POOL_SECTOR && s.data + s.bytes <= flash + LEGACY * POOL_SECTOR + bytes;
+            ok = s.data >= raw(LEGACY * POOL_SECTOR) && s.data + s.bytes <= raw(LEGACY * POOL_SECTOR) + bytes;
         }
         ok = ok && !kit_bank_read(&pool, &k, kit_bank_crc(&pool, &k), 0, out, kit_bank_bytes(&pool, &k));
         if (!ok) went_wrong("stock bank in place, header bit flipped:", (long)bit);
     }
     CHECK_EQ(wrong, 0);
     printf("banks: %u damaged banks in (%u refused, %u still checked out), %u stock banks in place damaged (%u still made a kit)\n",
-           in_refused + in_accepted, in_refused, in_accepted, KIT_BANK_HEADER * 8U, made);
+           in_refused + in_accepted, in_refused, in_accepted, in_place, made);
 }
 
 int main(void)
 {
     test_kit_table();
     test_banks();
+#ifdef TEST_FULL_LAYOUT
+    return report("test_corrupt_kits_full");
+#else
     return report("test_corrupt_kits");
+#endif
 }

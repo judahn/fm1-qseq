@@ -3,7 +3,9 @@
  * leaves a good copy, allocation and compaction, kits sharing samples,
  * a stock bank loading as a kit and reading back the same, and the
  * recovery copy's timing. Flash here is RAM that behaves like NOR: bits
- * only clear, erase sets a sector, and power can go at any byte. */
+ * only clear, erase sets a sector, and power can go at any byte. Built a
+ * second time with TEST_FULL_LAYOUT (test_store_full), it all runs on the
+ * full device build's pool through song_flash.h's map (ram_flash.h). */
 #include "harness.h"
 #include "pool.h"
 #include "song_file.h"
@@ -11,35 +13,11 @@
 #include "glitch.h"
 #include "lanes.h"
 
-enum { SECTORS = 48, BYTES = SECTORS * POOL_SECTOR, SKIP = 15, SKIP_END = 17 };
-static uint8_t flash[BYTES], snapshot[BYTES];
-static long budget = -1; /* bytes that still get written before the power goes, -1 for no limit */
-static int f_read(uint32_t at, void *data, size_t n) { if (at + n > BYTES) return -1; memcpy(data, flash + at, n); return 0; }
-static int f_write(uint32_t at, const void *data, size_t n)
-{
-    const uint8_t *s = data;
-    if (at + n > BYTES) return -1;
-    for (size_t i = 0; i < n; ++i) if ((flash[at + i] & s[i]) != s[i]) return -4; /* needs erase */
-    for (size_t i = 0; i < n; ++i) {
-        if (!budget) return -2;
-        if (budget > 0) --budget;
-        flash[at + i] = s[i];
-    }
-    return 0;
-}
-static int f_erase(uint32_t at)
-{
-    if (!budget || at % POOL_SECTOR || at >= BYTES) return -2;
-    memset(flash + at, 0xff, POOL_SECTOR);
-    return 0;
-}
-static const uint8_t *f_map(uint32_t at, size_t n) { return at + n <= BYTES ? flash + at : NULL; }
-static const struct song_flash ram = {f_read, f_write, f_erase, f_map};
+#include "ram_flash.h" /* the stock layout, or with TEST_FULL_LAYOUT the full device build's */
 
+static uint8_t snapshot[BYTES];
 static struct song a, b;
-static struct song_pool pool;
 static uint8_t sounds[1998];
-static void scan(void) { pool_scan(&pool, &ram, 0, SECTORS, SKIP, SKIP_END); }
 static void build(struct song *s, unsigned seed)
 {
     song_clear(s, 12, 12000 + seed);
@@ -157,17 +135,17 @@ static void test_pool(void)
 {
     memset(flash, 0xff, sizeof flash);
     scan();
-    CHECK_EQ(pool_free(&pool), SECTORS - 2);
+    CHECK_EQ(pool_free(&pool), POOL_SECTORS);
     /* Small songs, then every other one deleted: plenty free, no long run. */
     static struct song small;
     song_clear(&small, 2, 12000);
-    for (unsigned id = 1; id <= 46; ++id) {
+    for (unsigned id = 1; id <= POOL_SECTORS; ++id) {
         small.seed = id;
         CHECK_EQ(save(&small, id), 0);
     }
     CHECK_EQ(pool_free(&pool), 0);
     unsigned per = pool_find(&pool, POOL_SONG, 1)->sectors;
-    for (unsigned id = 1; id <= 46; id += 2) CHECK_EQ(pool_delete(&pool, POOL_SONG, id), 0);
+    for (unsigned id = 1; id <= POOL_SECTORS; id += 2) CHECK_EQ(pool_delete(&pool, POOL_SONG, id), 0);
     build(&a, 3);
     unsigned need = pool_sectors(song_file_bytes(&a, sizeof sounds));
     CHECK(pool_free(&pool) >= need);
@@ -177,11 +155,11 @@ static void test_pool(void)
     CHECK_EQ(save(&a, 99), 0);
     scan();
     unsigned intact = 0;
-    for (unsigned id = 2; id <= 46; id += 2) {
+    for (unsigned id = 2; id <= POOL_SECTORS; id += 2) {
         const struct pool_extent *e = pool_find(&pool, POOL_SONG, id);
         intact += e && !pool_check(&pool, e) && e->sectors == per;
     }
-    CHECK_EQ(intact, 23);
+    CHECK_EQ(intact, POOL_SECTORS / 2);
     CHECK(load(99, &b) == song_file_crc(&a, sounds, sizeof sounds));
 }
 
@@ -281,12 +259,17 @@ static void test_kits(void)
     CHECK_EQ(pool_used(&pool, POOL_SAMPLE) + pool_used(&pool, POOL_KIT), 0);
 }
 
-/* A stock bank where the stock firmware kept it becomes a kit in place. */
+/* A stock bank where the stock firmware kept it becomes a kit in place. The
+ * full device build has none: its first sectors are code there. */
 static void test_stock_bank(void)
 {
     memset(flash, 0xff, sizeof flash);
     uint32_t bytes = make_bank(0);
-    memcpy(flash + 17 * POOL_SECTOR, bank, bytes);
+#ifdef TEST_FULL_LAYOUT
+    CHECK(raw(17 * POOL_SECTOR) == NULL && f_write(17 * POOL_SECTOR, bank, bytes) != 0);
+    return;
+#endif
+    memcpy(raw(17 * POOL_SECTOR), bank, bytes);
     scan();
     CHECK(pool_find(&pool, POOL_LEGACY, 0) != NULL);
     unsigned id = kit_tidy(&pool, "STOCK BANK");
@@ -295,7 +278,7 @@ static void test_stock_bank(void)
     CHECK_EQ(kit_read(&pool, id, &k), 0);
     CHECK(k.sample[0] == KIT_LEGACY && k.sample[2] == KIT_LEGACY + 2 && !k.sample[3]);
     struct kit_sample s;
-    CHECK(!kit_sample(&pool, KIT_LEGACY + 2, &s) && s.data == flash + 17 * POOL_SECTOR + KIT_BANK_HEADER + 16 * KIT_CHUNK);
+    CHECK(!kit_sample(&pool, KIT_LEGACY + 2, &s) && s.data == raw(17 * POOL_SECTOR) + KIT_BANK_HEADER + 16 * KIT_CHUNK);
     static uint8_t out[sizeof bank];
     CHECK_EQ(kit_bank_read(&pool, &k, kit_bank_crc(&pool, &k), 0, out, bytes), 0);
     CHECK(!memcmp(out, bank, bytes));
@@ -323,7 +306,7 @@ static void test_recovery(void)
     scan();
     static struct song small;
     song_clear(&small, 2, 12000);
-    unsigned seen[SECTORS] = {0}, places = 0;
+    unsigned seen[POOL_END] = {0}, places = 0;
     for (unsigned i = 0; i < 30; ++i) {
         small.seed = i;
         struct pool_writer w;
@@ -344,5 +327,9 @@ int main(void)
     test_kits();
     test_stock_bank();
     test_recovery();
+#ifdef TEST_FULL_LAYOUT
+    return report("test_store_full");
+#else
     return report("test_store");
+#endif
 }

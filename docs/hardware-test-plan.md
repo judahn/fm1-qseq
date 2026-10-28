@@ -17,6 +17,23 @@ This test build fits (453,832 bytes) because it leaves out:
 So during the test the workbench can't read or write projects or samples, and the sampler track may be
 silent if its samples don't carry over from V15. Everything else plays normally.
 
+### The opt-in full build
+
+The full song mode build (`FM1_SONG_DEVICE_FULL=1`) is a separate test that needs your OK. It has every song
+page, and it makes room by giving 23 of the 131 storage sectors (92 KB) to code: the 15 stock project slots
+(sectors 0 to 14) and the first 8 sectors of the sample area (17 to 24). Its app limit is 548,129 bytes, and it
+uses 513,320.
+
+What it means for the data on the device:
+- Sector 25 on keeps its place: the song and kit pool (25 to 125, about 404 KB), the DX7 voice banks (126 to
+  129) and the tuning and session sector (130).
+- The settings sector (15) and the staging sector (16) move, so the MIDI, clock and Bluetooth settings start
+  from their defaults.
+- Stock projects are overwritten, and the stock sample bank can't stay, because it starts at sector 17. Kits
+  come from the workbench, which keeps its sample transfers in this build.
+- The SDK's settings area (VM) takes the space between the code and the Bluetooth sector, 64 KB at this size
+  instead of 32 KB, and the Bluetooth sector moves. Both are untested on hardware.
+
 ## What you need
 
 - A computer with desktop Chrome or Edge, and a USB data cable.

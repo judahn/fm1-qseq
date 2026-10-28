@@ -113,14 +113,14 @@ static void test_pool_directory(void)
     for (unsigned i = 0; i < clean.count; ++i)            /* every bit of every header */
         for (unsigned bit = 0; bit < POOL_HEADER * 8U; ++bit, ++flips) {
             const struct pool_extent *e = &clean.extent[i];
-            flip(flash + e->sector * POOL_SECTOR, bit);
+            flip(raw(e->sector * POOL_SECTOR), bit);
             scan();
             const struct pool_extent *now = pool_find(&pool, e->type, e->id);
             dropped += !now;
             int ok = !now || (now->sector == e->sector && now->sectors == e->sectors && now->length == e->length);
             ok &= others_load(e->type == POOL_SONG ? e->id : 0, e->type != POOL_KIT);
             if (!ok) went_wrong("pool header bit flipped (extent, bit):", (long)(i * 1000U + bit));
-            flip(flash + e->sector * POOL_SECTOR, bit);
+            flip(raw(e->sector * POOL_SECTOR), bit);
         }
     /* Song 2's payload: a bit gone bad, or its end erased. The payload CRC
      * refuses it, and everything else loads. */
@@ -128,27 +128,27 @@ static void test_pool_directory(void)
     unsigned hits = 0, refused_two = 0;
     for (unsigned k = 0; k < 400; ++k) {
         uint32_t at = pool_address(two) + (k < 200 ? rnd() % two->length : two->length - 1U - (k - 200U));
-        uint8_t keep = flash[at];
-        flash[at] = k < 200 ? (uint8_t)(keep ^ 1U << rnd() % 8U) : 0xff;
-        if (flash[at] != keep) {
+        uint8_t keep = *raw(at);
+        *raw(at) = k < 200 ? (uint8_t)(keep ^ 1U << rnd() % 8U) : 0xff;
+        if (*raw(at) != keep) {
             ++hits;
             scan();
             refused_two += load(2, &target) != 0;
             if (!others_load(2, 1)) went_wrong("song 2's payload damaged at", (long)at);
         }
-        flash[at] = keep;
+        *raw(at) = keep;
     }
     CHECK_EQ(refused_two, hits);
     /* Stray sectors: random bytes in free ones, and headers with a good CRC
      * but a type, version or length out of range. None becomes an object. */
-    uint8_t used[SECTORS] = {0};
+    uint8_t used[POOL_END] = {0};
     for (unsigned i = 0; i < clean.count; ++i)
         for (unsigned k = 0; k < clean.extent[i].sectors; ++k) used[clean.extent[i].sector + k] = 1;
     unsigned strays = 0;
     for (unsigned k = 0; k < 800; ++k) {
-        unsigned s = rnd() % SECTORS;
-        if (used[s] || (s >= SKIP && s < SKIP_END) || s == LEGACY) continue;
-        uint8_t *at = flash + s * POOL_SECTOR;
+        unsigned s = POOL_FIRST + rnd() % (POOL_END - POOL_FIRST);
+        if (used[s] || (s >= pool.skip_first && s < pool.skip_end) || s == LEGACY) continue;
+        uint8_t *at = raw(s * POOL_SECTOR);
         for (unsigned i = 0; i < POOL_SECTOR; ++i) at[i] = (uint8_t)rnd();
         if (k % 2U) {
             struct pool_header h;
@@ -165,7 +165,7 @@ static void test_pool_directory(void)
         }
         scan();
         if (pool.count != clean.count || !others_load(0, 1)) went_wrong("a stray sector, try", (long)k);
-        memcpy(at, good + s * POOL_SECTOR, POOL_SECTOR);
+        memcpy(at, good_at(s * POOL_SECTOR), POOL_SECTOR);
         ++strays;
     }
     CHECK_EQ(wrong, 0);
@@ -178,5 +178,9 @@ int main(void)
 {
     test_song_payloads();
     test_pool_directory();
+#ifdef TEST_FULL_LAYOUT
+    return report("test_corrupt_full");
+#else
     return report("test_corrupt");
+#endif
 }

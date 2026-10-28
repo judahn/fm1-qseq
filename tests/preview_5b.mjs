@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
-import { checker } from './preview_lib.mjs';
+import { checker, shot } from './preview_lib.mjs';
 
 const require = createRequire(import.meta.url);
 export async function phase5b(browser, root) {
@@ -95,7 +95,7 @@ export async function phase5b(browser, root) {
     controllers: parsed.tracks.flat().filter(e => e.status === 0xb0).length, programs: parsed.tracks.flat().filter(e => e.status === 0xc0).length };
   out.midiRead = await open('#sw-song-file', 'rich.mid', mid);
   out.report = await page.textContent('#sw-import-report');
-  await page.locator('#sw-import').screenshot({ path: path.join(root, 'docs/phase5b-midi-import.png') });
+  await shot(page.locator('#sw-import'), path.join(root, 'docs/phase5b-midi-import.png'));
   out.imported = await act('#sw-import-go');
   const back = S.decode(S.unwrap(await download('#sw-current-save')));
   const key = e => [S.clockOf(e), S.kindOf(e), e.a, e.b, e.length].join(':');
@@ -126,7 +126,7 @@ export async function phase5b(browser, root) {
   out.templateSong = { name: S.name(template), kit: template.kit, events: S.eventCount(template),
     sameTypes: types.join() === Array.from({ length: 8 }, (_, t) => factory[t * 223]).join(), types };
   out.afterTemplate = (await device()).info;
-  await page.locator('#sw-songs-part').screenshot({ path: path.join(root, 'docs/phase5b-songs.png') });
+  await shot(page.locator('#sw-songs-part'), path.join(root, 'docs/phase5b-songs.png'));
 
   // 4. A kit from generated WAVs, prepared per pad, written twice: the
   // second time every sample is already there.
@@ -168,7 +168,7 @@ export async function phase5b(browser, root) {
     afterDelete: afterDelete.samples, kits: afterDelete.kits.map(k => k.name), inUse: (await device()).info.kit, newKit: afterOne.kits.at(-1).id };
   out.gauge = await page.textContent('#sw-pool-text');
   await page.evaluate(() => { document.querySelector('.sw-wide').scrollLeft = 0; });
-  await page.locator('#sw-kits-part').screenshot({ path: path.join(root, 'docs/phase5b-kits.png') });
+  await shot(page.locator('#sw-kits-part'), path.join(root, 'docs/phase5b-kits.png'));
 
   // 5. A pad plays: the page's flash in a fresh simulator, its sampler track
   // (track 5, channel 5) hit with the stock kit and then the new one.
