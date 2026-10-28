@@ -1,0 +1,174 @@
+/* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
+/* song-mode: the edit job page's screen, input and running, included by
+ * song_jobs.inc. */
+
+static void song_job_open(void)
+{
+    if (!song_job_ready) {
+        for (unsigned j = 0; j < SONG_JOBS; ++j)
+            for (unsigned p = 0; p < 6; ++p) song_job_value[j][p] = song_jobs[j].p[p].init;
+        song_job_value[JOB_COPY][0] = (int16_t)track;
+        song_job_ready = 1;
+    }
+    song_job_armed = 0;
+    page = music_page = SONG_JOB;
+    cache->shown_page = ~0U;
+}
+
+static void song_job_draw(void)
+{
+    const struct song_job_def *d = &song_jobs[song_job];
+    char where[40], value[16];
+    song_job_where(where);
+    uint32_t sig = signature(song_job | song_job_page << 8 | (uint32_t)track << 12, song_job_value[song_job], 12);
+    sig = signature(sig, where, (unsigned)strlen(where)) ^ (uint32_t)song_port_engine(track) << 20;
+    if ((!paint_rendering || paint_top < 192) && sig != cache->middle_cache) {
+        cache->middle_cache = sig;
+        paint_fill(0, 0, 240, 192, BACK);
+        if (paint_rendering) {
+            text(8, 4, "JOB", 1, DIM, BACK);
+            number(28, 4, (int)song_job + 1, 2, 1, DIM, BACK);
+            text(8, 14, d->name, 2, ACCENT, BACK);
+            text(8, 34, where, 1, TEXT, BACK);
+            for (unsigned p = 0; p < d->count; ++p) {
+                unsigned y = 52 + p * 21, live = p / 3U == song_job_page;
+                char label[12] = "K";
+                decimal(label + 1, (int)(p % 3U) + 2, 1);
+                if (live) text(8, y + 3, label, 1, colors[p % 3U + 1U], BACK);
+                text(24, y + 3, d->p[p].name, 1, live ? TEXT : DIM, BACK);
+                song_job_text(p, value);
+                text(96, y, value, 2, live ? TEXT : DIM, BACK);
+            }
+            if (!d->count) text(24, 55, "NOTHING TO SET", 1, DIM, BACK);
+            text(8, 182, d->about, 1, DIM, BACK);
+        }
+    }
+    if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
+    knob(0, "JOB", d->name, colors[0]);
+    for (unsigned k = 0; k < 3; ++k) {
+        unsigned p = song_job_page * 3U + k;
+        if (p < d->count) { song_job_text(p, value); knob(k + 1U, d->p[p].name, value, colors[k + 1U]); }
+        else knob(k + 1U, "-", "", colors[k + 1U]);
+    }
+    if (notice && (int32_t)(frame_time - notice_until) >= 0) notice = NULL;
+    const char *hint = notice ? notice : (previous_buttons & BUTTON(LFO)) ? "LFO + F3-F4 TRACKS  G4 ALL"
+        : d->count > 3 ? "ALGO MORE  SAVE RUNS  HOME BACK" : "SAVE RUNS  HOME BACK  LFO TRACKS";
+    uint32_t h = signature(0, hint, (unsigned)strlen(hint));
+    if (h == cache->hint_cache) return;
+    cache->hint_cache = h;
+    paint_fill(6, 231, 228, 7, BACK);
+    text(6, 231, hint, 1, DIM, BACK);
+}
+
+/* The job, with its settings, on the range. Below -1: a reason of its own. */
+static int song_job_go(void)
+{
+    struct song *s = song_port_song();
+    const int16_t *v = song_job_value[song_job];
+    struct song_range r = song_job_range();
+    switch (song_job) {
+    case JOB_QUANTIZE: return song_job_quantize(s, &r, song_job_grid(v[1]), (unsigned)v[2], (unsigned)v[3], (unsigned)v[4]);
+    case JOB_VELOCITY: return song_job_velocity(s, &r, (unsigned)v[1], (unsigned)(v[1] ? v[2] : clamp(v[2], 1, 127)), v[3]);
+    case JOB_CRESCENDO: return song_job_crescendo(s, &r, v[1]);
+    case JOB_GATE: return song_job_gate(s, &r, (unsigned)v[1], (unsigned)(v[1] == SONG_JOB_SET && !v[2] ? 1 : v[2]), v[3]);
+    case JOB_TRANSPOSE: return song_job_transpose(s, &r, v[1], (unsigned)v[2], (unsigned)v[3], (unsigned)v[4]);
+    case JOB_FIT: return s->key_scale ? song_job_fit_scale(s, &r) : -2;
+    case JOB_SHIFT: return song_job_shift(s, &r, v[1]);
+    case JOB_SORT: return song_job_chord_sort(s, &r, (unsigned)v[1]);
+    case JOB_STRUM: return song_job_strum(s, &r, (unsigned)v[1], (unsigned)v[2]);
+    case JOB_PASTE:
+        return song_port_clip()->length ? song_job_paste(s, song_port_clip(), song_port_player()->playhead, track,
+                                                         (unsigned)v[0], v[1], song_drums()) : -3;
+    case JOB_ERASE: return song_job_erase(s, &r, v[1] == 3 ? 7U : 1U << v[1]);
+    case JOB_EXTRACT: return song_job_extract(s, &r, 1U << v[1], (unsigned)v[2]);
+    case JOB_RAMP: {
+        unsigned lane = song_job_lane(v[1]), tempo = lane == SONG_JOB_TEMPO;
+        int low = tempo ? 20 : 0, high = tempo ? 300 : 127;
+        return song_job_ramp(s, &r, lane, clamp(v[2], low, high), clamp(v[3], low, high), 30U << v[4], v[5]);
+    }
+    case JOB_THIN: return song_job_thin(s, &r, song_job_lane(v[1]));
+    case JOB_STRETCH: return song_job_stretch(s, &r, (unsigned)v[1]);
+    case JOB_COPY: {
+        int n = v[2] == 1 ? 0 : song_job_copy_track(s, (unsigned)v[0], (unsigned)v[1]);
+        uint8_t before[SONG_SOUND_BYTES], sound[SONG_SOUND_BYTES];
+        if (n < 0 || !v[2] || v[0] == v[1]) return v[0] == v[1] ? -1 : n;
+        if (groove_timbre_export((unsigned)v[1], before, sizeof before) || groove_timbre_export((unsigned)v[0], sound, sizeof sound) ||
+            groove_timbre_import((unsigned)v[1], sound, sizeof sound)) return n ? n : -1;
+        song_undo_sound(song_port_undo(), (unsigned)v[1], before, sound);
+        return n + 1;
+    }
+    case JOB_MERGE: return song_job_merge(s, (unsigned)v[0], (unsigned)v[1]);
+    case JOB_CLEAR: return song_job_clear(s, r.tracks);
+    default: song_port_ready_pads(); return song_job_normalize(s, r.tracks, song_port_player());
+    }
+}
+/* SAVE once asks, with what the job takes on and whether undo can hold
+ * it. Again within 3 s, it runs: one undo step, playing goes on in time. */
+static void song_job_save(uint32_t now)
+{
+    static char asked[40];
+    if (!song_job_armed || now - song_job_armed > 3000U) {
+        const struct song *s = song_port_song();
+        const struct song_range r = song_job_range();
+        unsigned n = 0;
+        char part[12];
+        for (unsigned t = 0; t < SONG_TRACKS; ++t)
+            if (r.tracks >> t & 1U) n += song_find(s, t, r.to) - song_find(s, t, r.from);
+        song_job_armed = now ? now : 1U;
+        strcpy(asked, "SAVE AGAIN TO RUN, ");
+        decimal(part, (int)n, 1); strcat(asked, part); strcat(asked, " EVENTS");
+        if (n * 24U + 512U > SONG_UNDO_BYTES) strcpy(asked, "SAVE AGAIN: TOO BIG TO UNDO");
+        notice = asked; notice_until = now + 3000U;
+        return;
+    }
+    static char done[40];
+    struct song_place place;
+    uint32_t state = song_port_hold(&place);
+    song_undo_step(song_port_undo());
+    int r = song_job_go();
+    song_port_resume(&place, state);
+    song_job_armed = 0;
+    if (r > 0) {
+        char part[12];
+        strcpy(done, song_jobs[song_job].name); strcat(done, ": ");
+        decimal(part, r, 1); strcat(done, part); strcat(done, r == 1 ? " EVENT" : " EVENTS");
+        notice = done;
+    } else if ((song_job == JOB_COPY || song_job == JOB_MERGE) && song_job_value[song_job][0] == song_job_value[song_job][1])
+        notice = "PICK TWO DIFFERENT TRACKS";
+    else notice = !r ? "NOTHING TO CHANGE THERE" : r == -2 ? "PICK A KEY AND SCALE IN SETTINGS"
+        : r == -3 ? "COPY SOMETHING FIRST" : song_job == JOB_STRETCH ? "DOESN'T FIT, OR TRACKS IN THE WAY" : "DOESN'T FIT";
+    notice_until = now + 2500U;
+}
+
+static int song_job_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
+{
+    unsigned shift = (c->buttons & BUTTON(FX)) != 0;
+    if (*pressed & (BUTTON(HOME) | BUTTON(EDIT))) { /* back to the song */
+        *pressed &= ~(BUTTON(HOME) | BUTTON(EDIT));
+        page = music_page = SONG;
+        cache->shown_page = ~0U;
+        return 1;
+    }
+    if (*pressed & BUTTON(PLAY)) { if (song_port_player()->playing) song_port_stop(); else song_start(now); }
+    if (*pressed & BUTTON(SAVE)) song_job_save(now);
+    *pressed &= ~(BUTTON(PLAY) | BUTTON(SAVE) | BUTTON(FX) | BUTTON(REC) | BUTTON(ARP) | BUTTON(ENV) | BUTTON(SCL) | BUTTON(LFO));
+    if (*pressed & BUTTON(GLO)) return 0;
+    select_track(c->encoders[0]);
+    unsigned before = song_job;
+    song_job = (unsigned)clamp((int)song_job + c->encoders[2], 0, SONG_JOBS - 1);
+    const struct song_job_def *d = &song_jobs[song_job];
+    unsigned pages = d->count ? (d->count + 2U) / 3U : 1U;
+    if (song_job != before) song_job_page = 0;
+    song_job_page = (unsigned)clamp((int)song_job_page + c->encoders[1], 0, (int)pages - 1);
+    for (unsigned k = 0; k < 3; ++k) {
+        unsigned p = song_job_page * 3U + k;
+        if (p >= d->count || !c->encoders[3 + k]) continue;
+        int high = d->p[p].high;
+        if (d->p[p].kind == V_LANE) { const uint8_t *index; high = (int)song_job_lanes(&index) - 1; }
+        song_job_value[song_job][p] = (int16_t)clamp(song_job_value[song_job][p] + c->encoders[3 + k] * (shift ? 10 : 1),
+                                                     d->p[p].low, high);
+    }
+    if (song_job != before || c->encoders[1] || c->encoders[3] || c->encoders[4] || c->encoders[5]) song_job_armed = 0;
+    if (c->buttons & BUTTON(LFO)) { song_pick_tracks(key_down & ~blocked_keys); blocked_keys |= key_down; }
+    return 1;
+}

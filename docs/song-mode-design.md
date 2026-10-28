@@ -182,6 +182,40 @@ When bars are inserted or deleted, the markers and tempo changes after that poin
 clipboard holds one selection and survives switching songs, so bars can move between songs. Its size is capped
 by memory and gets measured with everything else. Every action can be undone.
 
+## 6b. Edit jobs (phase 6)
+
+**Where they live.** SHIFT+EDIT in the song view opens the job page, since EDIT alone stays sound editing (8c)
+and jobs are edits. It works like the QY70's Job menu: K1 picks the job, K2 to K4 set what the screen lists
+(ALGO turns to the next three, SHIFT moves a setting by ten), and SAVE runs it after asking once, as the QY's
+ENTER. The question says how many events the job takes on, and warns when it is too big to undo. HOME or EDIT
+goes back, PLAY plays, and HOME+SAVE undoes as everywhere. Every job is one undo step.
+
+**Range.** Most jobs start with RANGE: the selection (the loop region on the 6a tracks, picked here too by
+holding LFO and tapping F3 to G4) or the whole song. The screen always shows it as bars and tracks. Copy,
+merge, clear and normalize work on whole tracks. An event belongs to the range by its start.
+
+| Job | What it does |
+|---|---|
+| Quantize | Toward the nearest grid line of the bar, 1/64 to 1/1 with triplets, strength 0 to 100%, swing 50 to 83%, and the note ends too if GATE is on |
+| Velocity | Set, or rate 0 to 200% plus an offset |
+| Crescendo | Velocity ramps by -99 to +99 across the range |
+| Gate time | Set in clocks, rate plus offset, or legato to the next note on the track |
+| Transpose | Semitones or scale steps, only inside a note range. Drum tracks stay |
+| Fit to scale | Notes up to the next note of the song's key (8a). Drum tracks stay |
+| Shift clock | Notes and automation by plus or minus clocks, kept inside the range |
+| Chord sort | A chord's notes low to high or high to low |
+| Strum | Each chord's notes start a set number of clocks apart, in sort order. Their ends stay |
+| Paste N times | The clipboard from the playhead, over what is there, each copy transposed one more step. The song grows to fit |
+| Erase | Notes, controllers, program changes or all |
+| Extract | One kind of event moves to another track |
+| Ramp | A controller the track's engine takes, or tempo: start, end, a point every 1/64 to 1/1, curve -16 to 16. It replaces that lane in the range |
+| Thin out | Every other change in a lane, or every other tempo change |
+| Time stretch | 50 to 200%, gates included. Later events, markers and tempo changes move, as inserting or deleting time does. Shrinking needs the tracks left out to be empty where time closes |
+| Copy track | Events, sound or both, replacing the target |
+| Merge tracks | One track into another |
+| Clear track | Every event of the tracks. The FX lane stays |
+| Normalize | Swing, humanize and the glitch attributes become plain notes, as the next play from the top would roll them, so they edit and export to MIDI. The tracks' swing and humanize go off |
+
 ## 7. Automation
 
 - While recording, K1 to K4 record parameter moves on the selected track. Each knob shows which parameter it

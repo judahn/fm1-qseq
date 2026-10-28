@@ -108,6 +108,10 @@ int song_remove(struct song *s, unsigned track, unsigned index);
 int song_add_event(struct song *s, unsigned track, const struct song_event *e);
 int song_set_event(struct song *s, unsigned track, unsigned index, const struct song_event *e);
 int song_shift(struct song *s, uint32_t from, int32_t delta);
+/* An event changed in place, journaled, leaving the track to be sorted
+ * again with song_sort_track (stable). For jobs that touch many events. */
+void song_retouch(struct song *s, unsigned track, unsigned index, const struct song_event *e);
+void song_sort_track(struct song *s, unsigned track);
 /* Conductor changes: removing the tempo change at a clock or the time
  * signature change at a bar. The first of each stays. 0, or -1 if none. */
 int song_remove_tempo(struct song *s, uint32_t clock);

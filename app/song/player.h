@@ -91,6 +91,11 @@ struct song_place { uint64_t inside; uint32_t at, rate; };
 void song_player_stutter(struct song_player *p, uint32_t slice, int drift);
 void song_player_stutter_drift(struct song_player *p, int drift);
 uint32_t song_player_stutter_stop(struct song_player *p);
+/* Normalize's capture (player_bake.inc): the notes the tracks in the mask
+ * would send from the top, rolled as the next start of `live` would roll
+ * them, as plain notes with their tracks. How many, or -1 past `room`. */
+int song_player_bake(const struct song_player *live, struct song *s, unsigned tracks, struct song_event *out,
+                     uint8_t *track, unsigned room);
 #endif
 void song_player_hold(const struct song_player *p, struct song_place *place);
 void song_player_resume(struct song_player *p, const struct song_place *place);

@@ -9,8 +9,8 @@
  * song_auto.inc and input in song_panel.inc. */
 #include "song_port.h"
 
-enum { SONG = STARTUP + 1, SONG_STEP, SONG_SETUP, SONG_DIAG, SONG_REC, SONG_AUTO, SONG_LIST }; /* song view, step entry,
-                                                              settings, diagnostics, REC, automation, songs */
+enum { SONG = STARTUP + 1, SONG_STEP, SONG_SETUP, SONG_DIAG, SONG_REC, SONG_AUTO, SONG_LIST, SONG_JOB }; /* song view,
+                                     step entry, settings, diagnostics, REC, automation, songs, edit jobs */
 enum {
     SONG_X = 22, SONG_W = 214, SONG_RULER = 32, SONG_ROWS = 48, SONG_ROW = 18,
     SONG_BOTTOM = SONG_ROWS + 8 * SONG_ROW - 2,
@@ -178,7 +178,7 @@ static void song_draw(void)
     char glitch[40];
     const char *hint = notice ? notice : song_now.glitching ? song_stutter_hint(glitch)
         : song_now.jumping ? "JUMP WAITS FOR THE NEXT BAR"
-        : song_now.shift ? "F3-E4 EDIT F#3-A#3 MANGLE F4-G5 MARK"
+        : song_now.shift ? "F3-E4 EDIT  F#-A# MANGLE  EDIT JOBS"
         : (previous_buttons & BUTTON(LFO)) ? "LFO + F3-F4 TRACKS  G4 ALL" : selection;
     uint32_t sig = signature(0, hint, (unsigned)strlen(hint));
     if (sig == cache->hint_cache) return;
@@ -192,6 +192,7 @@ static void song_draw(void)
 #include "song_rec.inc"
 #include "song_auto.inc"
 #include "song_list.inc"
+#include "song_jobs.inc"
 #endif
 #if SONG_HW_TEST
 #include "song_diag.inc"
@@ -207,6 +208,7 @@ static void song_page_draw(unsigned visible)
     else if (visible == SONG_REC) song_rec_draw();
     else if (visible == SONG_AUTO) song_auto_draw();
     else if (visible == SONG_LIST) song_list_draw();
+    else if (visible == SONG_JOB) song_job_draw();
     else song_draw();
 #endif
     (void)visible;

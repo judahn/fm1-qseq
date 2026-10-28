@@ -58,6 +58,11 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
         return 1;
     }
     if (*pressed & BUTTON(SCL)) song_add_marker_here(now);
+    if ((*pressed & BUTTON(EDIT)) && shift) { /* SHIFT+EDIT: the edit jobs (EDIT alone stays sound editing) */
+        *pressed &= ~BUTTON(EDIT);
+        song_job_open();
+        return 1;
+    }
     *pressed &= ~(BUTTON(PLAY) | BUTTON(FX) | BUTTON(ENV) | BUTTON(ARP) | BUTTON(SCL) | BUTTON(LFO));
     if (*pressed & (BUTTON(HOME) | BUTTON(EDIT) | BUTTON(SAVE)))
         return 0;
@@ -203,6 +208,7 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
     if (page == SONG_REC) return song_rec_input(c, pressed, key_down, now);
     if (page == SONG_AUTO) return song_auto_input(c, pressed, key_down, now);
     if (page == SONG_LIST) return song_list_input(c, pressed, key_down, now);
+    if (page == SONG_JOB) return song_job_input(c, pressed, key_down, now);
     return song_view_input(c, pressed, key_down, now);
 #else
     return 0;

@@ -58,7 +58,12 @@ SONG_SMALL static void maps_write(struct song *s, const struct song_maps *m, uns
     ++s->revision;
 }
 
-SONG_SMALL void song_undo_init(struct song_undo *u) { memset(u, 0, sizeof *u); }
+SONG_SMALL void song_undo_init(struct song_undo *u)
+{
+    void (*sound)(unsigned, const uint8_t *) = u->sound; /* the port's hook outlives a cleared history */
+    memset(u, 0, sizeof *u);
+    u->sound = sound;
+}
 
 /* Make room by dropping the oldest finished transactions. */
 SONG_SMALL static int room(struct song_undo *u, uint32_t bytes)
@@ -103,6 +108,14 @@ SONG_SMALL void song_undo_record(struct song_undo *u, unsigned op, unsigned trac
         append(u, op, 0, shift, sizeof shift);
     } else append(u, op, track, e, sizeof *e);
 }
+SONG_SMALL void song_undo_step(struct song_undo *u) { if (u->depth) u->step = 1; }
+SONG_SMALL void song_undo_sound(struct song_undo *u, unsigned track, const uint8_t *before, const uint8_t *after)
+{
+    uint8_t both[2 * SONG_SOUND_BYTES];
+    memcpy(both, before, SONG_SOUND_BYTES);
+    memcpy(both + SONG_SOUND_BYTES, after, SONG_SOUND_BYTES);
+    append(u, SONG_UNDO_SOUND, track, both, sizeof both);
+}
 SONG_SMALL void song_undo_begin(struct song_undo *u, const struct song *s)
 {
     if (u->depth++) return;
@@ -128,7 +141,8 @@ SONG_SMALL int song_undo_end(struct song_undo *u, const struct song *s)
     /* On its own, a loop change is the selection moving, not an edit. A
      * settings change right after one like it joins that step, so a knob
      * turned over many polls is one step. */
-    if (u->pending && (mask == MAP_LOOP || (mask && same_kind(u, mask)))) mask = 0;
+    if (u->pending && (mask == MAP_LOOP || (mask && !u->step && same_kind(u, mask)))) mask = 0;
+    u->step = 0;
     if (mask) append(u, SONG_UNDO_MAPS, mask, &u->before, sizeof u->before);
     u->depth = 0;
     if (u->pending && !u->lost) { u->pending = 0; return 0; } /* nothing changed */
@@ -159,6 +173,7 @@ SONG_SMALL static void remove_equal(struct song *s, unsigned track, const struct
             return;
         }
 }
+static void (*u_sound)(unsigned track, const uint8_t *setup); /* the hook of the journal being applied */
 SONG_SMALL static void apply(struct song *s, uint8_t *record, unsigned forward)
 {
     unsigned op = record[0], track = record[1];
@@ -173,6 +188,8 @@ SONG_SMALL static void apply(struct song *s, uint8_t *record, unsigned forward)
         int32_t delta = (int32_t)shift[1];
         if (forward) (void)song_shift(s, shift[0], delta);
         else (void)song_shift(s, shift[0] + (uint32_t)delta, -delta);
+    } else if (op == SONG_UNDO_SOUND) {
+        if (u_sound) u_sound(track, record + 2 + (forward ? SONG_SOUND_BYTES : 0U));
     } else if (op == SONG_UNDO_MAPS) { /* swap, so the record holds the other side */
         struct song_maps now, then;
         song_maps_read(s, &now);
@@ -186,6 +203,7 @@ SONG_SMALL int song_undo(struct song_undo *u, struct song *s)
     if (u->depth || u->done < 4U) return -1;
     uint32_t length = get16(u->data + u->done - 2U), start = u->done - 2U - length, end = u->done - 2U;
     u->paused = 1;
+    u_sound = u->sound;
     while (end > start) {
         uint32_t size = get16(u->data + end - 2U);
         end -= size;
@@ -201,9 +219,10 @@ SONG_SMALL int song_redo(struct song_undo *u, struct song *s)
     if (u->depth || u->done + 4U > u->used) return -1;
     uint32_t length = get16(u->data + u->done), at = u->done + 2U, end = at + length;
     u->paused = 1;
+    u_sound = u->sound;
     while (at < end) {
         uint32_t size = get16(u->data + at + 2U + (u->data[at] == SONG_UNDO_MAPS ? sizeof(struct song_maps)
-                                                    : u->data[at] == SONG_UNDO_SHIFT ? 8U : 8U));
+                                                    : u->data[at] == SONG_UNDO_SOUND ? 2U * SONG_SOUND_BYTES : 8U));
         apply(s, u->data + at, 1);
         at += size;
     }

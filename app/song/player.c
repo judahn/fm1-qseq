@@ -275,3 +275,6 @@ SONG_SMALL void song_player_advance(struct song_player *p, uint64_t frame)
         else if (p->jumping) p->jump_at = bar_after(s, p->next);
     }
 }
+#if SONG_UI
+#include "player_bake.inc" /* Normalize's capture */
+#endif

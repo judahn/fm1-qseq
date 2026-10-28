@@ -16,7 +16,8 @@
 // Phase 5a: songs saved, changed and loaded, a kit through the transfer
 // calls, and the recovery copy across a reboot. Saves docs/phase5a-*.png.
 // Phase 5b (preview_5b.mjs): the workbench's Songs and Kits sections against
-// the page's simulator. Saves docs/phase5b-*.png.
+// the page's simulator. Saves docs/phase5b-*.png. Phase 6 (preview_6.mjs):
+// edit jobs through the panel, then playback. Saves docs/phase6-*.png.
 // Needs Playwright with a cached Chromium:
 //   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright node tests/preview_check.mjs
 import { createRequire } from 'node:module';
@@ -24,6 +25,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 import { phase5b } from './preview_5b.mjs';
+import { phase6 } from './preview_6.mjs';
 
 const require = createRequire(import.meta.url);
 const same3 = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -1042,6 +1044,7 @@ const phase5a = await page.evaluate(() => {
   return out;
 });
 const phase5bRun = await phase5b(browser, root);
+const phase6Run = await phase6(browser, root);
 await browser.close();
 fs.writeFileSync(path.join(root, 'docs/hw-diag.png'), Buffer.from(hwdiag.png, 'base64'));
 delete hwdiag.png;
@@ -1107,12 +1110,13 @@ const p5a = q.boot.kits === 1 && q.boot.kit === 1 && q.boot.padsUsed > 0 && q.sa
   q.backToSong === 19 && q.recovery.after && q.recovery.after !== q.recovery.before && q.reboot.page === 25 &&
   q.reboot.waiting === 1 && q.reboot.songs === 2 && q.restored.sameBytes && q.restored.waiting === 0;
 result.phase5b = phase5bRun.out;
+result.phase6 = phase6Run.out;
 console.log(JSON.stringify(result, null, 1));
 const k = result.controls;
 const ok = result.whole.notes.ok && result.whole.balanced && result.whole.stoppedAtEnd && result.whole.songPage === 19 &&
   result.loop.notes.ok && result.loop.balancedAfterStop && result.whole.rms > 0.001 && result.loop.rmsAfterStop < 1e-4 &&
   k.rewindToLoopStart && k.loopOff && k.k1MovesBySnap && k.shiftK1NextMarker && k.loopEdgesOk &&
   k.pendingAfterRequest && k.jumpLandsOnBarLine && k.afterJump.ok && k.balancedAfterStop && k.seqOk && p2 && hw && p3 && p4ok && p4b && p5a &&
-  phase5bRun.ok;
+  phase5bRun.ok && phase6Run.ok;
 console.log(ok ? 'preview_check: passed' : 'preview_check: FAILED');
 process.exit(ok ? 0 : 1);

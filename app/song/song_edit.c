@@ -24,6 +24,28 @@ SONG_SMALL int song_set_event(struct song *s, unsigned track, unsigned index, co
     return 0;
 }
 
+/* Phase 6 jobs: an event changed where it sits, journaled, and the track
+ * put back in order afterwards. Equal starts keep their order. */
+SONG_SMALL void song_retouch(struct song *s, unsigned track, unsigned index, const struct song_event *e)
+{
+    struct song_event *at = &s->event[s->first[track] + index];
+    if (!memcmp(at, e, sizeof *e)) return;
+    if (s->undo) song_undo_record(s->undo, SONG_UNDO_DEL, track, at, 0);
+    *at = *e;
+    if (s->undo) song_undo_record(s->undo, SONG_UNDO_ADD, track, e, 0);
+    ++s->revision;
+}
+SONG_SMALL void song_sort_track(struct song *s, unsigned track)
+{
+    struct song_event *e = s->event + s->first[track];
+    for (unsigned i = 1; i < s->count[track]; ++i) {
+        struct song_event x = e[i];
+        unsigned j = i;
+        for (; j > 0 && song_event_start(&e[j - 1U]) > song_event_start(&x); --j) e[j] = e[j - 1U];
+        e[j] = x;
+    }
+}
+
 SONG_SMALL int song_remove_tempo(struct song *s, uint32_t clock)
 {
     for (unsigned k = 1; k < s->tempos; ++k)

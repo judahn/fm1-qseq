@@ -94,6 +94,7 @@ int song_store_restore(void);
 void song_store_skip_recovery(void);
 struct song_gauge { uint32_t pool, songs, samples, free; unsigned events; };
 void song_store_gauge(struct song_gauge *g);
+void song_port_ready_pads(void); /* each drum track's pads, as a start would take them (phase 6) */
 /* Transfers to and from a computer (song_store_io.inc, phase 5b). */
 struct song_pool;
 struct song_pool *song_store_pool(void);

@@ -10,8 +10,9 @@
  * preferences, not edits.
  * Undo applies the inverses backwards and redo replays them. The oldest
  * transactions go when the buffer is full. */
-enum { SONG_UNDO_BYTES = 16384, SONG_UNDO_LEVELS = 64 };
-enum { SONG_UNDO_ADD = 1, SONG_UNDO_DEL, SONG_UNDO_SHIFT, SONG_UNDO_MAPS };
+enum { SONG_UNDO_BYTES = 32768, SONG_UNDO_LEVELS = 64 }; /* 32 KB since phase 6: a job can touch ~1,300 events */
+enum { SONG_UNDO_ADD = 1, SONG_UNDO_DEL, SONG_UNDO_SHIFT, SONG_UNDO_MAPS, SONG_UNDO_SOUND };
+enum { SONG_SOUND_BYTES = 223 }; /* a track's sound setup, opaque here (phase 6, Copy Track) */
 struct song_maps {
     struct song_tempo tempo[SONG_TEMPOS];
     struct song_meter meter[SONG_METERS];
@@ -27,6 +28,8 @@ struct song_undo {
     struct song_maps before;  /* the maps when the open transaction began */
     uint32_t used, done, open_at;
     uint8_t depth, paused, lost, levels, pending; /* pending: nothing written yet, redo still kept */
+    uint8_t step; /* this transaction stands alone, never joined to the one before (song_undo_step) */
+    void (*sound)(unsigned track, const uint8_t *setup); /* puts a sound setup back, set by the port */
 };
 void song_undo_init(struct song_undo *u);
 void song_undo_begin(struct song_undo *u, const struct song *s); /* nests */
@@ -35,6 +38,11 @@ void song_undo_record(struct song_undo *u, unsigned op, unsigned track, const st
 /* Closes the transaction. Returns 0, or -1 when it was too big to keep
  * (the history is then cleared, since older steps no longer line up). */
 int song_undo_end(struct song_undo *u, const struct song *s);
+/* The open transaction is a step of its own, even if it only changes the
+ * maps like the one before (a job, not a knob turned over many polls). */
+void song_undo_step(struct song_undo *u);
+/* A track's sound setup before and after a change, so undo can swap it. */
+void song_undo_sound(struct song_undo *u, unsigned track, const uint8_t *before, const uint8_t *after);
 int song_undo(struct song_undo *u, struct song *s);  /* 0, or -1 when there is nothing */
 int song_redo(struct song_undo *u, struct song *s);
 unsigned song_undo_count(const struct song_undo *u, unsigned redo);

@@ -78,6 +78,9 @@ SONG_SMALL static void pads(void)
         for (unsigned i = 0; i < player.pad_count[t]; ++i) player.pads[t][i] = (uint8_t)groove_pad_note(t, i);
     }
 }
+void song_port_ready_pads(void) { pads(); } /* Normalize rolls pad swaps as playing would */
+/* Undo's hook for Copy Track's sound (undo.h). */
+SONG_SMALL static void put_sound(unsigned track, const uint8_t *setup) { (void)groove_timbre_import(track, setup, SONG_SOUND_BYTES); }
 #endif
 SONG_SMALL static void ensure(void)
 {
@@ -96,6 +99,7 @@ SONG_SMALL static void ensure(void)
     song_diag.heaviest = -1;
 #if SONG_UI
     song_undo_init(&undo);
+    undo.sound = put_sound;
     song.undo = &undo; /* after the test song, which is not an edit */
     song.strength = 100; /* recording defaults: full strength, a bar of count-in, clicks while recording */
     song.count_in = 1;
