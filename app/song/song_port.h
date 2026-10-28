@@ -46,5 +46,19 @@ struct song_recorder *song_port_recorder(void);
 int song_port_record(unsigned mode, unsigned track); /* with count-in and metronome */
 void song_port_record_stop(void);
 void song_port_key(const uint8_t *message, size_t bytes); /* a live key on its way to the engine */
+int64_t song_port_live_clock(void);                   /* where a key or knob lands now, -1 in a count-in */
+void song_deliver_message(const uint8_t *message, size_t bytes); /* automation, as notes go */
+uint32_t song_port_hold(struct song_place *place);    /* player.h, with the player locked meanwhile */
+void song_port_resume(const struct song_place *place, uint32_t state);
+/* K1 to K4 while recording (song_knobs.c): each drives a lane on the take
+ * track, chosen per track (lanes.h), recorded in touch style. */
+unsigned song_port_engine(unsigned track);
+unsigned song_knob_lane(unsigned track, unsigned knob);
+unsigned song_knob_value(unsigned track, unsigned knob); /* what it is at or setting now */
+unsigned song_knob_held(unsigned knob);
+void song_knob_turn(unsigned knob, int delta, uint32_t now);
+void song_knobs_poll(uint32_t now);      /* lets go of knobs that stopped moving */
+void song_knobs_release(uint32_t clock); /* lets go of every knob: the take ends */
+void song_knobs_wrap(uint32_t loop_end); /* a loop pass ends */
 #endif
 #endif

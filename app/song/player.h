@@ -2,15 +2,20 @@
 #ifndef FM1_SONG_PLAYER_H
 #define FM1_SONG_PLAYER_H
 #include "song.h"
+#include "song_config.h"
 
 /* Song player. Its time base is audio frames. Advancing to frame N emits
  * every event due before N, so a caller that advances to the end of each
  * block puts every note on its exact block. Song time is carried in tempo
  * segment units, so remainders carry from block to block and nothing drifts. */
 struct song_output {
-    /* Velocity 0 is a note-off. Controllers join with automation. */
-    void (*note)(void *context, unsigned track, unsigned pitch, unsigned velocity);
+    void (*note)(void *context, unsigned track, unsigned pitch, unsigned velocity); /* velocity 0: off */
     void *context;
+#if SONG_UI
+    /* Automation: a controller (status 0xb0, number, value) or a program
+     * change (0xc0, program). NULL leaves it out. */
+    void (*control)(void *context, unsigned track, unsigned status, unsigned a, unsigned b);
+#endif
 };
 enum { SONG_HELD = 16 }; /* sounding notes tracked per track */
 struct song_held { uint32_t end; uint8_t pitch; };
@@ -34,6 +39,11 @@ struct song_player {
     uint32_t mute_from, mute_to, click_next, click_off, pre_rate;
     uint16_t pre_left, pre_done;
     uint8_t mute_track, click, click_track, pre_beats;
+#if SONG_UI
+    /* Lanes a knob is recording on touch_track play nothing from the song.
+     * program: the last program change sent per track, 0xff for none. */
+    uint8_t touch_track, touch_lane[4], program[SONG_TRACKS];
+#endif
 };
 void song_player_init(struct song_player *p, struct song *s, const struct song_output *out);
 /* Start at the playhead. The first event lands in the block starting at frame. */
@@ -53,4 +63,13 @@ uint32_t song_player_target(const struct song_player *p);
 void song_player_count_in(struct song_player *p, uint64_t frame, unsigned bars);
 /* The clock playing at an audio frame up to the last advance. */
 uint32_t song_player_clock_at(const struct song_player *p, uint64_t frame);
+/* Sends every automated lane's value as of `clock` (lanes.h). Playback
+ * does this itself on start, jumps and loop wraps. */
+void song_player_chase(struct song_player *p, uint32_t clock);
+/* An edit that may change the tempo map under playback (undo, inserting
+ * or deleting bars): hold the place first and resume after, so playing
+ * goes on from the same clock and time. */
+struct song_place { uint64_t inside; uint32_t at, rate; };
+void song_player_hold(const struct song_player *p, struct song_place *place);
+void song_player_resume(struct song_player *p, const struct song_place *place);
 #endif

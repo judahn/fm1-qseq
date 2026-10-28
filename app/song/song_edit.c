@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* Journaled edits beyond adding and removing notes: changing a note in
- * place, and shifting everything after a point in time. */
+/* Edits beyond adding and removing notes: changing a note in place and
+ * shifting everything after a point in time (both journaled), and removing
+ * conductor changes (undo sees those through the maps). */
 #include "undo.h"
 #include "song_config.h"
+#include <string.h>
 #if SONG_UI
 
 /* Index is within the track. A new start clock re-sorts the note. */
@@ -20,6 +22,30 @@ SONG_SMALL int song_set_event(struct song *s, unsigned track, unsigned index, co
     if (s->undo) song_undo_record(s->undo, SONG_UNDO_ADD, track, e, 0);
     ++s->revision;
     return 0;
+}
+
+SONG_SMALL int song_remove_tempo(struct song *s, uint32_t clock)
+{
+    for (unsigned k = 1; k < s->tempos; ++k)
+        if (s->tempo[k].clock == clock) {
+            memmove(&s->tempo[k], &s->tempo[k + 1], (s->tempos - k - 1U) * sizeof s->tempo[0]);
+            --s->tempos;
+            song_tempo_refresh(s);
+            ++s->revision;
+            return 0;
+        }
+    return -1;
+}
+SONG_SMALL int song_remove_meter(struct song *s, unsigned bar)
+{
+    for (unsigned m = 1; m < s->meters; ++m)
+        if (s->meter[m].bar == bar) {
+            memmove(&s->meter[m], &s->meter[m + 1], (s->meters - m - 1U) * sizeof s->meter[0]);
+            --s->meters;
+            ++s->revision;
+            return 0;
+        }
+    return -1;
 }
 
 /* Every event at or after `from` moves by delta, on all tracks. Moving left

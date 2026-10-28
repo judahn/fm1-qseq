@@ -25,7 +25,7 @@ static void hear(void *context, unsigned track, unsigned pitch, unsigned velocit
     if (heard_count < CAPTURE)
         heard[heard_count++] = (struct heard){block_now, (uint8_t)track, (uint8_t)pitch, (uint8_t)velocity};
 }
-static const struct song_output listener = {hear, NULL};
+static const struct song_output listener = {.note = hear};
 /* Advance block by block, as the simulator does: the player is asked for
  * everything due before the end of the block it is about to render. */
 static void run_blocks(struct song_player *p, uint32_t first, uint32_t count)

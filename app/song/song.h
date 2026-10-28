@@ -30,10 +30,13 @@ enum {
 #define SONG_UNITS_PER_CLOCK 264600000ULL
 static inline uint32_t song_rate(unsigned bpm100) { return 480U * bpm100; }
 
-enum { SONG_NOTE, SONG_CONTROL }; /* event kinds. Controllers come with automation */
+/* Event kinds. A note keeps its pitch in a, velocity in b and its length in
+ * clocks (1..65535). A controller keeps its number in a and value in b, a
+ * program change its program in a, and both have length 0. Controllers
+ * and program changes are automation (lanes.h). */
+enum { SONG_NOTE, SONG_CONTROL, SONG_PROGRAM };
 #define SONG_FRESH 0x80000000U /* flag in `at`: recorded in the take that is running */
-/* Start clock in bits 0..23 of `at`, kind in bits 24..31. A note keeps its
- * pitch in a, velocity in b and its length in clocks (1..65535). */
+/* Start clock in bits 0..23 of `at`, kind in bits 24..30. */
 struct song_event {
     uint32_t at;
     uint8_t a, b;
@@ -42,6 +45,7 @@ struct song_event {
 _Static_assert(sizeof(struct song_event) == 8, "song event layout");
 static inline uint32_t song_event_start(const struct song_event *e) { return e->at & 0xffffffU; }
 static inline unsigned song_event_kind(const struct song_event *e) { return e->at >> 24 & 0x7fU; }
+static inline int song_is_note(const struct song_event *e) { return song_event_kind(e) == SONG_NOTE; }
 
 struct song_tempo { uint32_t clock; uint16_t bpm100; };
 struct song_meter { uint16_t bar; uint8_t beats, unit; }; /* from bar (0-based), beats/unit */
@@ -66,6 +70,9 @@ struct song {
      * + triplet, lengths as in step entry) and its strength in percent. */
     uint8_t rec_mode, count_in, metronome, quantize, strength;
     struct song_undo *undo;  /* edit journal, or NULL (undo.c) */
+    /* The controller each of K1 to K4 records on each track, 0 for the
+     * engine's default (lanes.h). */
+    uint8_t knob_cc[SONG_TRACKS][4];
 };
 
 /* Editing (song.c). Calls return 0, or -1 when invalid or full. */
@@ -84,6 +91,10 @@ int song_remove(struct song *s, unsigned track, unsigned index);
 int song_add_event(struct song *s, unsigned track, const struct song_event *e);
 int song_set_event(struct song *s, unsigned track, unsigned index, const struct song_event *e);
 int song_shift(struct song *s, uint32_t from, int32_t delta);
+/* Conductor changes: removing the tempo change at a clock or the time
+ * signature change at a bar. The first of each stays. 0, or -1 if none. */
+int song_remove_tempo(struct song *s, uint32_t clock);
+int song_remove_meter(struct song *s, unsigned bar);
 
 /* Bars, beats and snapping (song_time.c). Bars are 0-based here and 1-based
  * on screen. Zoom 0..3 snaps to a bar, half bar, beat or 8th. */

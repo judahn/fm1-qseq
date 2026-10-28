@@ -3,12 +3,14 @@
  * band painter, text, knob footer and draw caches. As on every stock page,
  * the marking pass records damage and the band pass repaints from a frame
  * snapshot. Transport, snap and zoom, markers, the loop and the selection.
- * The header is in song_header.inc, step entry in song_step.inc, settings
- * in song_setup.inc, REC's chooser in song_rec.inc, arranging in
- * song_select.inc and input in song_panel.inc. */
+ * The header, playhead and recording knobs are in song_header.inc, step
+ * entry in song_step.inc, settings in song_setup.inc, REC's chooser in
+ * song_rec.inc, arranging in song_select.inc, the automation view in
+ * song_auto.inc and input in song_panel.inc. */
 #include "song_port.h"
 
-enum { SONG = STARTUP + 1, SONG_STEP, SONG_SETUP, SONG_DIAG, SONG_REC }; /* song view, step entry, settings, diagnostics, REC */
+enum { SONG = STARTUP + 1, SONG_STEP, SONG_SETUP, SONG_DIAG, SONG_REC, SONG_AUTO }; /* song view, step entry, settings,
+                                                                                      diagnostics, REC, automation */
 enum {
     SONG_X = 22, SONG_W = 214, SONG_RULER = 32, SONG_ROWS = 48, SONG_ROW = 18,
     SONG_BOTTOM = SONG_ROWS + 8 * SONG_ROW - 2,
@@ -27,6 +29,7 @@ static void select_track(int delta);
 static void song_start(uint32_t now);
 #if SONG_UI
 #include "song_select.inc"
+#include "lanes.h"
 
 static uint32_t song_span(void) { return (16U >> song_zoom) * (uint32_t)SONG_WHOLE; }
 static unsigned song_x(uint32_t clock)
@@ -54,11 +57,12 @@ static void song_ranges(const struct song *s)
         unsigned count, low = 127, high = 0;
         const struct song_event *e = song_track(s, t, &count);
         for (unsigned i = 0; i < count; ++i) {
+            if (!song_is_note(&e[i])) continue;
             if (e[i].a < low) low = e[i].a;
             if (e[i].a > high) high = e[i].a;
         }
-        song_low[t] = (uint8_t)(count ? low : 60);
-        song_high[t] = (uint8_t)(count ? high : 60);
+        song_low[t] = (uint8_t)(low <= high ? low : 60);
+        song_high[t] = (uint8_t)(low <= high ? high : 60);
     }
 }
 #include "song_header.inc"
@@ -129,7 +133,7 @@ static void song_row(const struct song *s, unsigned t)
     for (unsigned i = first > 32 ? first - 32 : 0; i < count; ++i) {
         uint32_t at = song_event_start(&e[i]);
         if (at >= end) break;
-        if (at + e[i].length <= song_window) continue;
+        if (at + e[i].length <= song_window || !song_is_note(&e[i])) continue;
         unsigned x = song_x(at), w = song_x(at + e[i].length) - x;
         w = w > 2 ? w - 1 : 1;
         unsigned rise = span ? (unsigned)(e[i].a - song_low[t]) * 13U / span : 6U;
@@ -145,42 +149,22 @@ static void song_row(const struct song *s, unsigned t)
 static void song_draw(void)
 {
     struct song *s = song_port_song();
-    if (!paint_rendering) {
-        const struct song_player *p = song_port_player();
-        song_now.clock = song_player_clock(p);
-        song_now.target = song_player_target(p);
-        song_now.playing = p->playing;
-        song_now.jumping = p->jumping;
-        song_now.shift = (previous_buttons & BUTTON(FX)) != 0;
-        song_now.recording = song_port_recorder()->active;
-        song_now.selected = (uint8_t)song_selected();
-        const struct song_clip *c = song_port_clip();
-        unsigned single = c->tracks && !(c->tracks & (c->tracks - 1U));
-        song_now.ghost_tracks = (uint8_t)(c->length && !p->playing ? single ? 1U << track : c->tracks : 0);
-        song_now.ghost_from = p->playhead;
-        song_now.ghost_to = p->playhead + c->length;
-        song_follow(s, song_now.clock);
-        song_ranges(s);
-    }
+    if (!paint_rendering) song_now_read(s);
     song_header(s);
     song_ruler(s);
     for (unsigned t = 0; t < SONG_TRACKS; ++t) song_row(s, t);
-    /* The playhead: the marking pass damages its old and new columns. */
-    unsigned x = song_visible(song_now.clock) ? song_x(song_now.clock) : ~0U;
-    if (!paint_rendering && x != song_drawn_x) {
-        if (song_drawn_x != ~0U) paint_fill(song_drawn_x, SONG_RULER, 1, SONG_BOTTOM - SONG_RULER, BACK);
-        if (x != ~0U) paint_fill(x, SONG_RULER, 1, SONG_BOTTOM - SONG_RULER, GREEN);
-        song_drawn_x = x;
-    } else if (paint_rendering && song_drawn_x != ~0U)
-        paint_fill(song_drawn_x, SONG_RULER, 1, SONG_BOTTOM - SONG_RULER, GREEN);
+    song_playhead_line();
     if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
     char start[24], end[24];
     song_position(s, s->loop_start, start, 0);
     song_position(s, s->loop_end, end, 0);
-    knob(0, song_now.shift ? "MARKER" : "SNAP", song_now.shift ? "< >" : song_snaps[song_zoom], colors[0]);
-    knob(1, "LOOP IN", start, colors[1]);
-    knob(2, "LOOP OUT", end, colors[2]);
-    knob(3, "ZOOM", song_spans[song_zoom], colors[3]);
+    if (song_now.recording) song_knob_footer(); /* K1 to K4 record parameters */
+    else {
+        knob(0, song_now.shift ? "MARKER" : "SNAP", song_now.shift ? "< >" : song_snaps[song_zoom], colors[0]);
+        knob(1, "LOOP IN", start, colors[1]);
+        knob(2, "LOOP OUT", end, colors[2]);
+        knob(3, "ZOOM", song_spans[song_zoom], colors[3]);
+    }
     if (notice && (int32_t)(frame_time - notice_until) >= 0) notice = NULL;
     char selection[40], part[12];
     if (song_now.recording) {
@@ -211,6 +195,7 @@ static void song_draw(void)
 #include "song_step.inc"
 #include "song_setup.inc"
 #include "song_rec.inc"
+#include "song_auto.inc"
 #endif
 #if SONG_HW_TEST
 #include "song_diag.inc"
@@ -224,6 +209,7 @@ static void song_page_draw(unsigned visible)
     if (visible == SONG_STEP) song_step_draw();
     else if (visible == SONG_SETUP) song_setup_draw();
     else if (visible == SONG_REC) song_rec_draw();
+    else if (visible == SONG_AUTO) song_auto_draw();
     else song_draw();
 #endif
     (void)visible;

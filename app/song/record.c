@@ -44,7 +44,7 @@ SONG_SMALL static int at_pitch(const struct song *s, unsigned track, uint32_t cl
     unsigned count, i = song_find(s, track, clock);
     const struct song_event *e = song_track(s, track, &count);
     for (; i < count && song_event_start(&e[i]) == clock; ++i)
-        if (e[i].a == pitch) return (int)i;
+        if (song_is_note(&e[i]) && e[i].a == pitch) return (int)i;
     return -1;
 }
 /* A held note becomes a song note, ending at `off`. */
@@ -110,7 +110,7 @@ SONG_SMALL void song_rec_stop(struct song_recorder *r, uint32_t clock)
         unsigned count, first = song_find(s, r->track, from);
         const struct song_event *e = song_track(s, r->track, &count);
         for (unsigned i = song_find(s, r->track, to); i-- > first;)
-            if (!(e[i].at & SONG_FRESH)) (void)song_remove(s, r->track, i);
+            if (!(e[i].at & SONG_FRESH) && song_is_note(&e[i])) (void)song_remove(s, r->track, i); /* automation stays */
     }
     unsigned count;
     song_track(s, r->track, &count);

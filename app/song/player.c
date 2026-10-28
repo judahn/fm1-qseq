@@ -12,10 +12,12 @@
 enum { EDGE_TEMPO, EDGE_END, EDGE_LOOP, EDGE_JUMP, CLICK = 37 /* rim */ };
 #define NEVER 0xffffffffU
 #if SONG_UI
+#include "lanes.h"
 #define QUIET(p, t, e) ((t) == (p)->mute_track && !((e)->at & SONG_FRESH) && \
     song_event_start(e) >= (p)->mute_from && song_event_start(e) < (p)->mute_to)
+#define PLAY(p, t, e, at) play(p, t, e, at)
 #else
-#define QUIET(p, t, e) 0
+#define PLAY(p, t, e, at) do { if (song_event_kind(e) == SONG_NOTE) note_on(p, t, e, at); } while (0)
 #endif
 
 SONG_SMALL static void send(struct song_player *p, unsigned track, unsigned pitch, unsigned velocity)
@@ -50,6 +52,13 @@ SONG_SMALL static void note_on(struct song_player *p, unsigned t, const struct s
     p->held[t][p->held_count[t]++] = (struct song_held){at + e->length, e->a};
     send(p, t, e->a, e->b);
 }
+#if SONG_UI
+SONG_SMALL static void play(struct song_player *p, unsigned t, const struct song_event *e, uint32_t at)
+{
+    if (!song_is_note(e)) lane_out(p, t, song_event_lane(e), song_event_value(e), 0);
+    else if (!QUIET(p, t, e)) note_on(p, t, e, at);
+}
+#endif
 SONG_SMALL static uint32_t onset(const struct song_player *p, unsigned t, const struct song_event *e)
 {
     return song_event_start(e) + song_swing(p->song, t, song_event_start(e));
@@ -83,13 +92,11 @@ SONG_SMALL static void emit(struct song_player *p, uint32_t end)
                 if (p->held[t][i].end < off) { off = p->held[t][i].end; first = i; }
             if (off <= on && off <= late && off < end) release(p, t, first);
             else if (late <= on && late < end) {
-                if (song_event_kind(&e[p->late_first[t]]) == SONG_NOTE && !QUIET(p, t, &e[p->late_first[t]]))
-                    note_on(p, t, &e[p->late_first[t]], late);
+                PLAY(p, t, &e[p->late_first[t]], late);
                 ++p->late_first[t];
                 --p->late_count[t];
             } else if (on < end) {
-                if (song_event_kind(&e[p->cursor[t]]) == SONG_NOTE && !QUIET(p, t, &e[p->cursor[t]]))
-                    note_on(p, t, &e[p->cursor[t]], on);
+                PLAY(p, t, &e[p->cursor[t]], on);
                 ++p->cursor[t];
             } else break;
         }
@@ -110,6 +117,7 @@ SONG_SMALL static void relocate(struct song_player *p, uint32_t clock, uint64_t 
 #if SONG_UI
     click_off(p);
     p->click_next = next_beat(s, clock);
+    song_player_chase(p, clock);
 #endif
 }
 SONG_SMALL static uint32_t bar_after(const struct song *s, uint32_t clock)
@@ -128,6 +136,8 @@ SONG_SMALL void song_player_init(struct song_player *p, struct song *s, const st
     p->mute_track = 0xff;
     p->click_track = SONG_TRACKS - 1U; /* the 808 kit in the default project */
     p->click_off = NEVER;
+    p->touch_track = 0xff;
+    memset(p->program, 0xff, sizeof p->program);
 #endif
 }
 SONG_SMALL void song_player_start(struct song_player *p, uint64_t frame)

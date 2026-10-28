@@ -38,7 +38,8 @@ SONG_SMALL uint32_t step_gate_clocks(const struct song_step *st, uint32_t step)
     return length ? length : 1;
 }
 
-/* Notes at a clock on the step track: [first, end) as track indices. */
+/* Events at a clock on the step track: [first, end) as track indices.
+ * Step entry works on the notes among them and leaves automation alone. */
 SONG_SMALL static unsigned at_clock(const struct song_step *st, uint32_t clock, unsigned *end)
 {
     unsigned count, i = song_find(st->song, st->track, clock);
@@ -51,7 +52,7 @@ SONG_SMALL static int find_note(const struct song_step *st, uint32_t clock, unsi
     unsigned end, i = at_clock(st, clock, &end);
     const struct song_event *e = st->song->event + st->song->first[st->track];
     for (; i < end; ++i)
-        if (e[i].a == pitch) return (int)(st->song->first[st->track] + i);
+        if (song_is_note(&e[i]) && e[i].a == pitch) return (int)(st->song->first[st->track] + i);
     return -1;
 }
 SONG_SMALL unsigned step_selection(const struct song_step *st, unsigned index[STEP_CHORD])
@@ -59,6 +60,7 @@ SONG_SMALL unsigned step_selection(const struct song_step *st, unsigned index[ST
     unsigned end, n = 0, i = at_clock(st, st->pointer, &end), first = st->song->first[st->track];
     for (; i < end && n < STEP_CHORD; ++i) {
         unsigned pitch = st->song->event[first + i].a;
+        if (!song_is_note(&st->song->event[first + i])) continue;
         if (!st->picked || (st->pick[pitch / 32U] >> (pitch % 32U) & 1U)) index[n++] = first + i;
     }
     return n;
@@ -154,12 +156,13 @@ SONG_SMALL int step_delete(struct song_step *st)
     st->tie_ok = st->picked = 0;
     return 0;
 }
-/* Back one step, deleting whatever starts in the step backed over. */
+/* Back one step, deleting the notes that start in the step backed over. */
 SONG_SMALL int step_back_delete(struct song_step *st)
 {
     uint32_t step = step_clocks(st), to = st->pointer > step ? st->pointer - step : 0;
     unsigned from = song_find(st->song, st->track, to), end = song_find(st->song, st->track, st->pointer);
-    while (end-- > from) (void)song_remove(st->song, st->track, end);
+    while (end-- > from)
+        if (song_is_note(&st->song->event[st->song->first[st->track] + end])) (void)song_remove(st->song, st->track, end);
     st->pointer = to;
     st->tie_ok = st->picked = 0;
     return 0;
@@ -175,10 +178,13 @@ SONG_SMALL void step_jump(struct song_step *st, int direction)
 {
     unsigned count, i;
     const struct song_event *e = song_track(st->song, st->track, &count);
-    if (direction > 0 && (i = song_find(st->song, st->track, st->pointer + 1)) < count)
-        st->pointer = song_event_start(&e[i]);
-    else if (direction < 0 && (i = song_find(st->song, st->track, st->pointer)) > 0)
-        st->pointer = song_event_start(&e[i - 1]);
+    if (direction > 0)
+        for (i = song_find(st->song, st->track, st->pointer + 1); i < count; ++i) {
+            if (song_is_note(&e[i])) { st->pointer = song_event_start(&e[i]); break; }
+        }
+    else
+        for (i = song_find(st->song, st->track, st->pointer); i-- > 0;)
+            if (song_is_note(&e[i])) { st->pointer = song_event_start(&e[i]); break; }
     step_land(st);
 }
 SONG_SMALL void step_preview_stop(struct song_step *st)

@@ -1,8 +1,11 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* Arranging: copy, cut, paste, duplicate, and inserting or deleting time.
  * Note edits go through the journaled calls, and the caller's undo
- * transaction picks up marker, tempo and meter changes on its own. */
+ * transaction picks up marker, tempo and meter changes on its own.
+ * Automation travels with the notes, starting from the values in effect
+ * where the copy starts, so it sounds the same wherever it lands. */
 #include "arrange.h"
+#include "lanes.h"
 #include "song_config.h"
 #include <string.h>
 #if SONG_UI
@@ -31,14 +34,34 @@ SONG_SMALL static struct song_event moved(const struct song_event *e, uint32_t a
     return c;
 }
 
+/* A lane's value in effect at `from`, when no change sits right there. */
+struct start_values { struct song *s; struct song_clip *clip; uint32_t from, to; unsigned count, fill; };
+SONG_SMALL static void start_value(void *context, unsigned track, unsigned lane, unsigned value)
+{
+    struct start_values *v = context;
+    if (song_lane_find(v->s, track, lane, v->from) >= 0 || song_lane_next(v->s, track, lane, v->from, -1) < 0) return;
+    ++v->count;
+    if (v->fill == 1) {
+        v->clip->event[v->clip->count] = song_lane_event(0, lane, value);
+        v->clip->track[v->clip->count++] = (uint8_t)track;
+    } else if (v->fill == 2) {
+        const struct song_event e = song_lane_event(v->to, lane, value);
+        (void)song_add_event(v->s, track, &e);
+    }
+}
 SONG_SMALL int song_copy(const struct song *s, struct song_clip *clip, unsigned tracks, uint32_t from, uint32_t to)
 {
-    if (from >= to || !(tracks & 0xffU) || in_range(s, tracks, from, to) > SONG_CLIP_EVENTS) return -1;
+    struct start_values v = {(struct song *)s, clip, from, to, 0, 0};
+    for (unsigned t = 0; t < SONG_TRACKS; ++t)
+        if (tracks >> t & 1U) song_chase(s, t, from, start_value, &v);
+    if (from >= to || !(tracks & 0xffU) || in_range(s, tracks, from, to) + v.count > SONG_CLIP_EVENTS) return -1;
     clip->count = 0;
     clip->length = to - from;
     clip->tracks = (uint8_t)tracks;
+    v.fill = 1;
     for (unsigned t = 0; t < SONG_TRACKS; ++t) {
         if (!(tracks >> t & 1U)) continue;
+        song_chase(s, t, from, start_value, &v);
         unsigned count, end = song_find(s, t, to);
         const struct song_event *e = song_track(s, t, &count);
         for (unsigned i = song_find(s, t, from); i < end; ++i) {
@@ -72,8 +95,10 @@ SONG_SMALL int song_duplicate(struct song *s, unsigned tracks, uint32_t *from, u
 {
     uint32_t a = *from, b = *to, length = b - a;
     if (a >= b || s->events + in_range(s, tracks, a, b) > SONG_EVENTS || song_insert_time(s, b, length)) return -1;
+    struct start_values v = {s, NULL, a, b, 0, 2};
     for (unsigned t = 0; t < SONG_TRACKS; ++t) {
         if (!(tracks >> t & 1U)) continue;
+        song_chase(s, t, a, start_value, &v); /* these land at b, after the originals */
         /* The copies sort after the originals, so these indexes hold. */
         for (unsigned i = song_find(s, t, a), end = song_find(s, t, b); i < end; ++i) {
             struct song_event e = moved(&s->event[s->first[t] + i], song_event_start(&s->event[s->first[t] + i]) + length, b);

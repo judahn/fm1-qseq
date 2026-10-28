@@ -100,6 +100,9 @@ SONG_SMALL void song_deliver_note(const uint8_t message[3])
     (void)song_midi_post(message, 3);
     if (emitting) song_diag_late(song_port_blocks(), due_block);
 }
+#if SONG_UI
+SONG_SMALL void song_deliver_message(const uint8_t *message, size_t bytes) { (void)song_midi_post(message, bytes); }
+#endif
 
 SONG_SMALL static void advance_to(uint32_t last)
 {
@@ -162,12 +165,32 @@ SONG_SMALL void song_port_stop(void)
     song_player_stop(song_port_player());
     unlock(state);
     wake_mode();
+#if SONG_UI
+    song_player_chase(song_port_player(), song_port_player()->playhead); /* stopping: lanes chase too */
+#endif
 }
+#if SONG_UI
+/* Around an edit that may move the tempo map while playing. */
+SONG_SMALL uint32_t song_port_hold(struct song_place *place)
+{
+    uint32_t state = lock();
+    song_player_hold(song_port_player(), place);
+    return state;
+}
+SONG_SMALL void song_port_resume(const struct song_place *place, uint32_t state)
+{
+    song_player_resume(song_port_player(), place);
+    unlock(state);
+}
+#endif
 SONG_SMALL void song_port_jump(uint32_t clock)
 {
     uint32_t state = lock();
     song_player_jump(song_port_player(), clock);
     unlock(state);
+#if SONG_UI
+    if (!song_port_player()->playing) song_player_chase(song_port_player(), song_port_player()->playhead);
+#endif
 }
 SONG_SMALL int song_port_set_tempo(uint32_t clock, unsigned bpm100)
 {

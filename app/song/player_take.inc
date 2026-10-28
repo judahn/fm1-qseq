@@ -1,8 +1,45 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* song-mode: the player's side of recording, included by player.c. The
- * metronome, the count-in before the first beat, and the clock at an
- * earlier frame for keys played live. */
+/* song-mode: the player's side of recording and automation, included by
+ * player.c. The metronome, the count-in before the first beat, the clock
+ * at an earlier frame for keys played live, and lane changes and chase. */
 #if SONG_UI
+/* A lane change goes out unless a knob is recording that lane. A program
+ * change resets the track's sound, so a chase sends one only when the
+ * track is on another program. */
+SONG_SMALL static void lane_out(struct song_player *p, unsigned track, unsigned lane, unsigned value, unsigned chasing)
+{
+    if (!p->out.control) return;
+    if (track == p->touch_track)
+        for (unsigned k = 0; k < 4; ++k)
+            if (p->touch_lane[k] == lane) return;
+    if (lane != SONG_LANE_PROGRAM) { p->out.control(p->out.context, track, 0xb0, lane, value); return; }
+    if (chasing && p->program[track] == value) return;
+    p->program[track] = (uint8_t)value;
+    p->out.control(p->out.context, track, 0xc0, value, 0);
+}
+SONG_SMALL static void chased(void *context, unsigned track, unsigned lane, unsigned value)
+{
+    lane_out(context, track, lane, value, 1);
+}
+SONG_SMALL void song_player_chase(struct song_player *p, uint32_t clock)
+{
+    for (unsigned t = 0; t < SONG_TRACKS; ++t) song_chase(p->song, t, clock, chased, p);
+}
+SONG_SMALL void song_player_hold(const struct song_player *p, struct song_place *place)
+{
+    const struct song *s = p->song;
+    place->at = song_player_clock(p);
+    place->rate = song_rate(s->tempo[p->segment].bpm100);
+    place->inside = p->playing ? p->pos - song_units(s, p->segment, place->at) : 0;
+}
+SONG_SMALL void song_player_resume(struct song_player *p, const struct song_place *place)
+{
+    if (!p->playing) return;
+    const struct song *s = p->song;
+    p->segment = (uint8_t)song_tempo_at(s, place->at);
+    p->pos = song_units(s, p->segment, place->at) +
+             song_rescale(place->inside, song_rate(s->tempo[p->segment].bpm100), place->rate);
+}
 /* Metronome: a rim click on every beat of the song's grid, louder on the
  * downbeat, 60 clocks long. */
 SONG_SMALL static uint32_t next_beat(const struct song *s, uint32_t clock)

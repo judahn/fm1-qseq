@@ -46,12 +46,22 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
             notice_until = now + 1500U;
         }
     }
+    if ((*pressed & BUTTON(LFO)) && shift) { /* SHIFT+LFO: the automation view */
+        page = music_page = SONG_AUTO;
+        cache->shown_page = ~0U;
+        return 1;
+    }
     if (*pressed & BUTTON(SCL)) song_add_marker_here(now);
     *pressed &= ~(BUTTON(PLAY) | BUTTON(FX) | BUTTON(ENV) | BUTTON(ARP) | BUTTON(SCL) | BUTTON(LFO));
     if (*pressed & (BUTTON(HOME) | BUTTON(EDIT) | BUTTON(SAVE)))
         return 0;
     octave = clamp(octave + !!(*pressed & BUTTON(OCT_UP)) - !!(*pressed & BUTTON(OCT_DOWN)), -2, 2);
     select_track(c->encoders[0]);
+    if (song_port_recorder()->active) { /* K1 to K4 record parameters on the take track */
+        for (unsigned k = 0; k < 4; ++k)
+            if (c->encoders[2 + k]) song_knob_turn(k, fm_encoder_delta(2 + k, c->encoders[2 + k]), now);
+        return 1;
+    }
     int move = c->encoders[2];
     if (move && shift) {
         /* Marker to marker, from a pending jump or the playhead. */
@@ -168,6 +178,7 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
     if (page == SONG_STEP) return song_step_input(c, pressed, key_down, now);
     if (page == SONG_SETUP) return song_setup_input(c, pressed, key_down, now);
     if (page == SONG_REC) return song_rec_input(c, pressed, key_down, now);
+    if (page == SONG_AUTO) return song_auto_input(c, pressed, key_down, now);
     return song_view_input(c, pressed, key_down, now);
 #else
     return 0;

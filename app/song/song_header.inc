@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* song-mode: the song view's header. Position, transport or REC, the loop,
- * the marker, the time signature and the tempo. Included by song_view.inc. */
+/* song-mode: what the song view shares with the automation view: reading
+ * the transport, the header (position, transport or REC, the loop, the
+ * marker, the time signature and the tempo), the playhead and the footer
+ * knobs while recording. Included by song_view.inc. */
 
 static void song_position(const struct song *s, uint32_t clock, char out[24], unsigned full)
 {
@@ -58,4 +60,45 @@ static void song_header(const struct song *s)
         text(200, 8, tempo, 1, TEXT, BACK);
     } else number(200, 4, (int)(bpm / 100), 3, 2, TEXT, BACK);
     text(212, 19, "BPM", 1, DIM, BACK);
+}
+/* The marking pass reads the transport once for every band. */
+static void song_now_read(struct song *s)
+{
+    const struct song_player *p = song_port_player();
+    song_now.clock = song_player_clock(p);
+    song_now.target = song_player_target(p);
+    song_now.playing = p->playing;
+    song_now.jumping = p->jumping;
+    song_now.shift = (previous_buttons & BUTTON(FX)) != 0;
+    song_now.recording = song_port_recorder()->active;
+    song_now.selected = (uint8_t)song_selected();
+    const struct song_clip *c = song_port_clip();
+    unsigned single = c->tracks && !(c->tracks & (c->tracks - 1U));
+    song_now.ghost_tracks = (uint8_t)(c->length && !p->playing ? single ? 1U << track : c->tracks : 0);
+    song_now.ghost_from = p->playhead;
+    song_now.ghost_to = p->playhead + c->length;
+    song_follow(s, song_now.clock);
+    song_ranges(s);
+}
+/* The playhead: the marking pass damages its old and new columns. */
+static void song_playhead_line(void)
+{
+    unsigned x = song_visible(song_now.clock) ? song_x(song_now.clock) : ~0U;
+    if (!paint_rendering && x != song_drawn_x) {
+        if (song_drawn_x != ~0U) paint_fill(song_drawn_x, SONG_RULER, 1, SONG_BOTTOM - SONG_RULER, BACK);
+        if (x != ~0U) paint_fill(x, SONG_RULER, 1, SONG_BOTTOM - SONG_RULER, GREEN);
+        song_drawn_x = x;
+    } else if (paint_rendering && song_drawn_x != ~0U)
+        paint_fill(song_drawn_x, SONG_RULER, 1, SONG_BOTTOM - SONG_RULER, GREEN);
+}
+/* The four recording knobs, by parameter name, on the take track. */
+static void song_knob_footer(void)
+{
+    unsigned t = song_port_recorder()->track, engine = song_port_engine(t);
+    for (unsigned k = 0; k < 4; ++k) {
+        char value[12];
+        const struct song_param *p = song_param_for(engine, song_knob_lane(t, k));
+        decimal(value, (int)song_knob_value(t, k), 1);
+        knob(k, p ? p->name : "-", value, song_knob_held(k) ? AMBER : colors[k]);
+    }
 }

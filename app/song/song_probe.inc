@@ -7,14 +7,17 @@
 #else
 #define SONG_EXPORT(name)
 #endif
-struct song_heard { uint32_t block; uint8_t track, pitch, velocity, unused; };
+/* kind: 0 for a note, else the status of a controller (pitch is its number,
+ * velocity its value) or program change (pitch is the program). */
+struct song_heard { uint32_t block; uint8_t track, pitch, velocity, kind; };
 enum { HEARD = 8192 };
 static struct song_heard heard[HEARD];
 static unsigned heard_count, heard_on;
-SONG_SMALL static void capture(unsigned track, unsigned pitch, unsigned velocity)
+SONG_SMALL static void capture(unsigned track, unsigned pitch, unsigned velocity, unsigned kind)
 {
     if (heard_on && heard_count < HEARD)
-        heard[heard_count++] = (struct song_heard){song_port_blocks(), (uint8_t)track, (uint8_t)pitch, (uint8_t)velocity, 0};
+        heard[heard_count++] = (struct song_heard){song_port_blocks(), (uint8_t)track, (uint8_t)pitch, (uint8_t)velocity,
+                                                   (uint8_t)kind};
 }
 SONG_EXPORT("sim_song_capture") void sim_song_capture(unsigned enable) { heard_on = enable != 0; heard_count = 0; }
 SONG_EXPORT("sim_song_heard") const void *sim_song_heard(void) { return heard; }
@@ -51,6 +54,12 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
                               song_undo_count(&undo, 1), clip.length, clip.tracks, song.bars, player.mute_track};
         return index < sizeof v / sizeof v[0] ? v[index] : 0;
     }
+    case 30: return index < count ? song_event_kind(&e[index]) : 0;
+    case 31: return song_knob_lane(track, index) | song_knob_value(track, index) << 8 | song_knob_held(index) << 16;
+    case 32: return track ? song.meters : index < song.meters ? song.meter[index].bar |
+                    (uint32_t)song.meter[index].beats << 16 | (uint32_t)song.meter[index].unit << 24 : 0;
+    case 33: return player.touch_track | (uint32_t)player.touch_lane[index & 3U] << 8;
+    case 34: return song_port_engine(track);
 #endif
     case 18: return index < count ? e[index].b : 0;
     case 19: return song.swing | (uint32_t)song.swing_grid << 8 | (uint32_t)song.swing_tracks << 16;

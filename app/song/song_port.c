@@ -8,6 +8,7 @@
 #include "undo.h"
 #include "arrange.h"
 #include "record.h"
+#include "lanes.h"
 static struct song_undo undo;
 static struct song_clip clip;
 static struct song_recorder recorder;
@@ -35,7 +36,7 @@ SONG_SMALL static int64_t live_clock(void)
 }
 #endif
 #ifdef FM1_OPEN_WEB
-static void capture(unsigned track, unsigned pitch, unsigned velocity);
+static void capture(unsigned track, unsigned pitch, unsigned velocity, unsigned kind);
 static uint32_t start_block, start_clock;
 #endif
 
@@ -50,13 +51,32 @@ SONG_SMALL static void deliver(void *context, unsigned track, unsigned pitch, un
                                 (uint8_t)velocity};
     song_deliver_note(message);
 #ifdef FM1_OPEN_WEB
-    capture(track, pitch, velocity);
+    capture(track, pitch, velocity, 0);
 #endif
 }
+#if SONG_UI
+/* Automation takes the same path, on Normal tracks only. */
+SONG_SMALL static void deliver_control(void *context, unsigned track, unsigned status, unsigned a, unsigned b)
+{
+    (void)context;
+    unsigned channel = groove_midi_input_channel(track);
+    if (channel > 15 || groove_track_role(track) != GROOVE_TRACK_NORMAL) return;
+    const uint8_t message[3] = {(uint8_t)(status | channel), (uint8_t)a, (uint8_t)b};
+    song_deliver_message(message, status == 0xc0 ? 2U : 3U);
+#ifdef FM1_OPEN_WEB
+    capture(track, a, b, status);
+#endif
+}
+int64_t song_port_live_clock(void) { return live_clock(); }
+#endif
 SONG_SMALL static void ensure(void)
 {
     if (ready) return;
+#if SONG_UI
+    static const struct song_output output = {deliver, NULL, deliver_control};
+#else
     static const struct song_output output = {deliver, NULL};
+#endif
     song_build_test(&song);
     song_player_init(&player, &song, &output);
 #if SONG_UI
@@ -87,7 +107,12 @@ SONG_SMALL void song_port_poll(void)
     song_deliver_poll();
 #if SONG_UI
     if (recorder.active && !player.playing) song_port_record_stop(); /* the song ended */
-    else if (recorder.active && live_clock() >= 0) song_rec_follow(&recorder, (uint32_t)live_clock());
+    else if (recorder.active && live_clock() >= 0) {
+        uint32_t clock = (uint32_t)live_clock();
+        if (recorder.mode == SONG_REC_LOOP && clock < recorder.last) song_knobs_wrap(song.loop_end);
+        song_rec_follow(&recorder, clock);
+    }
+    song_knobs_poll(fm1_millis());
 #endif
 }
 
@@ -151,6 +176,7 @@ SONG_SMALL void song_port_record_stop(void)
     if (!recorder.active) return;
     int64_t now = live_clock();
     uint32_t clock = player.playing && now >= 0 ? (uint32_t)now : recorder.last;
+    song_knobs_release(clock); /* before the chase on stop */
     song_port_stop();
     song_rec_stop(&recorder, clock);
     player.mute_track = 0xff;

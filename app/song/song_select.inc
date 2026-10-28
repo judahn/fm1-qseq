@@ -34,6 +34,8 @@ static void song_action(unsigned which, uint32_t now)
     const struct song_player *p = song_port_player();
     struct song_clip *c = song_port_clip();
     uint32_t at = p->playing ? song_player_clock(p) : p->playhead;
+    struct song_place place;
+    uint32_t state = song_port_hold(&place); /* playing goes on in time */
     int r;
     if (which == 0) r = song_copy(s, c, song_selected(), s->loop_start, s->loop_end);
     else if (which == 1) r = song_cut(s, c, song_selected(), s->loop_start, s->loop_end);
@@ -41,6 +43,7 @@ static void song_action(unsigned which, uint32_t now)
     else if (which == 4) r = song_duplicate(s, song_selected(), &s->loop_start, &s->loop_end);
     else if (which == 5) r = song_insert_time(s, s->loop_start, s->loop_end - s->loop_start);
     else r = song_delete_time(s, s->loop_start, s->loop_end);
+    song_port_resume(&place, state);
     notice = !r ? done[which] : which >= 2 && which <= 3 && !c->length ? "COPY SOMETHING FIRST" : "DOESN'T FIT";
     notice_until = now + 1500U;
 }
@@ -69,9 +72,13 @@ static unsigned song_combo_from;
 static void song_undo_key(uint32_t buttons, uint32_t now)
 {
     unsigned redo = (buttons & BUTTON(FX)) != 0;
-    if (song_port_recorder()->active) notice = "STOP RECORDING FIRST";
-    else if (redo ? song_redo(song_port_undo(), song_port_song()) : song_undo(song_port_undo(), song_port_song()))
-        notice = redo ? "NOTHING TO REDO" : "NOTHING TO UNDO";
+    struct song_place place;
+    uint32_t state = song_port_hold(&place);
+    int r = song_port_recorder()->active ? 1 : redo ? song_redo(song_port_undo(), song_port_song())
+                                                    : song_undo(song_port_undo(), song_port_song());
+    song_port_resume(&place, state);
+    if (r > 0) notice = "STOP RECORDING FIRST";
+    else if (r) notice = redo ? "NOTHING TO REDO" : "NOTHING TO UNDO";
     else { notice = redo ? "REDONE" : "UNDONE"; song_port_recorder()->taken = 0; } /* the take can't be requantized now */
     notice_until = now + 1500U;
 }

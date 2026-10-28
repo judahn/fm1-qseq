@@ -157,7 +157,7 @@ SONG_SMALL static int find_pitch(const struct song_step *st, unsigned pitch)
     unsigned count, i = song_find(st->song, st->track, st->pointer);
     const struct song_event *e = song_track(st->song, st->track, &count);
     for (; i < count && song_event_start(&e[i]) == st->pointer; ++i)
-        if (e[i].a == pitch) return 1;
+        if (song_is_note(&e[i]) && e[i].a == pitch) return 1;
     return 0;
 }
 /* Move each selected note, highest first going up and lowest first going

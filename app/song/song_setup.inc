@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* song-mode: the song settings page (design section 8a). Starting tempo and
- * time signature, swing and key. ALGO turns between the two knob pages, and
- * the first eight white keys switch swing per track. */
+ * time signature, swing and key. ALGO turns between the knob pages, and
+ * the first eight white keys switch swing per track. The third page picks
+ * the parameter each of K1 to K4 records on a track (SELECT for the track). */
 
 static unsigned song_setup_page, song_setup_back = SONG, song_glo_from;
 static void song_tempo_text(const struct song *s, char out[24])
@@ -21,6 +22,42 @@ static void song_setup_row(unsigned y, const char *label, const char *value, uns
     text(8, y, label, 1, live ? ACCENT : DIM, BACK);
     text(84, y - 3, value, 2, TEXT, BACK);
 }
+/* Page 3: the recording knobs of the current track. */
+static void song_knobs_draw(void)
+{
+    unsigned engine = song_port_engine(track);
+    uint32_t sig = 0x6b0bU ^ track;
+    for (unsigned k = 0; k < 4; ++k) sig = sig * 131U + song_knob_lane(track, k);
+    if ((!paint_rendering || (paint_top < 192 && paint_top + PAINT_ROWS > 30)) && sig != cache->middle_cache) {
+        cache->middle_cache = sig;
+        paint_fill(0, 30, 240, 162, BACK);
+        if (paint_rendering) {
+            static const char *const engines[SONG_ENGINES] = {"DX7", "303", "808", "PSG", "PLUCK", "SAMPLER"};
+            text(8, 40, "RECORD KNOBS", 1, DIM, BACK);
+            text(92, 37, "T", 2, colors[track], BACK);
+            number(106, 37, (int)track + 1, 1, 2, colors[track], BACK);
+            text(130, 40, engines[engine < SONG_ENGINES ? engine : SONG_SAMPLER], 1, TEXT, BACK);
+            for (unsigned k = 0; k < 4; ++k) {
+                const struct song_param *p = song_param_for(engine, song_knob_lane(track, k));
+                text(8, 68 + k * 26, "K", 1, colors[k], BACK);
+                number(14, 68 + k * 26, (int)k + 1, 1, 1, colors[k], BACK);
+                text(40, 65 + k * 26, p ? p->name : "-", 2, TEXT, BACK);
+            }
+        }
+    }
+    if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
+    for (unsigned k = 0; k < 4; ++k) {
+        const struct song_param *p = song_param_for(engine, song_knob_lane(track, k));
+        char name[12] = "K";
+        decimal(name + 1, (int)k + 1, 1);
+        knob(k, name, p ? p->name : "-", colors[k]);
+    }
+    if (cache->hint_cache != 3U) {
+        cache->hint_cache = 3U;
+        paint_fill(6, 231, 228, 7, BACK);
+        text(6, 231, "SELECT TRACK  K1-K4 PARAMETER", 1, DIM, BACK);
+    }
+}
 static void song_setup_draw(void)
 {
     const struct song *s = song_port_song();
@@ -29,6 +66,7 @@ static void song_setup_draw(void)
         paint_fill(0, 0, 240, 27, BACK);
         text(8, 7, "SONG SETTINGS", 2, ACCENT, BACK);
     }
+    if (song_setup_page == 2) { song_knobs_draw(); return; }
     unsigned page2 = song_setup_page != 0;
     uint32_t sig = signature(page2 | (uint32_t)s->metronome << 4, &s->swing, 5) ^ s->tempo[0].bpm100 ^ ((uint32_t)s->meter[0].beats << 16) ^
                    ((uint32_t)s->meter[0].unit << 24);
@@ -88,9 +126,19 @@ static int song_setup_input(const struct fm1_controls *c, uint32_t *pressed, uin
     if (*pressed & BUTTON(PLAY)) { if (p->playing) song_port_stop(); else song_start(now); }
     *pressed &= ~(BUTTON(PLAY) | BUTTON(FX) | BUTTON(REC) | BUTTON(ARP) | BUTTON(ENV) | BUTTON(SCL) | BUTTON(LFO));
     if (*pressed & (BUTTON(HOME) | BUTTON(EDIT) | BUTTON(GLO) | BUTTON(SAVE))) return 0;
-    song_setup_page = (unsigned)clamp((int)song_setup_page + c->encoders[1], 0, 1);
+    song_setup_page = (unsigned)clamp((int)song_setup_page + c->encoders[1], 0, 2);
     const int16_t *k = c->encoders + 2;
-    if (!song_setup_page) {
+    if (song_setup_page == 2) {
+        select_track(c->encoders[0]);
+        const uint8_t *index;
+        unsigned n = song_params(song_port_engine(track), &index);
+        for (unsigned i = 0; i < 4; ++i) {
+            if (!k[i]) continue;
+            unsigned at = 0, cc = song_knob_lane(track, i);
+            while (at < n && song_param(index[at])->cc != cc) ++at;
+            s->knob_cc[track][i] = song_param(index[clamp((int)at + k[i], 0, (int)n - 1)])->cc;
+        }
+    } else if (!song_setup_page) {
         if (k[0]) /* whole BPM, or hundredths with SHIFT */
             (void)song_port_set_tempo(0, (unsigned)clamp(s->tempo[0].bpm100 + k[0] * (shift ? 1 : 100),
                                                                SONG_TEMPO_MIN, SONG_TEMPO_MAX));
@@ -109,7 +157,7 @@ static int song_setup_input(const struct fm1_controls *c, uint32_t *pressed, uin
         s->key_scale = (uint8_t)clamp(s->key_scale + k[1], 0, SONG_SCALES - 1);
         s->metronome = (uint8_t)clamp(s->metronome + k[2], 0, 2);
     }
-    for (unsigned t = 0; t < SONG_TRACKS; ++t)
+    for (unsigned t = 0; t < SONG_TRACKS && song_setup_page != 2; ++t)
         if ((key_down & ~blocked_keys) & (1U << white_keys[t])) s->swing_tracks ^= (uint8_t)(1U << t);
     blocked_keys |= key_down; /* these keys are switches here */
     return 1;
