@@ -39,8 +39,8 @@ is in hand and the panel layout can be checked.
 - **Loop region:** start and end follow the current snap (section 6). It can be set from two markers.
   Recording inside a loop is how you build up a section, like a pattern, without leaving song mode.
 - **Sounds:** each song stores its 8 sound setups and mix, so loading a song brings its sounds with it.
-- **Reserved for later:** a pattern lane (which pattern plays at each bar) and a chord track, so pattern mode
-  can slot in without changing existing songs.
+- **Clips and clip lanes** (8f, phase 7): looping clips per track, and blocks on each track saying which clip
+  plays where. A chord track comes later (8g).
 
 **Memory.** Notes are stored compactly, roughly 4 to 6 bytes each, and automation only stores changes. There
 is about 247 KB of working memory, shared with the sound engines. The real budget gets measured in the browser
@@ -266,7 +266,8 @@ probability, humanize (small random timing and velocity) and per-pad swing.
 ## 8a. Settings, swing and scales
 
 **Where settings live.** GLO opens the song's settings, which are saved with the song. SHIFT plus GLO opens the
-device settings (MIDI, clock, Bluetooth), which is the stock firmware's global page, kept as is.
+device settings (MIDI, clock, Bluetooth), which is the stock firmware's global page, kept as is. The stock sync
+and MIDI pages join it there (10/28), since SEQ now opens the clip grid.
 
 **Song settings:**
 - Tempo and time signature (the starting values, since changes can happen anywhere in the song)
@@ -386,45 +387,92 @@ part of the song and can be repeated, edited and undone.
 **Responsibly:** a limiter on the master output catches level spikes, every glitch can be undone, and the
 buffer effects stop as soon as the button is released.
 
-## 8f. Pattern mode and the chord track (phase 7 proposal, for Judah's review)
+## 8f. Clips (phase 7, agreed 10/28)
 
-**Patterns.** A pattern is a looping clip, 1 to 8 bars in any time signature, with 8 tracks (one per sound
-slot). It uses the same event format as song tracks, so step entry, loop recording, glitch, automation and the
-edit jobs all work inside a pattern unchanged.
-- **Pattern mode:** a pattern view that looks like the song view with the loop set to the pattern. While
-  playing, the lower white keys queue the next pattern, which starts when the current one ends (the QY70's
-  section keys, and how most grooveboxes switch).
-- **Where patterns live:** inside the song, up to 16 per song, numbered and optionally named. The browser
-  editor can copy patterns between songs, so a library builds up without a separate on-device style store.
-- **In the song:** a pattern lane, like the QY70's pattern track, says which pattern plays from each bar.
-  Pattern tracks and free-form tracks share the 8 sound slots and both play, so you can lay a free-form
-  melody over a pattern groove. Recording while switching patterns live writes the pattern lane. An "expand
-  patterns" job turns the lane into ordinary notes for detailed editing (the QY70's Expand Backing).
+Judah, 10/28: patterns work like Ableton Live's session view, and the song holds references to clips, with an
+Expand job to turn them into notes. This replaces the 8-track patterns proposed on 10/27.
 
-**Chord track.** A song-level lane, alongside the conductor lane: at most one chord per beat, with an
-optional 8th or 16th anticipation and a slash bass, using the QY70's 25 chord types plus root-only.
-- **Entry:** the lower 12 keys pick the root, and the upper 12 keys pick the type, with a second press for
-  the key's second type, as on the QY70. SHIFT plus a key sets the slash bass, and a knob sets anticipation.
+**A clip** is one track's loop: notes and automation in the same event format as a song track, from 1 beat to
+16 bars long. Step entry, loop recording, glitch, automation and the edit jobs all work inside a clip
+unchanged. Each clip has its own length, so a 3-bar bass line can run against a 4-bar beat. Clips belong to the
+song and share its event pool, sounds and conductor lane. The clipboard survives switching songs, so a clip
+copies to another song on the device, and the workbench can copy clips between songs too.
+
+**The grid.** SEQ switches between the song view and the clip grid: 8 tracks across, 16 rows down in two pages
+of 8, and a SONG row at the top. Rows are numbered and can take a short name, like markers. A filled cell is a
+clip, a playing cell shows its progress, and a waiting cell blinks. SELECT picks the track (the column), as
+everywhere, and K1 moves the row cursor. Function buttons are labeled on screen, as in step mode.
+
+The stock sync and MIDI pages that SEQ used to reach move to the device settings on SHIFT+GLO (8a).
+
+| Control (grid) | Action |
+|---|---|
+| Lower white keys, F3 to F4 (the track keys) | Launch that track's cell in the cursor row. An empty cell stops the track. On the SONG row, the track goes back to the song |
+| Upper white keys, G4 to G5 | Launch rows 1 to 8 of the page (Live's scenes). Every track with a clip in the row plays it, and the others stop |
+| SHIFT + SEQ | Every track back to the song (from the song view too) |
+| SCL | Open the clip at the cursor. An empty cell gets a new 1-bar clip |
+| SHIFT + lower white keys | The song view's actions (6a) on the cell at the cursor: copy, cut, paste, delete |
+| REC | Record launches into the song (below) |
+| PLAY | Play and stop. Stopping hands every track back to the song |
+
+Launches wait for the launch quantize, a song setting: off, beat, bar (the default), 2 bars or 4 bars.
+Launching while stopped starts playback. The track keys' LEDs show each track: lit while its clip plays,
+blinking while a launch waits. A clip starts from its beginning and loops at its own length, and keeps its
+phase across a song loop or a marker jump.
+
+In the grid the keys launch instead of playing notes. SEQ flips back to the song view, the clips keep running,
+and the keys play again.
+
+**A track plays a clip or the song, never both** (Live's rule). A launched clip takes the track over from the
+song until that track goes back to the song. A free-form melody over a groove is the drums on a clip and the
+melody on the song.
+
+**Editing a clip.** SCL opens it in the song view's editor, looped to the clip, with K3 (loop end) setting its
+length. Everything there works on the clip: step entry, recording, automation, glitch and the jobs. SEQ goes
+back to the grid. Pasting copied song bars into a cell turns a section already written into a clip, and several
+copied tracks paste across the row onto their own tracks.
+
+**Clips in the song are references** (Judah, 10/28). Each track gets a clip lane of blocks, such as "clip 3
+from bar 9 to bar 17", drawn as shaded, numbered blocks on the track's row in the song view. Inside a block the
+clip loops from the block's start and the track's own notes are silent. Outside, the track plays its own notes.
+A block can also be a stop, so a stop recorded in a performance stays silent on playback. Editing a clip
+changes it everywhere it's used.
+- **Recording a performance.** REC in the grid arms it, and the take starts with the next launch or PLAY.
+  Every launch writes a block for its track, from the launch point to that track's next launch, stop or return
+  to the song. Tracks left on the song are untouched, and the song's loop is ignored while recording. The take
+  is one undo step.
+- **Placing by hand.** A clip copied in the grid pastes into the song view as a block at the playhead, the
+  clip's length long, and Duplicate extends it. Bar edits (copy, paste, insert and delete bars) carry blocks
+  the way they carry notes.
+- **Expand job** (the QY70's Expand Backing). It turns the blocks in the selection into plain notes on their
+  tracks, so one spot can go its own way. MIDI export expands every block on its own.
+
+**Storage.** Song files gain the clip table and the clip lanes, and older song files load with an empty grid.
+Clip events come out of the song's shared event pool, and a block costs a few bytes.
+
+**Later:** Live's follow actions, such as "after 4 bars, play a random clip from this column", next to the
+glitch tools.
+
+**Cost:** measured in the build. The full device build had about 10 KB of flash left after phase 6, so phase 7
+gets measured against that before anything else is cut.
+
+## 8g. The chord track (later, phase 8)
+
+Moved out of phase 7 on 10/28, since it isn't part of the clip model. The design stays as proposed.
+
+A song-level lane, alongside the conductor lane: at most one chord per beat, with an optional 8th or 16th
+anticipation and a slash bass, using the QY70's 25 chord types plus root-only.
+- **Entry:** the lower 12 keys pick the root, and the upper 12 keys pick the type, with a second press for the
+  key's second type, as on the QY70. SHIFT plus a key sets the slash bass, and a knob sets anticipation.
   Entering a chord can play it on a chosen track, and the key LEDs light its notes.
-- **Following chords:** each pattern track has a phrase type and the pattern has a source chord (C major by
-  default). Bypass is for drums and never changes. Parallel moves everything by the root difference. Chord 1
-  maps each note from its role in the source chord (root, third, fifth, seventh, or a scale step between) to
-  the same role in the new chord. Chord 2 does the same but picks the inversion closest to the previous
-  voicing, for smooth changes. Bass works like Chord 1, but the first note after a change is the root, or the
-  slash note. Low and high limits per track fold notes by octaves to stay in range. The QY70 manual only
-  describes these in prose, so the exact tables are ours, tuned by ear.
+- **Following chords:** each clip has a phrase type and a source chord (C major by default). Bypass is for drums
+  and never changes. Parallel moves everything by the root difference. Chord 1 maps each note from its role in
+  the source chord (root, third, fifth, seventh, or a scale step between) to the same role in the new chord.
+  Chord 2 does the same but picks the inversion closest to the previous voicing, for smooth changes. Bass works
+  like Chord 1, but the first note after a change is the root, or the slash note. Low and high limits per track
+  fold notes by octaves to stay in range. The QY70 manual only describes these in prose, so the exact tables are
+  ours, tuned by ear.
 - **Free-form tracks** ignore the chord track by default. A per-track "follow chords" switch could come later.
-
-**Cost:** about 15 to 25 KB more on the device, so it depends on the flash decision like everything since
-phase 1.
-
-**Questions for Judah:**
-1. Patterns inside each song (proposed), or a global library like the QY70's styles?
-2. Numbered patterns 1 to 16 with optional names (proposed), or QY-style named sections (Intro, Main A,
-   Main B, Fill, Ending)?
-3. Pattern tracks and free-form tracks both playing on the shared sound slots (proposed), or a pattern
-   silencing the song's own notes on its tracks while it plays?
-4. Free-form tracks following the chord track: later and off by default (proposed), or part of phase 7?
 
 ## 9. Undo
 
@@ -445,7 +493,9 @@ costs little memory. HOME plus SAVE stays undo, as in the stock firmware.
 5. **Saving and transfer:** songs saved to and loaded from flash, the song list, and export and import through
    the browser workbench (song files and MIDI files).
 6. **Edit jobs:** quantize, transpose, copy, insert and delete bars, velocity and gate changes.
-7. **Pattern mode and the chord track.**
+7. **Clips,** like Live's session view: the grid, launching, clip lanes in the song, recording a performance
+   and the Expand job (8f).
+8. **The chord track** (8g), later.
 
 Hardware checkpoints when the FM-1 arrives: the timing test, then saving to flash.
 
@@ -467,6 +517,8 @@ trims voices on its own when it runs out.
   sequencer. No time-stretching: samples are short one-shots.
 - Copy, cut, paste and duplicate whole bars or marker sections, with the loop region as the selection.
 - Songs export and import through the browser workbench, as our own song files and as standard MIDI files.
+- Patterns work like Ableton Live's session view: clips per track, launched from a grid (10/28).
+- The song holds references to clips, and an Expand job turns them into notes (10/28).
 - A song settings page with swing, key and scale. Out-of-scale notes snap up to the next scale note, and the
   pitch knob moves selected notes by scale step.
 
