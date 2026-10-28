@@ -4,12 +4,14 @@
 #include "song_port.h"
 #include "diag.h"
 #include "instrument.h"
+#include <string.h>
 #if SONG_UI
 #include "undo.h"
 #include "arrange.h"
 #include "record.h"
 #include "lanes.h"
 #include "glitch.h"
+#include "clips.h"
 static struct song_undo undo;
 static struct song_clip clip;
 static struct song_recorder recorder;
@@ -156,6 +158,45 @@ SONG_SMALL int song_port_start(void)
 struct song_undo *song_port_undo(void) { ensure(); return &undo; }
 struct song_clip *song_port_clip(void) { return &clip; }
 struct song_recorder *song_port_recorder(void) { ensure(); return &recorder; }
+
+/* Clips. Opening one while playing: it plays at once, in step with the bar
+ * the song is in. Closing picks the song up at the bar it left, in step
+ * with the clip's bar, or stopped, at its playhead. The track and the
+ * tracks on the song stop sounding first. */
+static uint32_t left_at, kept_playhead;
+SONG_SMALL void song_port_launch(unsigned track, unsigned to)
+{
+    uint32_t state = song_port_lock();
+    song_player_launch(&player, track, to);
+    song_port_unlock(state);
+}
+SONG_SMALL int song_port_clip_open(unsigned cell)
+{
+    uint32_t state = song_port_lock(), at = player.playing ? player.next : player.playhead, start;
+    unsigned edit = cell / SONG_GRID_ROWS;
+    song_bar_at(&song, at, &start, NULL);
+    int r = song_clip_open(&song, cell);
+    if (!r) {
+        for (unsigned t = 0; t < SONG_TRACKS; ++t)
+            if (player.from[t] == SONG_FROM_SONG || t == edit) song_player_cut(&player, t);
+        player.waiting[edit] = SONG_FROM_NONE;
+        left_at = start;
+        kept_playhead = player.playhead;
+        song_player_seek(&player, player.playing ? (at - start) % song.clip_length[cell] : 0);
+    }
+    song_port_unlock(state);
+    return r;
+}
+SONG_SMALL void song_port_clip_close(void)
+{
+    if (!song.open) return;
+    uint32_t state = song_port_lock(), at = player.next, start;
+    song_bar_at(&song, at, &start, NULL);
+    song_player_cut(&player, song_editing(&song));
+    song_clip_close(&song);
+    song_player_seek(&player, player.playing ? left_at + at - start : kept_playhead);
+    song_port_unlock(state);
+}
 
 /* Live keys on the take track, at the clock playing now. */
 SONG_SMALL void song_port_key(const uint8_t *m, size_t bytes)

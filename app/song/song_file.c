@@ -9,8 +9,17 @@ static void put8(struct pool_writer *w, unsigned v) { uint8_t b = (uint8_t)v; po
 static void put16(struct pool_writer *w, unsigned v) { put8(w, v); put8(w, v >> 8); }
 static void put32(struct pool_writer *w, uint32_t v) { put16(w, v & 0xffffU); put16(w, v >> 16); }
 
+/* A part's events: the count, then 8 bytes each. */
+SONG_SMALL static void put_part(struct pool_writer *w, const struct song *s, unsigned part)
+{
+    unsigned count;
+    const struct song_event *e = song_track(s, song_owner(s, part), &count);
+    put16(w, count);
+    for (unsigned i = 0; i < count; ++i) { put32(w, e[i].at & ~SONG_FRESH); put8(w, e[i].a); put8(w, e[i].b); put16(w, e[i].length); }
+}
 SONG_SMALL void song_file_write(struct pool_writer *w, const struct song *s, const uint8_t *sounds, uint32_t sounds_bytes)
 {
+    unsigned open = s->open != 0; /* a clip in the editor: the song's own loop is kept aside */
     put8(w, SONG_FILE_VERSION);
     put16(w, sounds_bytes);
     pool_put(w, sounds, sounds_bytes);
@@ -24,7 +33,8 @@ SONG_SMALL void song_file_write(struct pool_writer *w, const struct song *s, con
     for (unsigned m = 0; m < s->meters; ++m) { put16(w, s->meter[m].bar); put8(w, s->meter[m].beats); put8(w, s->meter[m].unit); }
     put8(w, s->markers);
     for (unsigned i = 0; i < s->markers; ++i) { put32(w, s->marker[i].clock); pool_put(w, s->marker[i].name, SONG_MARKER_NAME); }
-    put32(w, s->loop_start); put32(w, s->loop_end); put8(w, s->loop_on);
+    put32(w, open ? s->kept_start : s->loop_start); put32(w, open ? s->kept_end : s->loop_end);
+    put8(w, open ? s->kept_on : s->loop_on);
     const uint8_t settings[10] = {s->swing, s->swing_grid, s->swing_tracks, s->key_root, s->key_scale,
                                   s->rec_mode, s->count_in, s->metronome, s->quantize, s->strength};
     pool_put(w, settings, sizeof settings);
@@ -36,12 +46,17 @@ SONG_SMALL void song_file_write(struct pool_writer *w, const struct song *s, con
     pool_put(w, s->humanize_time, sizeof s->humanize_time);
     pool_put(w, s->humanize_velocity, sizeof s->humanize_velocity);
     put32(w, s->seed);
-    for (unsigned t = 0; t < SONG_TRACKS; ++t) {
-        unsigned count;
-        const struct song_event *e = song_track(s, t, &count);
-        put16(w, count);
-        for (unsigned i = 0; i < count; ++i) { put32(w, e[i].at & ~SONG_FRESH); put8(w, e[i].a); put8(w, e[i].b); put16(w, e[i].length); }
-    }
+    for (unsigned t = 0; t < SONG_TRACKS; ++t) put_part(w, s, t);
+    /* Version 2: the launch quantize, the named rows and the clips. */
+    unsigned named = 0, clips = 0;
+    for (unsigned r = 0; r < SONG_GRID_ROWS; ++r) named += s->row_name[r][0] != 0;
+    for (unsigned c = 0; c < SONG_CELLS; ++c) clips += s->clip_length[c] != 0;
+    put8(w, s->launch_q);
+    put8(w, named);
+    for (unsigned r = 0; r < SONG_GRID_ROWS; ++r) if (s->row_name[r][0]) { put8(w, r); pool_put(w, s->row_name[r], SONG_MARKER_NAME); }
+    put8(w, clips);
+    for (unsigned c = 0; c < SONG_CELLS; ++c)
+        if (s->clip_length[c]) { put8(w, c); put16(w, s->clip_length[c]); put_part(w, s, SONG_TRACKS + c); }
 }
 SONG_SMALL uint32_t song_file_bytes(const struct song *s, uint32_t sounds_bytes)
 {
@@ -76,12 +91,29 @@ static void copy(struct reader *r, void *to, uint32_t n, unsigned apply)
     const uint8_t *b = take(r, n);
     if (b && apply) memcpy(to, b, n);
 }
+/* A part's events into the pool after `total`, in clock order. The new total, or -1. */
+SONG_SMALL static int get_part(struct reader *r, struct song *s, unsigned part, unsigned total)
+{
+    unsigned count = get16(r);
+    uint32_t last = 0;
+    if (total + count > SONG_EVENTS) return -1;
+    if (s) { s->first[part] = (uint16_t)total; s->count[part] = (uint16_t)count; }
+    for (unsigned i = 0; i < count; ++i) {
+        struct song_event e;
+        e.at = get32(r); e.a = (uint8_t)get8(r); e.b = (uint8_t)get8(r); e.length = (uint16_t)get16(r);
+        if (song_event_start(&e) < last || (song_is_note(&e) && (e.a > 127 || !e.length))) r->bad = 1;
+        last = song_event_start(&e);
+        if (s) s->event[total + i] = e;
+    }
+    return (int)(total + count);
+}
 /* One pass checks (apply 0), the next fills the song. */
 SONG_SMALL static int parse(struct song *s, const uint8_t *data, uint32_t bytes, unsigned apply,
                             const uint8_t **sounds, uint32_t *sounds_bytes)
 {
     struct reader r = {data, bytes, 0};
-    if (get8(&r) != SONG_FILE_VERSION) return -1;
+    unsigned version = get8(&r);
+    if (!version || version > SONG_FILE_VERSION) return -1;
     *sounds_bytes = get16(&r);
     *sounds = take(&r, *sounds_bytes);
     char name[12];
@@ -149,22 +181,30 @@ SONG_SMALL static int parse(struct song *s, const uint8_t *data, uint32_t bytes,
     copy(&r, apply ? s->humanize_velocity : NULL, SONG_TRACKS, apply);
     uint32_t seed = get32(&r);
     if (apply) s->seed = seed;
-    unsigned total = 0;
-    for (unsigned t = 0; t < SONG_TRACKS && !r.bad; ++t) {
-        unsigned count = get16(&r);
-        uint32_t last = 0;
-        if (total + count > SONG_EVENTS) return -1;
-        if (apply) { s->first[t] = (uint16_t)total; s->count[t] = (uint16_t)count; }
-        for (unsigned i = 0; i < count; ++i) {
-            struct song_event e;
-            e.at = get32(&r); e.a = (uint8_t)get8(&r); e.b = (uint8_t)get8(&r); e.length = (uint16_t)get16(&r);
-            if (song_event_start(&e) < last || (song_is_note(&e) && (e.a > 127 || !e.length))) r.bad = 1;
-            last = song_event_start(&e);
-            if (apply) s->event[total + i] = e;
+    int total = 0;
+    struct song *to = apply ? s : NULL;
+    for (unsigned t = 0; t < SONG_TRACKS && total >= 0; ++t) total = get_part(&r, to, t, (unsigned)total);
+    unsigned cell = 0; /* clips come in cell order, so their parts fill the pool in order */
+    if (version > 1 && total >= 0) {
+        unsigned q = get8(&r);
+        if (q > 4) r.bad = 1;
+        if (apply) s->launch_q = (uint8_t)q;
+        for (unsigned n = get8(&r), i = 0; i < n; ++i) {
+            unsigned row = get8(&r);
+            if (row >= SONG_GRID_ROWS) { r.bad = 1; break; }
+            copy(&r, apply ? s->row_name[row] : NULL, SONG_MARKER_NAME, apply);
         }
-        total += count;
+        for (unsigned n = get8(&r), i = 0; i < n && total >= 0 && !r.bad; ++i, ++cell) {
+            unsigned at = get8(&r), length = get16(&r);
+            if (at < cell || at >= SONG_CELLS || !length) { r.bad = 1; break; }
+            for (; apply && cell < at; ++cell) s->first[SONG_TRACKS + cell] = (uint16_t)total;
+            cell = at;
+            if (apply) s->clip_length[cell] = (uint16_t)length;
+            total = get_part(&r, to, SONG_TRACKS + cell, (unsigned)total);
+        }
     }
-    if (r.bad || r.left) return -1;
+    if (r.bad || r.left || total < 0) return -1;
+    for (; apply && cell < SONG_CELLS; ++cell) s->first[SONG_TRACKS + cell] = (uint16_t)total;
     if (apply) {
         s->events = (uint16_t)total;
         song_tempo_refresh(s);

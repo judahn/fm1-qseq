@@ -178,10 +178,13 @@ SONG_SMALL static void apply(struct song *s, uint8_t *record, unsigned forward)
 {
     unsigned op = record[0], track = record[1];
     struct song_event e;
-    if (op == SONG_UNDO_ADD || op == SONG_UNDO_DEL) {
-        memcpy(&e, record + 2, sizeof e);
-        if ((op == SONG_UNDO_ADD) == forward) (void)song_add_event(s, track, &e);
-        else remove_equal(s, track, &e);
+    memcpy(&e, record + 2, sizeof e);
+    if (op == SONG_UNDO_ADD || op == SONG_UNDO_DEL) { /* journaled by part, wherever it is now */
+        if ((op == SONG_UNDO_ADD) == forward) (void)song_add_event(s, song_owner(s, track), &e);
+        else remove_equal(s, song_owner(s, track), &e);
+    } else if (op == SONG_UNDO_LENGTH) { /* a cell's clip length, before in `at`, after in `length` */
+        s->clip_length[track] = (uint16_t)(forward ? e.length : e.at);
+        ++s->revision;
     } else if (op == SONG_UNDO_SHIFT) {
         uint32_t shift[2];
         memcpy(shift, record + 2, sizeof shift);

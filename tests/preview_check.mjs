@@ -18,6 +18,8 @@
 // Phase 5b (preview_5b.mjs): the workbench's Songs and Kits sections against
 // the page's simulator. Saves docs/phase5b-*.png. Phase 6 (preview_6.mjs):
 // edit jobs through the panel, then playback. Saves docs/phase6-*.png.
+// Phase 7 (preview_7.mjs): the clip grid, launches on the bar line, and
+// clips saved and loaded. Saves docs/phase7-*.png.
 // Needs Playwright with a cached Chromium:
 //   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright node tests/preview_check.mjs
 import { createRequire } from 'node:module';
@@ -26,6 +28,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { phase5b } from './preview_5b.mjs';
 import { phase6 } from './preview_6.mjs';
+import { phase7 } from './preview_7.mjs';
 
 const require = createRequire(import.meta.url);
 const same3 = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -39,7 +42,7 @@ await page.waitForFunction(() => globalThis.FM1SimulatorCore && typeof FM1_SIMUL
 const result = await page.evaluate(() => {
   const wasm = Uint8Array.from(atob(FM1_SIMULATOR.data), ch => ch.charCodeAt(0));
   const c = new FM1SimulatorCore(wasm, null, null).c;
-  const BUTTON = { FX: 2, ENV: 4, SEQ: 11, PLAY: 12 }, KEY_G4 = 14;
+  const BUTTON = { FX: 2, ENV: 4, GLO: 7, SEQ: 11, PLAY: 12 }, KEY_G4 = 14;
   const tap = b => { c.sim_control(0, b, 1); c.sim_control(0, b, 0); };
   let rms = 0, blocks = 0;
   const render = n => {
@@ -192,15 +195,19 @@ const result = await page.evaluate(() => {
   controls.clockAfterJump = info(8);
   tap(BUTTON.PLAY);
   controls.balancedAfterStop = balanced(heard());
-  // SEQ: song view to the stock step page and back, and the stock long
-  // press on the step page still opens its actions page.
+  // SEQ: song view to the clip grid and back (phase 7). The stock sync and
+  // MIDI pages moved to the device settings: SHIFT+GLO opens Bluetooth, and
+  // ALGO turns on to the step page's 5 to 8, then the diagnostics, and back.
   const pageNow = () => new Uint8Array(c.memory.buffer, c.sim_state(), 8)[1];
   const pages = [pageNow()];
   tap(BUTTON.SEQ); pages.push(pageNow());
   tap(BUTTON.SEQ); render(4); pages.push(pageNow());
-  tap(BUTTON.SEQ); c.sim_control(0, BUTTON.SEQ, 1); render(300); c.sim_control(0, BUTTON.SEQ, 0); pages.push(pageNow());
+  c.sim_control(0, BUTTON.FX, 1); tap(BUTTON.GLO); c.sim_control(0, BUTTON.FX, 0); pages.push(pageNow());
+  for (let i = 0; i < 5; i++) { c.sim_control(2, 1, 1); pages.push(pageNow()); }
+  for (let i = 0; i < 5; i++) { c.sim_control(2, 1, -1); pages.push(pageNow()); }
+  tap(BUTTON.SEQ); pages.push(pageNow());
   controls.seqPages = pages;
-  controls.seqOk = pages.join() === '19,1,19,12';
+  controls.seqOk = pages.join() === '19,27,19,7,1,1,1,1,22,1,1,1,1,7,19';
   return { whole, loop, controls, png: canvas.toDataURL('image/png').split(',')[1] };
 });
 // Phase 2: step entry and the settings page, on a fresh simulator.
@@ -318,24 +325,27 @@ const phase2 = await page.evaluate(() => {
   out.shiftGlo = state()[1];
   return out;
 });
-// Hardware diagnostics: SHIFT+SEQ opens the page. The browser's control
-// loop runs every 10 ms, so method A should show late notes and B and C none.
+// Hardware diagnostics: SHIFT+GLO, then ALGO past the sync and MIDI pages,
+// opens the page. The browser's control loop runs every 10 ms, so method A
+// should show late notes and B and C none.
 const hwdiag = await page.evaluate(() => {
   const wasm = Uint8Array.from(atob(FM1_SIMULATOR.data), ch => ch.charCodeAt(0));
   const c = new FM1SimulatorCore(wasm, null, null).c;
-  const B = { FX: 2, ENV: 4, HOME: 8, SEQ: 11, PLAY: 12 };
+  const B = { FX: 2, ENV: 4, GLO: 7, HOME: 8, SEQ: 11, PLAY: 12 };
   const tap = b => { c.sim_control(0, b, 1); c.sim_control(0, b, 0); };
   const render = n => { for (let i = 0; i < n; i++) c.sim_render(); };
   const info = (what, index = 0) => c.sim_song_info(what, 0, index) >>> 0;
+  const toDiag = () => { c.sim_control(0, B.FX, 1); tap(B.GLO); c.sim_control(0, B.FX, 0); for (let i = 0; i < 5; i++) c.sim_control(2, 1, 1); };
   const out = {};
   render(32);
   tap(B.SEQ);
-  c.sim_control(0, B.FX, 1); tap(B.SEQ); c.sim_control(0, B.FX, 0); // SHIFT+SEQ
+  toDiag();
   out.page = new Uint8Array(c.memory.buffer, c.sim_state(), 8)[1];
   out.defaultMethod = info(22);
-  const rewind = () => {                       // HOME, SHIFT+PLAY to the top, SHIFT+SEQ back
+  const rewind = () => {                       // HOME, SHIFT+PLAY to the top, and back
     tap(B.HOME);
-    c.sim_control(0, B.FX, 1); tap(B.PLAY); tap(B.SEQ); c.sim_control(0, B.FX, 0);
+    c.sim_control(0, B.FX, 1); tap(B.PLAY); c.sim_control(0, B.FX, 0);
+    toDiag();
   };
   const run = method => {
     rewind();
@@ -1045,6 +1055,7 @@ const phase5a = await page.evaluate(() => {
 });
 const phase5bRun = await phase5b(browser, root);
 const phase6Run = await phase6(browser, root);
+const phase7Run = await phase7(browser, root);
 await browser.close();
 fs.writeFileSync(path.join(root, 'docs/hw-diag.png'), Buffer.from(hwdiag.png, 'base64'));
 delete hwdiag.png;
@@ -1111,12 +1122,13 @@ const p5a = q.boot.kits === 1 && q.boot.kit === 1 && q.boot.padsUsed > 0 && q.sa
   q.reboot.waiting === 1 && q.reboot.songs === 2 && q.restored.sameBytes && q.restored.waiting === 0;
 result.phase5b = phase5bRun.out;
 result.phase6 = phase6Run.out;
+result.phase7 = phase7Run.out;
 console.log(JSON.stringify(result, null, 1));
 const k = result.controls;
 const ok = result.whole.notes.ok && result.whole.balanced && result.whole.stoppedAtEnd && result.whole.songPage === 19 &&
   result.loop.notes.ok && result.loop.balancedAfterStop && result.whole.rms > 0.001 && result.loop.rmsAfterStop < 1e-4 &&
   k.rewindToLoopStart && k.loopOff && k.k1MovesBySnap && k.shiftK1NextMarker && k.loopEdgesOk &&
   k.pendingAfterRequest && k.jumpLandsOnBarLine && k.afterJump.ok && k.balancedAfterStop && k.seqOk && p2 && hw && p3 && p4ok && p4b && p5a &&
-  phase5bRun.ok && phase6Run.ok;
+  phase5bRun.ok && phase6Run.ok && phase7Run.ok;
 console.log(ok ? 'preview_check: passed' : 'preview_check: FAILED');
 process.exit(ok ? 0 : 1);

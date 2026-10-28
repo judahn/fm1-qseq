@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception
 // Node unit tests for the song workbench (web/workbench, phase 5b): the MIDI
-// writer and reader, the song and kit file codecs, songs to MIDI and back,
-// and sample prep. No dependencies: node tests/workbench_test.mjs
+// writer and reader, the song and kit file codecs (with phase 7's clips),
+// songs to MIDI and back, and sample prep. No dependencies:
+//   node tests/workbench_test.mjs
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,6 +58,37 @@ throws(() => S.decode(S.encode(badTempo)), 'a tempo out of range is refused');
 const badMeter = song(); badMeter.meters[0].bar = 1;
 throws(() => S.decode(S.encode(badMeter)), 'a first time signature off bar 1 is refused');
 check(S.barClock(song(), 2) === 3840 && S.barClock(song(), 4) === 3840 + 2 * 1680 && S.barClock(song(), 6) === 7200 + 2 * 1440, 'bar clocks follow the meters');
+
+// Version 2 (phase 7): the clip grid. A song with clips and row names round trips, the file
+// header carries the payload's version, and version 1 payloads and files still read and write
+// back byte for byte, with an empty grid.
+const withClips = song();
+withClips.launchQ = 4;
+withClips.rows = [{ row: 0, name: S.markerField('VERSE') }, { row: 15, name: S.markerField('OUTRO') }];
+withClips.clips = [{ cell: 3, length: 1920, events: [S.event(0, S.KIND.NOTE, 60, 100, 240), S.event(960, S.KIND.CONTROL, 74, 9, 0)] },
+  { cell: 127, length: 960, events: [] }];
+const payload2 = S.encode(withClips), back2 = S.decode(payload2);
+check(payload2[0] === 2 && B.same(S.encode(back2), payload2) && back2.launchQ === 4 && back2.clips.length === 2 &&
+  back2.clips[0].events.length === 2 && back2.rows[1].row === 15 && S.markerName(back2.rows[0]) === 'VERSE', 'clips and row names round trip');
+check(S.eventCount(back2) === S.eventCount(song()) + 2, 'clip events count toward the song');
+const file2 = S.wrap(payload2);
+check(file2[4] === 2 && B.same(S.unwrap(file2), payload2), 'a version 2 file');
+const v1 = song(); v1.version = 1;
+const payload1 = S.encode(v1);
+check(payload1[0] === 1 && payload1.length === payload.length - 3 && B.same(S.encode(S.decode(payload1)), payload1), 'version 1 writes back as version 1');
+const back1 = S.decode(payload1);
+check(back1.clips.length === 0 && back1.rows.length === 0 && back1.launchQ === 2, 'version 1 reads with an empty grid');
+const file1 = S.wrap(payload1);
+check(file1[4] === 1 && B.same(S.unwrap(file1), payload1), 'a version 1 file still opens');
+const outOfOrder = song(); outOfOrder.clips = [{ cell: 9, length: 480, events: [] }, { cell: 2, length: 480, events: [] }];
+throws(() => S.decode(S.encode(outOfOrder)), 'clips out of cell order are refused');
+const noLength = song(); noLength.clips = [{ cell: 9, length: 0, events: [] }];
+throws(() => S.decode(S.encode(noLength)), 'a clip with no length is refused');
+const tooMany = song(); tooMany.clips = [{ cell: 0, length: 480, events: Array.from({ length: 4096 }, (_, i) => S.event(i, S.KIND.NOTE, 60, 1, 1)) }];
+throws(() => S.decode(S.encode(tooMany)), 'clips over the event pool are refused');
+const future = payload2.slice(); future[0] = 3;
+throws(() => S.decode(future), 'a newer version is refused');
+check(SM.exportMidi(withClips).skipped.clips === 2, 'MIDI export reports the clips it leaves out');
 
 // MIDI file writer and reader: delta times, running status, note-off as velocity 0.
 const lengths = [0, 127, 128, 16383, 16384, 0x0fffffff];

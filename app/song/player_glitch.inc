@@ -13,8 +13,8 @@ SONG_SMALL static uint32_t mix(uint32_t x)
 }
 SONG_SMALL static uint32_t roll(const struct song_player *p, unsigned t, const struct song_event *e, unsigned salt)
 {
-    return mix(p->song->seed ^ mix(p->pass * 0x9e3779b9U ^ song_event_start(e) ^ (uint32_t)e->a << 24 ^ t << 20 ^
-                                   salt << 16));
+    return mix(p->song->seed ^ mix(p->pass * 0x9e3779b9U ^ p->base[t] ^ song_event_start(e) ^ (uint32_t)e->a << 24 ^
+                                   t << 20 ^ salt << 16)); /* base: a clip's every pass rolls again */
 }
 static int chance(uint32_t r, unsigned percent) { return r % 100U < percent; }
 

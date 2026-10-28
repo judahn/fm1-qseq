@@ -24,6 +24,8 @@ int song_copy(const struct song *s, struct song_clip *clip, unsigned tracks, uin
 int song_cut(struct song *s, struct song_clip *clip, unsigned tracks, uint32_t from, uint32_t to);
 /* One copied track pastes onto `track`. Several paste back onto their own. */
 int song_paste(struct song *s, const struct song_clip *clip, uint32_t at, unsigned track, unsigned insert);
+/* Clipboard event i moved `at` on, its glitch found in this song's table. */
+struct song_event song_board_event(struct song *s, const struct song_clip *clip, unsigned i, uint32_t at);
 /* Copy the selection to right after itself, inserting, and move the
  * selection onto the copy. */
 int song_duplicate(struct song *s, unsigned tracks, uint32_t *from, uint32_t *to);

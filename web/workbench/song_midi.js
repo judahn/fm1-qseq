@@ -18,7 +18,8 @@
   const byTick = (a, b) => a.tick - b.tick || a.order - b.order || a.seq - b.seq;
 
   function exportMidi(song) {
-    const skipped = { fx: 0, glitched: 0, humanize: song.humanizeTime.some(v => v) || song.humanizeVelocity.some(v => v) };
+    const skipped = { fx: 0, glitched: 0, humanize: song.humanizeTime.some(v => v) || song.humanizeVelocity.some(v => v),
+      clips: (song.clips || []).length };
     let end = S.barClock(song, song.bars), seq = 0;
     const conductor = [{ tick: 0, order: 0, seq: seq++, meta: M.META.NAME, data: M.ascii(S.name(song)) }];
     for (const m of song.meters) conductor.push({ tick: S.barClock(song, m.bar), order: 1, seq: seq++, meta: M.META.METER, data: M.meter(m.beats, m.unit) });
@@ -83,7 +84,7 @@
     }
     if (!tempos.length || tempos[0].clock) tempos.unshift({ clock: 0, bpm100: 12000 });
     const song = { ...base, tempos, meters: [{ bar: 0, beats: 4, unit: 4 }], markers: [], glitch: [],
-      humanizeTime: new Uint8Array(8), humanizeVelocity: new Uint8Array(8), tracks: [] };
+      humanizeTime: new Uint8Array(8), humanizeVelocity: new Uint8Array(8), tracks: [], rows: [], clips: [] };
     for (const e of metas(M.META.METER)) {
       let beats = e.data[0], unit = 2 ** e.data[1];
       while (unit < 4) { beats *= 2; unit *= 2; }

@@ -2,6 +2,7 @@
 #ifndef FM1_SONG_H
 #define FM1_SONG_H
 #include <stdint.h>
+#include "song_config.h"
 
 /* Song code runs on the control task (or once per block), so it is built
  * for size, like the stock firmware's control paths. Flash is tight. */
@@ -25,6 +26,15 @@ enum {
     SONG_TEMPO_MAX = 30000,
     SONG_FRAME_RATE = 44100
 };
+/* Clips (design 8f, clips.h): a grid of 8 tracks by 16 rows. Cell c, track
+ * * 16 + row, keeps its events in part SONG_TRACKS + c of the pool, after
+ * the tracks' own parts. Calls that take a track take any part. */
+#if SONG_UI
+enum { SONG_GRID_ROWS = 16, SONG_CELLS = SONG_TRACKS * SONG_GRID_ROWS, SONG_PARTS = SONG_TRACKS + SONG_CELLS,
+       SONG_CLIP_BARS = 16 };
+#else
+enum { SONG_PARTS = SONG_TRACKS };
+#endif
 /* Song time unit: one frame is 480 * bpm100 units, one clock is
  * SONG_UNITS_PER_CLOCK units at every tempo (44100 * 60 * 100). */
 #define SONG_UNITS_PER_CLOCK 264600000ULL
@@ -58,7 +68,7 @@ struct song_marker { uint32_t clock; char name[SONG_MARKER_NAME]; };
 struct song_undo;
 struct song {
     struct song_event event[SONG_EVENTS];
-    uint16_t first[SONG_TRACKS], count[SONG_TRACKS];
+    uint16_t first[SONG_PARTS], count[SONG_PARTS];
     struct song_tempo tempo[SONG_TEMPOS];
     uint64_t tempo_units[SONG_TEMPOS]; /* derived segment starts, see song_time.c */
     struct song_meter meter[SONG_METERS];
@@ -90,7 +100,32 @@ struct song {
     char name[12];
     uint16_t id, kit;
     uint8_t base_program[SONG_TRACKS];
+#if SONG_UI
+    /* Clips: each cell's length in clocks (0 when empty), the row names, the
+     * launch quantize (0 off, 1 beat, 2 bar, 3 two bars, 4 four bars), and
+     * the part of the clip open in the editor, or 0. While one is open its
+     * events and its track's own trade parts (song_owner), and the song's
+     * loop waits in kept_*. */
+    uint16_t clip_length[SONG_CELLS];
+    char row_name[SONG_GRID_ROWS][SONG_MARKER_NAME];
+    uint32_t kept_start, kept_end;
+    uint8_t kept_on, launch_q, open;
+#endif
 };
+#if SONG_UI
+/* The part holding a part's events: the open clip's and its track's trade. */
+static inline unsigned song_owner(const struct song *s, unsigned part)
+{
+    unsigned track = (s->open - SONG_TRACKS) / SONG_GRID_ROWS;
+    return !s->open ? part : part == track ? s->open : part == s->open ? track : part;
+}
+/* The track whose clip is open in the editor, or 0xff. */
+static inline unsigned song_editing(const struct song *s) { return s->open ? (s->open - SONG_TRACKS) / SONG_GRID_ROWS : 0xffU; }
+/* Bars on the timeline: the song's, or a clip's longest while one is open. */
+static inline unsigned song_bars(const struct song *s) { return s->open ? SONG_CLIP_BARS : s->bars; }
+#else
+static inline unsigned song_bars(const struct song *s) { return s->bars; }
+#endif
 
 /* Editing (song.c). Calls return 0, or -1 when invalid or full. */
 void song_clear(struct song *s, unsigned bars, unsigned bpm100);

@@ -102,7 +102,9 @@ SONG_SMALL void song_chase(const struct song *s, unsigned track, uint32_t clock,
             }
         }
     }
-    /* Before a track's first program change: the program the song was saved with. */
+    /* Before a track's first program change: the program the song was saved
+     * with. A clip's part answers for the track it belongs to. */
+    if (track >= SONG_TRACKS) track = (track - SONG_TRACKS) / SONG_GRID_ROWS;
     unsigned bit = 1U << (SONG_LANE_PROGRAM & 31U), base = s->base_program[track];
     if ((seen[SONG_LANE_PROGRAM >> 5] & bit) && !(send[SONG_LANE_PROGRAM >> 5] & bit) && base) {
         value[SONG_LANE_PROGRAM] = (uint8_t)(base - 1U);

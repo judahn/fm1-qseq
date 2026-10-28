@@ -60,12 +60,13 @@ static void song_auto_row(const struct song *s, unsigned t)
     if (picked && s->loop_end > song_window && s->loop_start < end)
         paint_fill(song_x(s->loop_start), y, song_x(s->loop_end) - song_x(s->loop_start), AUTO_ROW - 2,
                    s->loop_on ? SONG_LOOP : SONG_SELECT);
-    for (unsigned bar = song_bar_at(s, song_window, NULL, NULL); bar <= s->bars; ++bar) {
+    for (unsigned bar = song_bar_at(s, song_window, NULL, NULL); bar <= song_bars(s); ++bar) {
         uint32_t at = song_bar_clock(s, bar);
         if (at >= end) break;
         if (at >= song_window) paint_fill(song_x(at), y, 1, AUTO_ROW - 2, SONG_BAR_LINE);
     }
-    song_auto_curve(s, t, lane, y + 1, AUTO_ROW - 3, frame_views[t].audible ? colors[t] : DIM);
+    if (!s->open || t == song_editing(s)) /* a clip in the editor: only its row */
+        song_auto_curve(s, t, lane, y + 1, AUTO_ROW - 3, frame_views[t].audible ? colors[t] : DIM);
 }
 /* Tempo as a step line between the song's slowest and fastest, the time
  * signature changes as flags, and the FX lane's stutters as bars. */
@@ -162,6 +163,7 @@ static int song_auto_input(const struct fm1_controls *c, uint32_t *pressed, uint
     }
     if ((*pressed & BUTTON(SCL)) && !song_port_recorder()->active) song_auto_delete(s, shift, now);
     *pressed &= ~BUTTON(SCL);
+    if (s->open) { song_auto_conductor = 0; k.encoders[0] = 0; } /* a clip in the editor keeps its track, off the conductor */
     if (k.encoders[0] < 0 && !track && !song_auto_conductor) { song_auto_conductor = 1; k.encoders[0] = 0; }
     else if (k.encoders[0] > 0 && song_auto_conductor) { song_auto_conductor = 0; k.encoders[0] = 0; }
     else if (song_auto_conductor) k.encoders[0] = 0;

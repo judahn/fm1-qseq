@@ -19,8 +19,8 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
 {
     struct song *s = song_port_song();
     struct song_player *p = song_port_player();
-    unsigned shift = (c->buttons & BUTTON(FX)) != 0;
-    unsigned picking = (c->buttons & BUTTON(LFO)) != 0;
+    unsigned shift = (c->buttons & BUTTON(FX)) != 0, clip = s->open != 0; /* a clip in the editor: no markers */
+    unsigned picking = (c->buttons & BUTTON(LFO)) != 0 && !clip;
     unsigned glitching = song_stutter_input(c, *pressed, key_down, now);
     if (*pressed & BUTTON(SAVE)) { /* SAVE saves the song, SHIFT+SAVE opens the list */
         *pressed &= ~BUTTON(SAVE);
@@ -57,7 +57,7 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
         cache->shown_page = ~0U;
         return 1;
     }
-    if (*pressed & BUTTON(SCL)) song_add_marker_here(now);
+    if ((*pressed & BUTTON(SCL)) && !clip) song_add_marker_here(now);
     if ((*pressed & BUTTON(EDIT)) && shift) { /* SHIFT+EDIT: the edit jobs (EDIT alone stays sound editing) */
         *pressed &= ~BUTTON(EDIT);
         song_job_open();
@@ -74,7 +74,7 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
         return 1;
     }
     int move = glitching ? 0 : c->encoders[2];
-    if (move && shift) {
+    if (move && shift && !clip) {
         /* Marker to marker, from a pending jump or the playhead. */
         uint32_t at = p->playing ? (p->jumping ? p->jump : song_player_clock(p)) : p->playhead;
         int direction = move > 0 ? 1 : -1, found = -1;
@@ -85,9 +85,9 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
             at = s->marker[next].clock;
         }
         if (found >= 0) song_port_jump(at);
-    } else if (move)
+    } else if (move && !shift)
         song_port_jump(song_snap_move(s, song_player_target(p), song_zoom, move));
-    if (c->encoders[3] && shift) song_sections(c->encoders[3]);
+    if (c->encoders[3] && shift) { if (!clip) song_sections(c->encoders[3]); }
     else if (c->encoders[3]) {
         uint32_t at = song_snap_move(s, s->loop_start, song_zoom, c->encoders[3]);
         if (at < s->loop_end) s->loop_start = at;
@@ -110,7 +110,7 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
         static const uint8_t mangle_keys[3] = {1, 3, 5}; /* F#3, G#3, A#3 */
         for (unsigned i = 0; i < 3; ++i)
             if (down & (1U << mangle_keys[i])) song_mangle(i, now);
-        for (unsigned i = 0; i < 9; ++i)
+        for (unsigned i = 0; i < 9 && !clip; ++i)
             if (down & (1U << white_keys[7 + i])) {
                 if (i < s->markers) song_port_jump(s->marker[i].clock);
                 else { notice = "NO MARKER THERE"; notice_until = now + 1500U; }
@@ -125,29 +125,56 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
 #endif
 
 /* Panel input. Returns 1 when a song page consumed this poll. SEQ opens the
- * song view, and from there the stock step page. On the step page SEQ keeps
- * its stock long press (actions), and a tap comes back to the song. GLO on a
+ * song view, and from there the clip grid (8f), and back. With a clip open in
+ * the editor SEQ closes it and goes to the grid, and SHIFT+SEQ hands every
+ * track back to the song. Without the song pages SEQ opens the diagnostics
+ * page and from there the stock step page. On the step page SEQ keeps its
+ * stock long press (actions), and a tap comes back to the song. GLO on a
  * song page: a tap opens or closes the settings, a hold is still the stock
- * mixer layer, and SHIFT+GLO opens the stock device page. */
+ * mixer layer, and SHIFT+GLO opens the device settings (song_device_turn). */
 static unsigned song_seq_on_steps;
 enum { SONG_HOME = SONG_UI ? SONG : SONG_DIAG }; /* where SEQ goes */
+#if SONG_UI
+/* The device settings (8a): Bluetooth on SHIFT+GLO, then ALGO turns on to
+ * the stock sync and MIDI pages (the step page's 5 to 8) and the hardware
+ * diagnostics, and back. Within the step page's pages the stock code turns. */
+static int song_device_turn(int turn)
+{
+    unsigned to = turn > 0 && page == BLE ? 4U : turn < 0 && page == STEPS && seq_page == 4 ? 1U
+        : SONG_HW_TEST && turn > 0 && page == STEPS && seq_page == 7 ? 2U : turn < 0 && page == SONG_DIAG ? 7U : 0U;
+    if (!to) return 0;
+    if (to == 1) { page = BLE; ble_view = ble_forget = ble_action = 0; ble_result = 0; }
+    else if (to == 2) page = music_page = SONG_DIAG;
+    else { page = STEPS; seq_page = to; step_follow = 1; }
+    cache->shown_page = ~0U;
+    return 1;
+}
+#endif
 static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
 {
+#if SONG_UI
+    if ((page == BLE || page == STEPS || page == SONG_DIAG) && song_device_turn(c->encoders[1])) return 1;
+#endif
     if ((*pressed & BUTTON(SEQ)) && !(c->buttons & BUTTON(HOME))) {
         if (page == STEPS) { song_seq_on_steps = 1; return 0; }
-#if SONG_UI && SONG_HW_TEST
-        if (page == SONG && (c->buttons & BUTTON(FX))) { /* SHIFT+SEQ: hardware diagnostics */
-            page = music_page = SONG_DIAG;
-            cache->shown_page = ~0U;
+#if SONG_UI
+        if (page >= SONG && (c->buttons & BUTTON(FX))) { /* SHIFT+SEQ: every track back to the song */
+            for (unsigned t = 0; t < SONG_TRACKS; ++t) song_port_launch(t, SONG_FROM_SONG);
+            notice = "EVERY TRACK BACK TO THE SONG";
+            notice_until = now + 1500U;
             return 1;
         }
-#endif
-#if SONG_UI
+        if (song_port_recorder()->active) { notice = "STOP RECORDING FIRST"; notice_until = now + 1500U; return 1; }
+        unsigned from = page;
         if (page == SONG_STEP) song_step_leave(0, now);
-        else
-#endif
+        if (song_port_song()->open) { song_port_clip_close(); page = SONG_GRID; }
+        else page = from == SONG ? SONG_GRID : SONG;
+        music_page = page;
+        writing = 0;
+#else
         if (page != SONG_HOME) { page = music_page = SONG_HOME; writing = 0; }
         else { page = music_page = STEPS; seq_page = SONG_DROP_STEPS ? 4 : 0; step_follow = 1; } /* sync and MIDI pages only, without (a) */
+#endif
         cache->shown_page = ~0U;
 #if SONG_UI
         static uint8_t offered; /* a recovery copy from before: the list offers it, once */
@@ -209,6 +236,7 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
     if (page == SONG_AUTO) return song_auto_input(c, pressed, key_down, now);
     if (page == SONG_LIST) return song_list_input(c, pressed, key_down, now);
     if (page == SONG_JOB) return song_job_input(c, pressed, key_down, now);
+    if (page == SONG_GRID) return song_grid_input(c, pressed, key_down, now);
     return song_view_input(c, pressed, key_down, now);
 #else
     return 0;
@@ -223,6 +251,7 @@ static int song_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t 
     else if ((*pressed & (BUTTON(HOME) | BUTTON(SAVE))) && page >= SONG) song_combo_from = page;
     song_undo_begin(song_port_undo(), song_port_song());
     int result = song_input_pages(c, pressed, key_down, now);
+    song_clip_follow(song_port_song()); /* an open clip's length is its loop end */
     song_undo_end(song_port_undo(), song_port_song());
     return result;
 #else

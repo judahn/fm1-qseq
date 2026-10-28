@@ -1035,7 +1035,11 @@ static __attribute__((noinline)) void draw_ble(const struct fm1_ble_status *stat
         : ble_result ? "COMMAND UNAVAILABLE"
         : status->error <= FM1_BLE_LINK_LOST ? errors[status->error] : "";
     radio_line(3, 213, error, AMBER);
+#if SONG_UI /* song-mode: ALGO turns on to the sync and MIDI pages */
+    radio_line(4, 229, "ALGO PAGE  PRESETS ACTION  SAVE OK", DIM);
+#else
     radio_line(4, 229, "PRESETS ACTION  SAVE OK  HOME EXIT", DIM);
+#endif
 }
 static __attribute__((noinline)) void project_draw(void)
 {
@@ -1818,6 +1822,9 @@ void groove_screen_init(void)
 static void select_track(int delta)
 {
     unsigned before = track;
+#if SONG_UI /* song-mode: a clip open in the editor keeps its track on the song pages */
+    if (page >= SONG && song_port_song()->open) delta = 0;
+#endif
     track = (unsigned)clamp((int)track + delta, 0, 7);
     if (page == FM_QUICK && groove_source_type(track) != GROOVE_DX7) page = TONE_EDIT;
     if (page == TONE_EDIT && !advanced_edit && groove_source_type(track) == GROOVE_DX7) page = FM_QUICK;

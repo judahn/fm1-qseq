@@ -62,6 +62,9 @@ static int song_job_go(void)
     struct song *s = song_port_song();
     const int16_t *v = song_job_value[song_job];
     struct song_range r = song_job_range();
+    /* In a clip, nothing that reaches other tracks or the song's time. */
+    if (s->open && ((1U << JOB_PASTE | 1U << JOB_EXTRACT | 1U << JOB_STRETCH | 1U << JOB_COPY | 1U << JOB_MERGE) >> song_job & 1U ||
+                    (song_job == JOB_RAMP && song_job_lane(v[1]) == SONG_JOB_TEMPO))) return -4;
     switch (song_job) {
     case JOB_QUANTIZE: return song_job_quantize(s, &r, song_job_grid(v[1]), (unsigned)v[2], (unsigned)v[3], (unsigned)v[4]);
     case JOB_VELOCITY: return song_job_velocity(s, &r, (unsigned)v[1], (unsigned)(v[1] ? v[2] : clamp(v[2], 1, 127)), v[3]);
@@ -131,7 +134,7 @@ static void song_job_save(uint32_t now)
         notice = done;
     } else if ((song_job == JOB_COPY || song_job == JOB_MERGE) && song_job_value[song_job][0] == song_job_value[song_job][1])
         notice = "PICK TWO DIFFERENT TRACKS";
-    else notice = !r ? "NOTHING TO CHANGE THERE" : r == -2 ? "PICK A KEY AND SCALE IN SETTINGS"
+    else notice = !r ? "NOTHING TO CHANGE THERE" : r == -2 ? "PICK A KEY AND SCALE IN SETTINGS" : r == -4 ? "NOT INSIDE A CLIP"
         : r == -3 ? "COPY SOMETHING FIRST" : song_job == JOB_STRETCH ? "DOESN'T FIT, OR TRACKS IN THE WAY" : "DOESN'T FIT";
     notice_until = now + 2500U;
 }

@@ -11,7 +11,7 @@
 
 static const char *const song_rec_modes[SONG_REC_MODES] = {"STEP", "REPLACE", "OVERDUB", "PUNCH", "LOOP"};
 static uint8_t song_sel, song_sel_hand;
-static unsigned song_selected(void) { return song_sel_hand ? song_sel : 1U << track; }
+static unsigned song_selected(void) { return song_sel_hand && !song_port_song()->open ? song_sel : 1U << track; }
 
 static void song_pick_tracks(uint32_t down)
 {
@@ -34,6 +34,11 @@ static void song_action(unsigned which, uint32_t now)
     const struct song_player *p = song_port_player();
     struct song_clip *c = song_port_clip();
     uint32_t at = p->playing ? song_player_clock(p) : p->playhead;
+    if (s->open && (which == 2 || which > 3)) { /* a clip keeps its length: copy, cut and paste over only */
+        notice = "NOT INSIDE A CLIP";
+        notice_until = now + 1500U;
+        return;
+    }
     struct song_place place;
     uint32_t state = song_port_hold(&place); /* playing goes on in time */
     int r;

@@ -59,7 +59,7 @@ silent if its samples don't carry over from V15. Everything else plays normally.
 ## 5. The diagnostics
 
 Press **SEQ** to open the diagnostics page. In this build SEQ goes straight there. With the full song
-pages it's SHIFT+SEQ in the song view. On the page:
+pages it's the last of the device settings: SHIFT+GLO, then ALGO past the sync and MIDI pages. On the page:
 - **PLAY** starts and stops the test song (12 bars, about 23 seconds, stopping by itself).
 - **K1** picks the delivery method.
 - **SCL** clears the numbers.

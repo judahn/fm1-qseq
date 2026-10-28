@@ -56,8 +56,18 @@ struct song_player {
     uint16_t stut_k[SONG_TRACKS], stut_i[SONG_TRACKS];
     int8_t stut_drift;
     uint8_t stut_running;
+    /* Clips (design 8f, player_clips.inc): what each track plays, a row of
+     * the grid, SONG_FROM_SONG or SONG_FROM_STOP, a launch waiting for its
+     * clock, and where the clip's pass began. Those are transport clocks:
+     * the song clock plus `shift`, running on through loops and jumps, so
+     * clips keep their phase. A clip's notes are timed on the transport. */
+    uint32_t shift, base[SONG_TRACKS], launch_at[SONG_TRACKS];
+    uint8_t from[SONG_TRACKS], waiting[SONG_TRACKS];
 #endif
 };
+#if SONG_UI
+enum { SONG_FROM_SONG = 0xff, SONG_FROM_STOP = 0xfe, SONG_FROM_NONE = 0xfd };
+#endif
 void song_player_init(struct song_player *p, struct song *s, const struct song_output *out);
 /* Start at the playhead. The first event lands in the block starting at frame. */
 void song_player_start(struct song_player *p, uint64_t frame);
@@ -96,6 +106,19 @@ uint32_t song_player_stutter_stop(struct song_player *p);
  * them, as plain notes with their tracks. How many, or -1 past `room`. */
 int song_player_bake(const struct song_player *live, struct song *s, unsigned tracks, struct song_event *out,
                      uint8_t *track, unsigned room);
+/* Launching (design 8f): a track to a row of the grid, back to the song or
+ * stopped, at the song's launch quantize from where playing has reached,
+ * exactly on that clock. Stopped, it takes over as playing starts. A track
+ * playing a clip or stopped stays that way through loops and jumps, until
+ * it is launched again or playing stops, which hands every track back. */
+void song_player_launch(struct song_player *p, unsigned track, unsigned to);
+/* The transport clock playing now. */
+uint32_t song_player_transport(const struct song_player *p);
+/* Playing moves to `clock` at once, the transport running on, as a clip
+ * opens or closes in the editor. Stopped, the playhead moves. */
+void song_player_seek(struct song_player *p, uint32_t clock);
+/* A track's notes, repeats and waiting swung notes end now. */
+void song_player_cut(struct song_player *p, unsigned track);
 #endif
 void song_player_hold(const struct song_player *p, struct song_place *place);
 void song_player_resume(struct song_player *p, const struct song_place *place);

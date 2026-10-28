@@ -17,9 +17,9 @@ SONG_SMALL int song_set_event(struct song *s, unsigned track, unsigned index, co
         if (song_remove(s, track, index)) return -1;
         return song_add_event(s, track, e);
     }
-    if (s->undo) song_undo_record(s->undo, SONG_UNDO_DEL, track, &t[index], 0);
+    if (s->undo) song_undo_record(s->undo, SONG_UNDO_DEL, song_owner(s, track), &t[index], 0);
     s->event[s->first[track] + index] = *e;
-    if (s->undo) song_undo_record(s->undo, SONG_UNDO_ADD, track, e, 0);
+    if (s->undo) song_undo_record(s->undo, SONG_UNDO_ADD, song_owner(s, track), e, 0);
     ++s->revision;
     return 0;
 }
@@ -30,9 +30,9 @@ SONG_SMALL void song_retouch(struct song *s, unsigned track, unsigned index, con
 {
     struct song_event *at = &s->event[s->first[track] + index];
     if (!memcmp(at, e, sizeof *e)) return;
-    if (s->undo) song_undo_record(s->undo, SONG_UNDO_DEL, track, at, 0);
+    if (s->undo) song_undo_record(s->undo, SONG_UNDO_DEL, song_owner(s, track), at, 0);
     *at = *e;
-    if (s->undo) song_undo_record(s->undo, SONG_UNDO_ADD, track, e, 0);
+    if (s->undo) song_undo_record(s->undo, SONG_UNDO_ADD, song_owner(s, track), e, 0);
     ++s->revision;
 }
 SONG_SMALL void song_sort_track(struct song *s, unsigned track)
@@ -70,21 +70,22 @@ SONG_SMALL int song_remove_meter(struct song *s, unsigned bar)
     return -1;
 }
 
-/* Every event at or after `from` moves by delta, on all tracks. Moving left
- * needs the span it moves into to be empty, so order is kept. */
+/* Every event at or after `from` moves by delta, on all tracks (wherever
+ * an open clip has put them), never in clips. Moving left needs the span it
+ * moves into to be empty, so order is kept. */
 SONG_SMALL int song_shift(struct song *s, uint32_t from, int32_t delta)
 {
     if (!delta) return 0;
     if (delta < 0 && (uint32_t)-delta > from) return -1;
-    for (unsigned t = 0; t < SONG_TRACKS; ++t) {
-        unsigned count, i = song_find(s, t, delta < 0 ? from + (uint32_t)delta : from);
+    for (unsigned k = 0; k < SONG_TRACKS; ++k) {
+        unsigned t = song_owner(s, k), count, i = song_find(s, t, delta < 0 ? from + (uint32_t)delta : from);
         const struct song_event *e = song_track(s, t, &count);
         if (delta < 0 && i < count && song_event_start(&e[i]) < from) return -1;
         if (delta > 0 && count && song_event_start(&e[count - 1]) >= from &&
             song_event_start(&e[count - 1]) + (uint32_t)delta > SONG_MAX_CLOCK) return -1;
     }
-    for (unsigned t = 0; t < SONG_TRACKS; ++t) {
-        unsigned count, i = song_find(s, t, from);
+    for (unsigned k = 0; k < SONG_TRACKS; ++k) {
+        unsigned t = song_owner(s, k), count, i = song_find(s, t, from);
         song_track(s, t, &count);
         for (struct song_event *e = s->event + s->first[t] + i; i < count; ++i, ++e)
             e->at = (e->at & 0xff000000U) | (song_event_start(e) + (uint32_t)delta);

@@ -6,11 +6,13 @@
  * The header, playhead and recording knobs are in song_header.inc, step
  * entry in song_step.inc, settings in song_setup.inc, REC's chooser in
  * song_rec.inc, arranging in song_select.inc, the automation view in
- * song_auto.inc and input in song_panel.inc. */
+ * song_auto.inc, the clip grid in song_grid.inc and input in song_panel.inc.
+ * A clip open in the editor (design 8f) is its track's row here, looped,
+ * with the other tracks and the markers out of the way. */
 #include "song_port.h"
 
-enum { SONG = STARTUP + 1, SONG_STEP, SONG_SETUP, SONG_DIAG, SONG_REC, SONG_AUTO, SONG_LIST, SONG_JOB }; /* song view,
-                                     step entry, settings, diagnostics, REC, automation, songs, edit jobs */
+enum { SONG = STARTUP + 1, SONG_STEP, SONG_SETUP, SONG_DIAG, SONG_REC, SONG_AUTO, SONG_LIST, SONG_JOB, SONG_GRID };
+/* song view, step entry, settings, diagnostics, REC, automation, songs, edit jobs, the clip grid */
 enum {
     SONG_X = 22, SONG_W = 214, SONG_RULER = 32, SONG_ROWS = 48, SONG_ROW = 18,
     SONG_BOTTOM = SONG_ROWS + 8 * SONG_ROW - 2,
@@ -92,7 +94,7 @@ static void song_ruler(const struct song *s)
     cache->title_cache = sig;
     paint_fill(0, SONG_RULER, 240, SONG_ROWS - SONG_RULER, BACK);
     uint32_t end = song_window + song_span(), every = song_zoom < 2 ? 4U >> song_zoom : 1;
-    for (unsigned bar = song_bar_at(s, song_window, NULL, NULL); bar < s->bars; ++bar) {
+    for (unsigned bar = song_bar_at(s, song_window, NULL, NULL); bar < song_bars(s); ++bar) {
         uint32_t at = song_bar_clock(s, bar);
         if (at >= end) break;
         if (at < song_window || bar % every) continue;
@@ -102,7 +104,7 @@ static void song_ruler(const struct song *s)
     if (s->loop_end > song_window && s->loop_start < end)
         paint_fill(song_x(s->loop_start), SONG_ROWS - 2, song_x(s->loop_end) - song_x(s->loop_start), 2,
                    s->loop_on ? ACCENT : DIM);
-    for (unsigned i = 0; i < s->markers; ++i)
+    for (unsigned i = 0; i < s->markers && !s->open; ++i)
         if (song_visible(s->marker[i].clock)) {
             unsigned x = song_x(s->marker[i].clock);
             paint_fill(x, SONG_RULER + 6, 1, 8, AMBER);
@@ -132,11 +134,11 @@ static void song_row(const struct song *s, unsigned t)
     if (picked && s->loop_end > song_window && s->loop_start < end) /* the selection, brighter when looping */
         paint_fill(song_x(s->loop_start), y, song_x(s->loop_end) - song_x(s->loop_start), SONG_ROW - 2,
                    s->loop_on ? SONG_LOOP : SONG_SELECT);
-    for (unsigned bar = song_bar_at(s, song_window, NULL, NULL); bar <= s->bars; ++bar) {
+    for (unsigned bar = song_bar_at(s, song_window, NULL, NULL); bar <= song_bars(s); ++bar) {
         uint32_t at = song_bar_clock(s, bar), beat = SONG_WHOLE / song_meter_at(s, bar)->unit;
         if (at >= end) break;
         if (at >= song_window) paint_fill(song_x(at), y, 1, SONG_ROW - 2, SONG_BAR_LINE);
-        if (song_zoom >= 2 && bar < s->bars)
+        if (song_zoom >= 2 && bar < song_bars(s))
             for (uint32_t b = at + beat; b < song_bar_clock(s, bar + 1) && b < end; b += beat)
                 if (b > song_window) paint_fill(song_x(b), y, 1, SONG_ROW - 2, SONG_BEAT_LINE);
     }
@@ -144,6 +146,7 @@ static void song_row(const struct song *s, unsigned t)
      * started before the window and still sound inside it. */
     unsigned count, first = song_find(s, t, song_window), span = song_high[t] - song_low[t];
     const struct song_event *e = song_track(s, t, &count);
+    if (s->open && t != song_editing(s)) count = 0; /* only the open clip's row */
     uint16_t color = frame_views[t].audible ? colors[t] : DIM;
     for (unsigned i = first > 32 ? first - 32 : 0; i < count; ++i) {
         uint32_t at = song_event_start(&e[i]);
@@ -203,6 +206,7 @@ static void song_draw(void)
 #include "song_auto.inc"
 #include "song_list.inc"
 #include "song_jobs.inc"
+#include "song_grid.inc"
 #endif
 #if SONG_HW_TEST
 #include "song_diag.inc"
@@ -219,6 +223,7 @@ static void song_page_draw(unsigned visible)
     else if (visible == SONG_AUTO) song_auto_draw();
     else if (visible == SONG_LIST) song_list_draw();
     else if (visible == SONG_JOB) song_job_draw();
+    else if (visible == SONG_GRID) song_grid_draw();
     else song_draw();
 #endif
     (void)visible;

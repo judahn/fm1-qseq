@@ -41,7 +41,7 @@ SONG_SMALL unsigned song_bar_at(const struct song *s, uint32_t clock, uint32_t *
     }
 }
 
-uint32_t song_end(const struct song *s) { return song_bar_clock(s, s->bars); }
+uint32_t song_end(const struct song *s) { return song_bar_clock(s, song_bars(s)); }
 
 SONG_SMALL void song_bbc(const struct song *s, uint32_t clock, unsigned out[3])
 {

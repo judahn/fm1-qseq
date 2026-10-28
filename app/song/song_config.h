@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 #ifndef FM1_SONG_CONFIG_H
 #define FM1_SONG_CONFIG_H
-/* Hardware test build: the diagnostics page (SHIFT+SEQ in song view) and
+/* Hardware test build: the diagnostics page (in the device settings) and
  * song playback on the device, through the delivery method picked there.
  * With 0, device playback stays off until a method is settled. */
 #ifndef SONG_HW_TEST
@@ -15,12 +15,12 @@
 /* SONG_DEVICE_FULL (FM1_SONG_DEVICE_FULL=1 ./build.sh, never the default):
  * full song mode on the device, for a hardware test with Judah's OK. Left
  * out (option 1): (a) the stock step and pattern pages, the MIDI and sync
- * pages under SEQ staying, (b) the stock project pages, (c) the demo
- * projects and (d) the FM factory voices, which the V15 restore puts in the
- * DX7 library. The stock project area goes to code: the user partition
- * starts at logical sector 15 (the settings, then the staging sector at 16),
- * and the pool is sectors 17 to 125. Stock offsets stay logical, song_flash.h
- * moves them. */
+ * pages staying in the device settings (SHIFT+GLO), (b) the stock project
+ * pages, (c) the demo projects and (d) the FM factory voices, which the V15
+ * restore puts in the DX7 library. The stock project area goes to code:
+ * the user partition starts at logical sector 15 (the settings, then the
+ * staging sector at 16), and the pool is sectors 17 to 125. Stock offsets
+ * stay logical, song_flash.h moves them. */
 #ifndef SONG_DEVICE_FULL
 #define SONG_DEVICE_FULL 0
 #endif

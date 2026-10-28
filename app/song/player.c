@@ -17,6 +17,12 @@ enum { EDGE_TEMPO, EDGE_END, EDGE_LOOP, EDGE_JUMP, CLICK = 37 /* rim */ };
 #define QUIET(p, t, e) ((t) == (p)->mute_track && !((e)->at & SONG_FRESH) && \
     song_event_start(e) >= (p)->mute_from && song_event_start(e) < (p)->mute_to)
 #define PLAY(p, t, e, at) play(p, t, e, at)
+/* A track plays the song unless it is on a clip or stopped, and while a
+ * clip is open in the editor only its track plays, the clip being in its part. */
+SONG_SMALL static int on_song(const struct song_player *p, unsigned t)
+{
+    return t == song_editing(p->song) || (p->from[t] == SONG_FROM_SONG && !p->song->open);
+}
 #else
 #define PLAY(p, t, e, at) do { if (song_event_kind(e) == SONG_NOTE) note_on(p, t, e, at); } while (0)
 #endif
@@ -77,6 +83,7 @@ SONG_SMALL static uint32_t onset(const struct song_player *p, unsigned t, const 
  * repeats still due come in time order too, and a note can come early (a
  * flam's grace hit, humanize). */
 #if SONG_UI
+#include "player_clips.inc"   /* each track's source, launches and clips */
 #include "player_stutter.inc" /* the emitter with glitch, the stutter and the FX lane */
 #else
 SONG_SMALL static void emit(struct song_player *p, uint32_t end)
@@ -118,10 +125,15 @@ SONG_SMALL static void relocate(struct song_player *p, uint32_t clock, uint64_t 
 {
     const struct song *s = p->song;
     unsigned k = song_tempo_at(s, clock);
+#if SONG_UI
+    for (unsigned t = 0; t < SONG_TRACKS; ++t) /* swung past an edge: dropped. Clips play on */
+        if (on_song(p, t)) { p->cursor[t] = (uint16_t)song_find(s, t, clock); p->late_count[t] = p->hits[t] = 0; }
+#else
     for (unsigned t = 0; t < SONG_TRACKS; ++t) p->cursor[t] = (uint16_t)song_find(s, t, clock);
     memset(p->late_count, 0, sizeof p->late_count); /* swung past an edge: dropped */
+#endif
 #if SONG_UI
-    memset(p->hits, 0, sizeof p->hits);
+    p->shift += p->next - clock; /* the transport runs on */
     ++p->pass; /* each pass rolls its own chances */
     if (p->stut_at != NEVER) { /* a loop or jump: a stutter goes on in step */
         uint32_t delta = clock - p->next;
@@ -158,6 +170,8 @@ SONG_SMALL void song_player_init(struct song_player *p, struct song *s, const st
     p->touch_track = 0xff;
     memset(p->program, 0xff, sizeof p->program);
     p->stut_at = NEVER;
+    memset(p->from, SONG_FROM_SONG, sizeof p->from);
+    memset(p->waiting, SONG_FROM_NONE, sizeof p->waiting);
 #endif
 }
 SONG_SMALL void song_player_start(struct song_player *p, uint64_t frame)
@@ -166,6 +180,8 @@ SONG_SMALL void song_player_start(struct song_player *p, uint64_t frame)
     if (p->playhead >= song_end(p->song)) p->playhead = 0;
 #if SONG_UI
     p->stut_at = NEVER;
+    p->next = p->playhead; /* the transport starts at the playhead */
+    p->shift = 0;
 #endif
     relocate(p, p->playhead, 0, 0);
     p->frame = frame;
@@ -184,6 +200,9 @@ SONG_SMALL void song_player_stop(struct song_player *p)
 #if SONG_UI
     p->stut_at = NEVER;
     memset(p->hits, 0, sizeof p->hits);
+    memset(p->from, SONG_FROM_SONG, sizeof p->from); /* every track back to the song */
+    memset(p->waiting, SONG_FROM_NONE, sizeof p->waiting);
+    memset(p->base, 0, sizeof p->base);
 #endif
 }
 SONG_SMALL void song_player_jump(struct song_player *p, uint32_t clock)
@@ -226,8 +245,12 @@ SONG_SMALL void song_player_advance(struct song_player *p, uint64_t frame)
      * events already due at the new position, and they belong to this block. */
     if (p->playing && p->revision != p->song->revision) {
         /* The notes changed under playback: find our place again. */
+#if SONG_UI
+        for (unsigned t = 0; t < SONG_TRACKS; ++t) refind(p, t, p->next + p->shift);
+#else
         for (unsigned t = 0; t < SONG_TRACKS; ++t) p->cursor[t] = (uint16_t)song_find(p->song, t, p->next);
         memset(p->late_count, 0, sizeof p->late_count);
+#endif
         p->revision = p->song->revision;
     }
 #if SONG_UI
@@ -264,6 +287,15 @@ SONG_SMALL void song_player_advance(struct song_player *p, uint64_t frame)
             p->pos = song_rescale(now, song_rate(s->tempo[k + 1].bpm100), rate);
             continue;
         }
+#if SONG_UI
+        if (kind == EDGE_END && !clips_playing(p)) { /* while clips play, the song goes round from the top */
+            song_player_stop(p);
+            p->playhead = 0;
+            return;
+        }
+        for (unsigned t = 0; t < SONG_TRACKS; ++t) if (on_song(p, t)) song_player_cut(p, t);
+        relocate(p, kind == EDGE_JUMP ? p->jump : kind == EDGE_END ? 0 : s->loop_start, now - at, rate);
+#else
         all_off(p);
         if (kind == EDGE_END) {
             p->playing = p->jumping = 0;
@@ -271,6 +303,7 @@ SONG_SMALL void song_player_advance(struct song_player *p, uint64_t frame)
             return;
         }
         relocate(p, kind == EDGE_JUMP ? p->jump : s->loop_start, now - at, rate);
+#endif
         if (kind == EDGE_JUMP) p->jumping = 0;
         else if (p->jumping) p->jump_at = bar_after(s, p->next);
     }

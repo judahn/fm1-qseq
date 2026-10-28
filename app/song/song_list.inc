@@ -80,6 +80,7 @@ static void song_list_draw(void)
 
 static void song_list_open(void)
 {
+    song_port_clip_close(); /* a clip in the editor goes back first: songs may load */
     page = music_page = SONG_LIST;
     song_list_confirm = song_list_naming = 0;
     cache->shown_page = ~0U;

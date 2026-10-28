@@ -32,9 +32,9 @@ static void song_header(const struct song *s)
     }
     unsigned bar = song_bar_at(s, song_now.clock, NULL, NULL), bpm = s->tempo[song_tempo_at(s, song_now.clock)].bpm100;
     const struct song_meter *m = song_meter_at(s, bar);
-    int marker = song_marker_step(s, song_now.clock + 1U, -1);
+    int marker = s->open ? -1 : song_marker_step(s, song_now.clock + 1U, -1);
     sig = song_now.playing | (s->loop_on << 1) | (song_now.jumping << 2) | ((uint32_t)(marker + 1) << 3) |
-          ((uint32_t)bpm << 8) | ((uint32_t)song_now.recording << 31);
+          ((uint32_t)bpm << 8) | ((uint32_t)s->open << 23) | ((uint32_t)song_now.recording << 31);
     sig = signature(sig, m, sizeof *m);
     if (sig == cache->header_cache) return;
     cache->header_cache = sig;
@@ -43,7 +43,8 @@ static void song_header(const struct song *s)
     else text(124, 5, song_now.playing ? "PLAY" : "STOP", 1, song_now.playing ? GREEN : DIM, BACK);
     text(124, 16, "LOOP", 1, s->loop_on ? ACCENT : PANEL, BACK);
     char name[SONG_MARKER_NAME + 1] = {0};
-    if (marker >= 0) memcpy(name, s->marker[marker].name, SONG_MARKER_NAME);
+    if (s->open) { strcpy(name, "CLIP "); decimal(name + 5, (s->open - SONG_TRACKS) % SONG_GRID_ROWS + 1, 1); } /* its row */
+    else if (marker >= 0) memcpy(name, s->marker[marker].name, SONG_MARKER_NAME);
     text(154, 5, name, 1, song_now.jumping ? DIM : AMBER, BACK);
     char meter[12], unit[12];
     decimal(meter, m->beats, 1);
@@ -114,7 +115,7 @@ static void song_footer(const struct song *s, const char *shift_k1)
     song_position(s, s->loop_end, end, 0);
     if (!song_now.glitching) knob(0, song_now.shift ? shift_k1 : "SNAP", song_now.shift ? "< >" : song_snaps[song_zoom], colors[0]);
     knob(1, "LOOP IN", start, colors[1]);
-    knob(2, "LOOP OUT", end, colors[2]);
+    knob(2, s->open ? "CLIP END" : "LOOP OUT", end, colors[2]);
     knob(3, "ZOOM", song_spans[song_zoom], colors[3]);
 }
 /* Memory, compact: flash (songs, then kits) and the song's RAM pool. */

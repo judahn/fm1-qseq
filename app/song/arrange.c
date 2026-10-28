@@ -107,15 +107,20 @@ SONG_SMALL int song_paste(struct song *s, const struct song_clip *clip, uint32_t
             if (song_event_kind(&e[i]) == SONG_FX) (void)song_remove(s, 0, i);
     }
     for (unsigned i = 0; i < clip->count; ++i) {
-        struct song_event e = moved(&clip->event[i], at + song_event_start(&clip->event[i]), 0);
-        unsigned glitch = song_event_glitch(&e), fx_event = song_event_kind(&e) == SONG_FX;
-        if (glitch) { /* the same attributes, wherever they sit in this song's table */
-            int at_now = song_glitch_intern(s, clip->glitch[glitch]);
-            e.at = (e.at & ~SONG_GLITCH_BITS) | (uint32_t)(at_now > 0 ? at_now : 0) << SONG_GLITCH_SHIFT;
-        }
-        (void)song_add_event(s, fx_event ? 0 : single ? track : clip->track[i], &e);
+        struct song_event e = song_board_event(s, clip, i, at);
+        (void)song_add_event(s, song_event_kind(&e) == SONG_FX ? 0 : single ? track : clip->track[i], &e);
     }
     return 0;
+}
+SONG_SMALL struct song_event song_board_event(struct song *s, const struct song_clip *clip, unsigned i, uint32_t at)
+{
+    struct song_event e = moved(&clip->event[i], at + song_event_start(&clip->event[i]), 0);
+    unsigned glitch = song_event_glitch(&e);
+    if (glitch) { /* the same attributes, wherever they sit in this song's table */
+        int at_now = song_glitch_intern(s, clip->glitch[glitch]);
+        e.at = (e.at & ~SONG_GLITCH_BITS) | (uint32_t)(at_now > 0 ? at_now : 0) << SONG_GLITCH_SHIFT;
+    }
+    return e;
 }
 SONG_SMALL int song_duplicate(struct song *s, unsigned tracks, uint32_t *from, uint32_t *to)
 {

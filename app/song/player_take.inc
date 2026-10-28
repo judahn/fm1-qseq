@@ -23,7 +23,8 @@ SONG_SMALL static void chased(void *context, unsigned track, unsigned lane, unsi
 }
 SONG_SMALL void song_player_chase(struct song_player *p, uint32_t clock)
 {
-    for (unsigned t = 0; t < SONG_TRACKS; ++t) song_chase(p->song, t, clock, chased, p);
+    for (unsigned t = 0; t < SONG_TRACKS; ++t)
+        if (on_song(p, t)) song_chase(p->song, t, clock, chased, p); /* clips chase as they launch */
 }
 SONG_SMALL void song_player_hold(const struct song_player *p, struct song_place *place)
 {

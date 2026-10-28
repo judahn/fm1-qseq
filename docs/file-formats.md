@@ -1,4 +1,4 @@
-# Song mode file formats and transfer commands (phase 5b)
+# Song mode file formats and transfer commands (phase 5b, clips in phase 7)
 
 Songs and kits move between the FM-1 and a computer through the browser workbench, over the stock SysEx
 transfer channel (`app/transfer.c`). The workbench saves them as two files of our own, and converts songs to
@@ -6,8 +6,8 @@ and from Standard MIDI Files. Everything is little endian. CRC-32 is the common 
 start `0xFFFFFFFF`, final inversion), the same as the device's `pool_crc` and the stock code's `groove_crc32`.
 
 Code: `app/song/song_file.c` (the payload on the device), `app/song/song_transfer.c` (the commands),
-`web/workbench/` (the codecs, MIDI and the workbench sections), with tests in `tests/workbench_test.mjs` and
-`tests/preview_5b.mjs`.
+`web/workbench/` (the codecs, MIDI and the workbench sections), with tests in `tests/workbench_test.mjs`,
+`tests/test_clips.c`, `tests/preview_5b.mjs` and `tests/preview_7.mjs`.
 
 ## Song file (`.fm1song`)
 
@@ -17,7 +17,7 @@ uploading the file gives the device the same bytes back, so device to file to de
 | Offset | Size | Field |
 |---|---|---|
 | 0 | 4 | Magic `FMSG` (`46 4D 53 47`) |
-| 4 | 2 | File version, 1 |
+| 4 | 2 | File version, the payload's: 1 or 2 |
 | 6 | 2 | Flags, 0 |
 | 8 | 4 | Payload length |
 | 12 | 4 | CRC-32 of the payload |
@@ -56,6 +56,28 @@ Size: 2,127 bytes with one tempo, one time signature and nothing else, plus 8 pe
 4 per extra time signature, 12 per marker and 5 per glitch entry. On the device a song takes
 ceil((64 + payload) / 4096) sectors of the pool: the 681-event test song is 7,641 bytes and 2 sectors.
 
+### Song payload, version 2 (phase 7, clips)
+
+Version 2 is version 1 with the payload version byte 2 and the clip grid after the tracks' events. The grid is 8
+tracks by 16 rows. Cell c is track * 16 + row, both from 0, and a cell holds a clip when it has a length.
+
+| Size | Field |
+|---|---|
+| 1 | Launch quantize: 0 off, 1 beat, 2 bar, 3 two bars, 4 four bars |
+| 1 + 9n | Row names in use, 0 to 16: row (1, 0 to 15), name (8, zero padded) |
+| 1 + per clip | Clips, 0 to 128, in rising cell order: cell (1, 0 to 127), length in clocks (2, 1 or more), event count (2), then the events as on a track |
+
+A clip's events are a track's: notes, controllers and program changes in clock order, at clocks from the clip's
+start. A clip keeps any events past its length, which stay quiet until the length grows again. The FX lane stays
+with the song and never sits in a clip. The 4,096-event limit counts the tracks and the clips together.
+
+The device saves every song as version 2 and reads both versions. A version 1 song loads with an empty grid and
+the launch quantize at a bar. The workbench reads both, writes a song back in the version it came in, and
+wraps each payload in a file of the same version, so an older song file keeps its bytes.
+
+Size: version 1 plus 3 bytes, 9 per named row, and 5 per clip plus 8 per clip event. The test song saved by the
+phase 7 firmware is 7,644 bytes.
+
 ## Kit file (`.fm1kit`)
 
 An 80-byte header, then the kit as a stock sample bank. The bank is what travels to the device (stock
@@ -64,7 +86,7 @@ commands 12 to 14), so a kit file is also readable by anything that knows the st
 | Offset | Size | Field |
 |---|---|---|
 | 0 | 4 | Magic `FMKT` (`46 4D 4B 54`) |
-| 4 | 2 | File version, 1 |
+| 4 | 2 | File version, the payload's: 1 or 2 |
 | 6 | 2 | Flags: bit 0 set when the pad settings are given |
 | 8 | 16 | Name, printable ASCII, zero padded, 15 characters at most |
 | 24 | 48 | Pad settings, 6 bytes per pad: level, tune, length, choke, variation, filter (zero when not given) |
@@ -126,8 +148,8 @@ Export is format 1 at 480 ticks per quarter note, so clocks carry over unchanged
 the song name, a time signature at the start of each signature's bar, the tempo changes and the markers.
 Tracks 2 to 9 are the FM-1 tracks 1 to 8 on MIDI channels 1 to 8, named after their engines, with the notes,
 controllers and program changes, and a program change at the start when the track's saved program is known
-and nothing else sits there. Every track ends at the end of the last bar. Glitch attributes, the FX lane and
-humanize are left out (the workbench says how many), and stay in the song file.
+and nothing else sits there. Every track ends at the end of the last bar. Glitch attributes, the FX lane,
+humanize and the clips are left out (the workbench says how many), and stay in the song file.
 
 Import takes format 0 and 1 files with any tick rate. Each part is a track and channel pair. Parts on
 channels 1 to 8, one per channel, map to the FM-1 track of that number, as an export does. Otherwise the

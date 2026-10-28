@@ -15,14 +15,18 @@ static uint32_t song_leds(uint32_t bits, unsigned visible)
 #endif
     if (visible == SONG) return bits | BUTTON(SEQ) | (p->song->loop_on ? BUTTON(ENV) : 0);
 #if SONG_UI
+    if (visible == SONG_GRID) return bits | BUTTON(SEQ) | (grid_naming ? BUTTON(ENV) : 0);
+#endif
+#if SONG_UI
     if (visible == SONG_STEP) return bits | BUTTON(REC) | (previous_buttons & BUTTON(LFO)) | (song_glitch_layer ? BUTTON(ARP) : 0);
 #else
     if (visible == SONG_STEP) return bits | BUTTON(REC) | (previous_buttons & BUTTON(LFO));
 #endif
     return visible == SONG_SETUP ? bits | BUTTON(GLO) : bits;
 }
-/* Key lights: the scale on pitched tracks, or the swinging tracks on the
- * settings page. Held keys stay lit. */
+/* Key lights: the scale on pitched tracks, the swinging tracks on the
+ * settings page, or in the grid each track key lit while its clip plays and
+ * blinking while a launch waits. Held keys stay lit. */
 static uint32_t song_key_leds(uint32_t bits, unsigned visible)
 {
 #if !SONG_UI
@@ -30,6 +34,14 @@ static uint32_t song_key_leds(uint32_t bits, unsigned visible)
     return bits;
 #else
     const struct song *s = song_port_song();
+    if (visible == SONG_GRID) {
+        const struct song_player *p = song_port_player();
+        bits = 0;
+        for (unsigned t = 0; t < SONG_TRACKS; ++t)
+            if (p->waiting[t] != SONG_FROM_NONE ? frame_time / 200U & 1U : p->from[t] < SONG_GRID_ROWS && p->playing)
+                bits |= 1U << white_keys[t];
+        return bits;
+    }
     if (visible == SONG_SETUP) {
         bits = 0;
         for (unsigned t = 0; t < SONG_TRACKS; ++t)

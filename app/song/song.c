@@ -1,12 +1,12 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* Song storage and editing. Tracks sit back to back in one event pool, each
- * sorted by start clock, so a track is one contiguous run. */
+/* Song storage and editing. Tracks, then the clips' parts, sit back to back
+ * in one event pool, each sorted by start clock, so a part is one run. */
 #include "song.h"
 #include "song_config.h"
 #include <string.h>
 #if SONG_UI /* edits are journaled for undo on the editing pages */
 #include "undo.h"
-#define JOURNAL(s, op, track, e) do { if ((s)->undo) song_undo_record((s)->undo, op, track, e, 0); } while (0)
+#define JOURNAL(s, op, track, e) do { if ((s)->undo) song_undo_record((s)->undo, op, song_owner(s, track), e, 0); } while (0)
 #else
 #define JOURNAL(s, op, track, e) ((void)0)
 #endif
@@ -21,12 +21,15 @@ SONG_SMALL void song_clear(struct song *s, unsigned bars, unsigned bpm100)
     s->meters = 1;
     s->loop_end = song_bar_clock(s, s->bars < 4 ? s->bars : 4);
     s->swing_tracks = 0xff;
+#if SONG_UI
+    s->launch_q = 2; /* a bar */
+#endif
     song_tempo_refresh(s);
 }
 
 SONG_SMALL const struct song_event *song_track(const struct song *s, unsigned track, unsigned *count)
 {
-    if (track >= SONG_TRACKS) { *count = 0; return s->event; }
+    if (track >= SONG_PARTS) { *count = 0; return s->event; }
     *count = s->count[track];
     return s->event + s->first[track];
 }
@@ -46,7 +49,7 @@ SONG_SMALL unsigned song_find(const struct song *s, unsigned track, uint32_t clo
 
 SONG_SMALL int song_add_event(struct song *s, unsigned track, const struct song_event *e)
 {
-    if (track >= SONG_TRACKS || s->events >= SONG_EVENTS) return -1;
+    if (track >= SONG_PARTS || s->events >= SONG_EVENTS) return -1;
     uint32_t clock = song_event_start(e);
     /* After any notes already at this clock, so chords keep their entry order. */
     unsigned at = s->first[track] + song_find(s, track, clock + 1);
@@ -54,7 +57,7 @@ SONG_SMALL int song_add_event(struct song *s, unsigned track, const struct song_
     s->event[at] = *e;
     ++s->count[track];
     ++s->events;
-    for (unsigned t = track + 1; t < SONG_TRACKS; ++t) ++s->first[t];
+    for (unsigned t = track + 1; t < SONG_PARTS; ++t) ++s->first[t];
     ++s->revision;
     JOURNAL(s, SONG_UNDO_ADD, track, e);
     return 0;
@@ -71,13 +74,13 @@ SONG_SMALL int song_add_note(struct song *s, unsigned track, uint32_t clock, uns
 
 SONG_SMALL int song_remove(struct song *s, unsigned track, unsigned index)
 {
-    if (track >= SONG_TRACKS || index >= s->count[track]) return -1;
+    if (track >= SONG_PARTS || index >= s->count[track]) return -1;
     unsigned at = s->first[track] + index;
     JOURNAL(s, SONG_UNDO_DEL, track, &s->event[at]);
     memmove(&s->event[at], &s->event[at + 1], (s->events - at - 1U) * sizeof s->event[0]);
     --s->count[track];
     --s->events;
-    for (unsigned t = track + 1; t < SONG_TRACKS; ++t) --s->first[t];
+    for (unsigned t = track + 1; t < SONG_PARTS; ++t) --s->first[t];
     ++s->revision;
     return 0;
 }

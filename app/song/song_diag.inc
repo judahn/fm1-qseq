@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* song-mode: the hardware diagnostics page, with SONG_HW_TEST on. SHIFT+SEQ
- * in the song view opens it, or SEQ when the song pages are left out.
+/* song-mode: the hardware diagnostics page, with SONG_HW_TEST on. It is the
+ * last of the device settings (SHIFT+GLO, then ALGO past the sync and MIDI
+ * pages), or SEQ opens it when the song pages are left out.
  * Control loop timing, note lateness per delivery method, audio health and
  * memory, each as one line of text. */
 #include "diag.h"

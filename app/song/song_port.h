@@ -52,6 +52,11 @@ uint32_t song_port_lock(void);                        /* the player, under deliv
 void song_port_unlock(uint32_t state);
 uint32_t song_port_hold(struct song_place *place);    /* player.h, with the player locked meanwhile */
 void song_port_resume(const struct song_place *place, uint32_t state);
+/* Clips (design 8f, song_port.c): launches, and a clip opened in the editor
+ * and closed again, playing on in step with the bar (player.h). */
+void song_port_launch(unsigned track, unsigned to);
+int song_port_clip_open(unsigned cell);
+void song_port_clip_close(void);
 /* K1 to K4 while recording (song_knobs.c): each drives a lane on the take
  * track, chosen per track (lanes.h), recorded in touch style. */
 unsigned song_port_engine(unsigned track);

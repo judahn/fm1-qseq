@@ -66,6 +66,14 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     case 36: return index ? player.stut_to : player.stut_at;
     case 37: return song.humanize_time[track & 7U] | (uint32_t)song.humanize_velocity[track & 7U] << 8;
     case 38: return song_store_probe(index);
+    case 39: return index < SONG_CELLS ? song.clip_length[index] : 0; /* clips (phase 7), by cell */
+    case 40: return index < SONG_CELLS ? song.count[song_owner(&song, SONG_TRACKS + index)] : 0;
+    case 41: return player.from[track & 7U] | (uint32_t)player.waiting[track & 7U] << 8;
+    case 42: return song.open | (uint32_t)song.launch_q << 8;
+    case 43: return song_player_transport(&player);
+    case 44: return player.base[track & 7U];
+    case 45: return player.launch_at[track & 7U];
+    case 46: { uint32_t v; memcpy(&v, song.row_name[index & 15U], 4); return v; }
 #endif
     case 18: return index < count ? e[index].b : 0;
     case 19: return song.swing | (uint32_t)song.swing_grid << 8 | (uint32_t)song.swing_tracks << 16;

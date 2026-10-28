@@ -29,7 +29,7 @@ static void test_model(void)
     CHECK_EQ(song_find(&song, 2, 0), 0);
     CHECK_EQ(song.events, 5);
     /* Invalid input is refused. */
-    CHECK(song_add_note(&song, 8, 0, 60, 100, 10) < 0);
+    CHECK(song_add_note(&song, SONG_PARTS, 0, 60, 100, 10) < 0); /* past the clips' parts */
     CHECK(song_add_note(&song, 0, 0, 128, 100, 10) < 0);
     CHECK(song_add_note(&song, 0, 0, 60, 0, 10) < 0);
     CHECK(song_add_note(&song, 0, 0, 60, 100, 0) < 0);

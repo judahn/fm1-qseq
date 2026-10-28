@@ -5,7 +5,8 @@
 #include "song_config.h"
 
 /* Multi-level undo as diffs (design section 9). An edit is a transaction of
- * records: notes added or removed, a time shift, and when the small maps
+ * records: notes added or removed (by part, song.h), a clip's length set, a
+ * time shift, and when the small maps
  * (tempo, meters, markers, loop, feel, key, glitch table) changed, their earlier
  * state. Moving the loop alone is not a step, and recording settings are
  * preferences, not edits.
@@ -18,7 +19,7 @@ enum { SONG_UNDO_BYTES = 16384, SONG_UNDO_LEVELS = 64 };
 #else
 enum { SONG_UNDO_BYTES = 32768, SONG_UNDO_LEVELS = 64 };
 #endif
-enum { SONG_UNDO_ADD = 1, SONG_UNDO_DEL, SONG_UNDO_SHIFT, SONG_UNDO_MAPS, SONG_UNDO_SOUND };
+enum { SONG_UNDO_ADD = 1, SONG_UNDO_DEL, SONG_UNDO_SHIFT, SONG_UNDO_MAPS, SONG_UNDO_SOUND, SONG_UNDO_LENGTH };
 enum { SONG_SOUND_BYTES = 223 }; /* a track's sound setup, opaque here (phase 6, Copy Track) */
 struct song_maps {
     struct song_tempo tempo[SONG_TEMPOS];

@@ -37,6 +37,7 @@
     if (s.glitched) left.push(s.glitched + ' glitch attributes');
     if (s.fx) left.push(s.fx + ' FX lane events');
     if (s.humanize) left.push('humanize');
+    if (s.clips) left.push(s.clips + (s.clips > 1 ? ' clips' : ' clip'));
     ui.save(out.bytes, ui.slug(name) + '.mid');
     ui.status('MIDI file saved.' + (left.length ? ' Left out (they stay in the song file): ' + left.join(', ') + '.' : ''));
   }

@@ -1,11 +1,13 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* song-mode: the song settings page (design section 8a). Starting tempo and
- * time signature, swing and key. ALGO turns between the knob pages, and
+ * time signature, swing, key, the metronome and the clips' launch quantize
+ * (8f). ALGO turns between the knob pages, and
  * the first eight white keys switch swing per track. The third page picks
  * the parameter each of K1 to K4 records on a track, and the fourth sets the
  * track's humanize (SELECT for the track on both). */
 
 static unsigned song_setup_page, song_setup_back = SONG, song_glo_from;
+static const char *const song_launch_names[5] = {"OFF", "BEAT", "BAR", "2 BARS", "4 BARS"};
 static void song_tempo_text(const struct song *s, char out[24])
 {
     char part[12];
@@ -122,7 +124,7 @@ static void song_setup_draw(void)
         }
     }
     if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
-    static const char *const labels[2][4] = {{"TEMPO", "TIME SIG", "SWING", "GRID"}, {"KEY", "SCALE", "METRONOME", "-"}};
+    static const char *const labels[2][4] = {{"TEMPO", "TIME SIG", "SWING", "GRID"}, {"KEY", "SCALE", "METRONOME", "LAUNCH Q"}};
     char values[4][24];
     if (!page2) {
         song_tempo_text(s, values[0]);
@@ -133,7 +135,7 @@ static void song_setup_draw(void)
         strcpy(values[0], song_key_names[s->key_root]);
         strcpy(values[1], song_scale_names[s->key_scale]);
         static const char *const clicks[3] = {"OFF", "ON", "REC"};
-        strcpy(values[2], clicks[s->metronome % 3U]); strcpy(values[3], "--");
+        strcpy(values[2], clicks[s->metronome % 3U]); strcpy(values[3], song_launch_names[s->launch_q % 5U]);
     }
     for (unsigned col = 0; col < 4; ++col) knob(col, labels[page2][col], values[col], colors[col]);
     const char *hint = page2 ? "ALGO PAGE  GLO BACK" : "KEYS 1-8 SWING TRACKS  ALGO PAGE";
@@ -182,6 +184,7 @@ static int song_setup_input(const struct fm1_controls *c, uint32_t *pressed, uin
         if (k[0]) s->key_root = (uint8_t)((s->key_root + 12 + k[0] % 12) % 12);
         s->key_scale = (uint8_t)clamp(s->key_scale + k[1], 0, SONG_SCALES - 1);
         s->metronome = (uint8_t)clamp(s->metronome + k[2], 0, 2);
+        s->launch_q = (uint8_t)clamp(s->launch_q + k[3], 0, 4);
     }
     for (unsigned t = 0; t < SONG_TRACKS && song_setup_page < 2; ++t)
         if ((key_down & ~blocked_keys) & (1U << white_keys[t])) s->swing_tracks ^= (uint8_t)(1U << t);
