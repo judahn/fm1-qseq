@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception
-// Phase 5b of the headless preview check, run from preview_check.mjs: the
+// Phase 5b of the preview check, run from preview_check.mjs: the
 // workbench's Songs and Kits sections driven through their own controls
 // against the page's simulator. Songs go down and back up byte for byte,
 // through MIDI and back, and from a factory template. A kit built from
@@ -10,6 +10,7 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
+import { checker } from './preview_lib.mjs';
 
 const require = createRequire(import.meta.url);
 export async function phase5b(browser, root) {
@@ -249,23 +250,64 @@ export async function phase5b(browser, root) {
     return out;
   });
   await context.close();
-  const q = out, k = q.kits, p = q.pad, l = q.loader, e = q.errors;
-  const ok = /saved as song 1/.test(q.saved) && /Uploaded as song 2/.test(q.uploaded) && /replaced/.test(q.replaced) &&
-    q.roundTrip.uploadedSame && q.roundTrip.replacedSame && q.midi.format === 1 && q.midi.division === 480 && q.midi.tracks === 9 &&
-    q.midi.tempos === original.tempos.length && q.midi.meters === original.meters.length && q.midi.markers === original.markers.length &&
-    q.midi.controllers === 17 && q.midi.programs >= 2 && /Uploaded as song 3/.test(q.richUploaded) && q.richSame &&
-    /1 glitch attributes, 1 FX lane events, humanize/.test(q.midiStatus) &&
-    /Imported/.test(q.imported) && Object.values(q.midiRoundTrip).every(v => v === true || v > 0) &&
-    /Uploaded as song 4/.test(q.importUploaded) && /Loaded/.test(q.importLoaded) && /Template ready/.test(q.template) &&
-    /Uploaded as song 5/.test(q.templateUploaded) && q.templateSong.name === 'ACID ALLEY' && q.templateSong.kit === 0 &&
-    q.templateSong.events === 0 && q.templateSong.sameTypes && q.afterTemplate.song === 5 && q.afterTemplate.kit === 1 &&
-    /written: 4 new samples, 0 already/.test(q.kitWritten) && /written: 0 new samples, 4 already/.test(q.kitAgain) &&
-    /written: 0 new samples, 4 already/.test(q.kitThird) && k.afterOne === k.samplesBefore + 4 && k.afterTwo === k.afterOne &&
-    k.afterThree === k.afterOne && k.afterDelete === k.afterOne && k.inUse === k.newKit && q.kitFile.name === 'TEST KIT 2' &&
-    q.kitFile.pads.filter(x => x[1]).length === 4 && q.kitFile.pads[0][1] === 8000 && p.newRms > 1e-3 && p.differs &&
-    p.newPads.slice(0, 4).every((a, i) => a && a !== p.stockPads[i]) && p.newPads.slice(4).every(a => !a) &&
-    l.after.songs === l.before.songs && l.after.kits === l.before.kits + 1 && l.after.samples === l.before.samples + 1 &&
-    q.cleared.songs === 0 && q.cleared.kits === l.after.kits && e.stock11 === 2 && e.stock0 === 14 && e.playing === 85 &&
-    e.invalid === 71 && e.copies > 10 && /Not enough room/.test(e.preCheck) && e.fullSong === 84 && e.fullKit === 84 && e.samplesAfter === e.samplesBefore;
-  return { ok, out };
+  const t = checker('5b'), q = out, k = q.kits, p = q.pad, l = q.loader, e = q.errors, rt = q.midiRoundTrip;
+  t.match('Songs: the working song is saved as song 1', q.saved, /saved as song 1/);
+  t.match('a downloaded song uploads as song 2', q.uploaded, /Uploaded as song 2/);
+  t.match('and replaces song 1', q.replaced, /replaced/);
+  t.yes('the upload downloads the same, byte for byte', q.roundTrip.uploadedSame, q.roundTrip);
+  t.yes('the replaced song downloads the same', q.roundTrip.replacedSame, q.roundTrip);
+  t.eq('MIDI export: format 1', q.midi.format, 1);
+  t.eq('MIDI export: 480 ticks per quarter', q.midi.division, 480);
+  t.eq('MIDI export: the conductor and 8 tracks', q.midi.tracks, 9);
+  t.eq('MIDI export: every tempo change', q.midi.tempos, original.tempos.length);
+  t.eq('MIDI export: every time signature', q.midi.meters, original.meters.length);
+  t.eq('MIDI export: every marker', q.midi.markers, original.markers.length);
+  t.eq('MIDI export: the controllers', q.midi.controllers, 17);
+  t.atLeast('MIDI export: the program changes', q.midi.programs, 2);
+  t.match('the rich song uploads as song 3', q.richUploaded, /Uploaded as song 3/);
+  t.yes('the rich song comes back byte for byte', q.richSame);
+  t.match('MIDI export says what it leaves out', q.midiStatus, /1 glitch attributes, 1 FX lane events, humanize/);
+  t.match('MIDI import imports', q.imported, /Imported/);
+  t.over('MIDI round trip: events', rt.events, 0);
+  for (const key of ['notesAndLanes', 'tempos', 'meters', 'markers', 'sounds', 'name']) t.eq('MIDI round trip: ' + key, rt[key], true);
+  t.match('the import uploads as song 4', q.importUploaded, /Uploaded as song 4/);
+  t.match('and loads', q.importLoaded, /Loaded/);
+  t.match('a factory template is ready', q.template, /Template ready/);
+  t.match('the template uploads as song 5', q.templateUploaded, /Uploaded as song 5/);
+  t.eq('template: its name', q.templateSong.name, 'ACID ALLEY');
+  t.eq('template: no kit of its own', q.templateSong.kit, 0);
+  t.eq('template: no events', q.templateSong.events, 0);
+  t.yes('template: the factory set\'s engines', q.templateSong.sameTypes, q.templateSong.types);
+  t.eq('after loading the template: song 5', q.afterTemplate.song, 5);
+  t.eq('after loading the template: the kit stays', q.afterTemplate.kit, 1);
+  t.match('Kits: the first write stores 4 samples', q.kitWritten, /written: 4 new samples, 0 already/);
+  t.match('the second finds all 4 there', q.kitAgain, /written: 0 new samples, 4 already/);
+  t.match('the kit file written again finds all 4 there', q.kitThird, /written: 0 new samples, 4 already/);
+  t.eq('samples after the first kit', k.afterOne, k.samplesBefore + 4);
+  t.eq('samples after the second kit', k.afterTwo, k.afterOne);
+  t.eq('samples after the third kit', k.afterThree, k.afterOne);
+  t.eq('samples after deleting a kit that shares them', k.afterDelete, k.afterOne);
+  t.eq('the new kit in use', k.inUse, k.newKit);
+  t.eq('kit file: its name', q.kitFile.name, 'TEST KIT 2');
+  t.eq('kit file: four pads with sound', q.kitFile.pads.filter(x => x[1]).length, 4);
+  t.eq('kit file: pad 1 trimmed to 8000 frames', q.kitFile.pads[0][1], 8000);
+  t.over('a pad plays the new kit (rms)', p.newRms, 1e-3);
+  t.yes('and sounds different from the stock kit', p.differs);
+  t.yes('pads 1 to 4 bound to new samples', p.newPads.slice(0, 4).every((a, i) => a && a !== p.stockPads[i]), p);
+  t.yes('pads 5 to 8 empty', p.newPads.slice(4).every(a => !a), p.newPads);
+  t.eq('the stock loader leaves the songs as they were', l.after.songs, l.before.songs);
+  t.eq('the stock loader makes a kit', l.after.kits, l.before.kits + 1);
+  t.eq('with one new sample', l.after.samples, l.before.samples + 1);
+  t.eq('clear drops the songs', q.cleared.songs, 0);
+  t.eq('clear keeps the kits', q.cleared.kits, l.after.kits);
+  t.eq('stock command 11 still answers', e.stock11, 2);
+  t.eq('stock command 0 still answers', e.stock0, 14);
+  t.eq('a song write while playing: refused (85)', e.playing, 85);
+  t.eq('a song with a bad tempo: refused as invalid (71)', e.invalid, 71);
+  t.over('songs written until the pool is full', e.copies, 10);
+  t.match('the workbench checks for room first', e.preCheck, /Not enough room/);
+  t.eq('a song into a full pool: refused (84)', e.fullSong, 84);
+  t.eq('a kit into a full pool: refused (84)', e.fullKit, 84);
+  t.eq('and no sample was left behind', e.samplesAfter, e.samplesBefore);
+  return { phase: '5b', checks: t.list, out };
 }

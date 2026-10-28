@@ -1,54 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception
-// Phase 6 of the headless preview check, run from preview_check.mjs: edit
+// Phase 6 of the preview check, run from preview_check.mjs: edit
 // jobs through the panel (SHIFT+EDIT, K1 the job, K2 to K4 its settings,
 // SAVE twice), then playback checked against exact block arithmetic.
 // Quantize (with undo and redo), strum, crescendo, fit to scale and a
 // cutoff ramp on one simulator. Normalize on a second, against a third
 // that plays the same song unbaked: every note on the same block. Saves
 // docs/phase6-*.png.
-import { pathToFileURL } from 'node:url';
-import fs from 'node:fs';
-import path from 'node:path';
+import { simPage, savePng, checker } from './preview_lib.mjs';
 
 export async function phase6(browser, root) {
-  const page = await browser.newPage();
-  await page.goto(pathToFileURL(path.join(root, 'build/preview/index.html')).href);
-  await page.waitForFunction(() => globalThis.FM1SimulatorCore && typeof FM1_SIMULATOR === 'object');
+  const page = await simPage(browser, root);
   const out = await page.evaluate(() => {
-    const wasm = Uint8Array.from(atob(FM1_SIMULATOR.data), ch => ch.charCodeAt(0));
-    const B = { FX: 2, ENV: 4, LFO: 5, EDIT: 6, GLO: 7, HOME: 8, SAVE: 9, ARP: 10, SEQ: 11, PLAY: 12, REC: 13 };
-    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    const B = previewButtons, same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    /* A simulator on the song view, with the job and playback helpers. */
     function rig() {
-      const c = new FM1SimulatorCore(wasm, null, null).c;
-      const r = { c };
-      r.tap = b => { c.sim_control(0, b, 1); c.sim_control(0, b, 0); };
-      r.key = k => { c.sim_control(1, k, 1); c.sim_control(1, k, 0); };
-      r.held = (b, fn) => { c.sim_control(0, b, 1); fn(); c.sim_control(0, b, 0); };
-      r.turn = (encoder, delta) => c.sim_control(2, encoder, delta);
-      r.render = n => { for (let i = 0; i < n; i++) c.sim_render(); };
-      r.info = (what, track = 0, index = 0) => c.sim_song_info(what, track, index) >>> 0;
-      r.page = () => new Uint8Array(c.memory.buffer, c.sim_state(), 8)[1];
-      r.knobs = () => {
-        const b = new Uint8Array(c.memory.buffer, c.sim_knobs(), 128);
-        const s = o => { let t = ''; for (let i = 0; i < 16 && b[o + i]; i++) t += String.fromCharCode(b[o + i]); return t; };
-        return [0, 1, 2, 3].map(k => s(k * 32) + ' ' + s(k * 32 + 16));
-      };
+      const r = previewRig(), c = r.c;
       r.events = t => Array.from({ length: r.info(0, t) }, (_, i) => ({ clock: r.info(1, t, i), a: r.info(2, t, i),
         length: r.info(3, t, i), b: r.info(18, t, i), kind: r.info(30, t, i), glitch: r.info(35, t, i) }));
       r.notes = t => r.events(t).filter(e => !e.kind);
-      r.png = () => {
-        const pixels = new Uint16Array(c.memory.buffer, c.sim_pixels(), 240 * 240);
-        const canvas = document.createElement('canvas'); canvas.width = canvas.height = 480;
-        const image = canvas.getContext('2d').createImageData(480, 480);
-        for (let y = 0; y < 480; y++)
-          for (let x = 0; x < 480; x++) {
-            const v = pixels[(y >> 1) * 240 + (x >> 1)], at = (y * 480 + x) * 4;
-            image.data[at] = (v >> 11) * 255 / 31; image.data[at + 1] = ((v >> 5) & 63) * 255 / 63;
-            image.data[at + 2] = (v & 31) * 255 / 31; image.data[at + 3] = 255;
-          }
-        canvas.getContext('2d').putImageData(image, 0, 0);
-        return canvas.toDataURL('image/png').split(',')[1];
-      };
       /* Jobs: open the page, K1 to the job, settings, SAVE twice. */
       r.job = (index, settings = () => {}) => {
         r.held(B.FX, () => r.tap(B.EDIT));
@@ -68,22 +37,12 @@ export async function phase6(browser, root) {
         r.tap(B.PLAY);
         const start = r.info(9);
         for (let i = 0; i < 40000 && r.info(7); i++) c.sim_render();
-        const n = c.sim_song_heard_count(), at = c.sim_song_heard();
-        const bytes = new Uint8Array(c.memory.buffer, at, n * 8), words = new Uint32Array(c.memory.buffer, at, n * 2);
-        const heard = Array.from({ length: n }, (_, i) => ({ block: words[i * 2], track: bytes[i * 8 + 4], a: bytes[i * 8 + 5],
-          b: bytes[i * 8 + 6], kind: bytes[i * 8 + 7] }));
+        const heard = r.heard();
         c.sim_song_capture(0);
         return { start, heard };
       };
       /* Exact block of a clock, for playing that began at block `start` on clock 0. */
-      r.block = () => {
-        const tempos = Array.from({ length: r.info(4) }, (_, k) => ({ clock: r.info(5, 0, k), bpm100: BigInt(r.info(6, 0, k)) }));
-        const den = tempos.reduce((d, t) => { let x = d, y = t.bpm100; while (y) [x, y] = [y, x % y]; return d / x * t.bpm100; }, 1n);
-        const frameNum = clock => { let num = 0n; tempos.forEach((t, k) => {
-          const to = Math.min(clock, k + 1 < tempos.length ? tempos[k + 1].clock : clock);
-          if (to > t.clock) num += BigInt(to - t.clock) * 551250n * (den / t.bpm100); }); return num; };
-        return (start, clock) => start + Number(frameNum(clock) / (den * 128n));
-      };
+      r.block = () => { const tempo = r.tempo(); return (start, clock) => tempo.block(start, 0, clock); };
       r.render(32);
       r.tap(B.SEQ);
       return r;
@@ -203,21 +162,42 @@ export async function phase6(browser, root) {
     o.loop = loop;
     return o;
   });
-  for (const [name, key] of [['jobs', 'jobsPng'], ['ramp', 'rampPng'], ['song', 'songPng'], ['normalize', 'normalizePng']]) {
-    fs.writeFileSync(path.join(root, `docs/phase6-${name}.png`), Buffer.from(out[key], 'base64'));
-    delete out[key];
-  }
+  for (const [name, key] of [['jobs', 'jobsPng'], ['ramp', 'rampPng'], ['song', 'songPng'], ['normalize', 'normalizePng']])
+    savePng(root, 'phase6-' + name, out, key);
   await page.close();
-  const q = out;
-  const ok = q.jobPage === 26 && q.quantizeShown[0] === 'JOB QUANTIZE' && q.quantizeShown[2] === 'GRID 1/8' &&
-    q.quantize.before > 0 && q.quantize.after === 0 && q.quantize.othersSame && q.undone && q.redone &&
-    q.strumShown[0] === 'JOB STRUM' && q.strum.chord.length === 4 &&
-    JSON.stringify(q.strum.got) === JSON.stringify(q.strum.chord.map((p, i) => [4320 + 30 * i, p])) &&
-    q.crescendoShown[0] === 'JOB CRESCENDO' && q.crescendo && q.key === (2 | 1 << 8) && q.fitShown[0] === 'JOB FIT TO SCALE' &&
-    q.fit.outside === 0 && q.fit.count > 0 && q.rampShown[0] === 'JOB RAMP' && q.ramp.points === 64 &&
-    q.ramp.first.b === 0 && q.ramp.last.b === 127 && q.playback.ok && q.playback.want > 600 &&
-    q.copyShown[3] === 'COPY SOUND' && q.copy.engine === q.copy.from && q.copy.from === 3 && q.copy.undone === 1 &&
-    q.glitched === 2 && q.normalizeShown[0] === 'JOB NORMALIZE' && q.bakedClean && q.bakedMore >= 5 &&
-    q.normalize.same && q.normalize.heard > 600;
-  return { ok, out };
+  const t = checker('6'), q = out;
+  t.eq('SHIFT+EDIT opens the job page', q.jobPage, 26);
+  t.eq('quantize: the job shown', q.quantizeShown[0], 'JOB QUANTIZE');
+  t.eq('quantize: grid 1/8', q.quantizeShown[2], 'GRID 1/8');
+  t.over('quantize: the PSG had triplets off the 8th grid', q.quantize.before, 0);
+  t.eq('quantize: none left off it', q.quantize.after, 0);
+  t.yes('quantize: other tracks untouched', q.quantize.othersSame);
+  t.yes('undo puts the triplets back', q.undone);
+  t.yes('redo quantizes again', q.redone);
+  t.eq('strum: the job shown', q.strumShown[0], 'JOB STRUM');
+  t.eq('strum: a four-note chord at 4320', q.strum.chord.length, 4);
+  t.eq('strum: its notes 30 clocks apart, low to high', q.strum.got, q.strum.chord.map((p, i) => [4320 + 30 * i, p]));
+  t.eq('crescendo: the job shown', q.crescendoShown[0], 'JOB CRESCENDO');
+  t.yes('crescendo: velocities ramp across the selection', q.crescendo);
+  t.eq('the key set to D major', q.key, 2 | 1 << 8);
+  t.eq('fit to scale: the job shown', q.fitShown[0], 'JOB FIT TO SCALE');
+  t.eq('fit to scale: no note outside D major', q.fit.outside, 0);
+  t.over('fit to scale: notes checked', q.fit.count, 0);
+  t.eq('ramp: the job shown', q.rampShown[0], 'JOB RAMP');
+  t.eq('ramp: a point every 16th', q.ramp.points, 64);
+  t.eq('ramp: starts at 0', q.ramp.first.b, 0);
+  t.eq('ramp: ends at 127', q.ramp.last.b, 127);
+  t.yes('played: every note and cutoff change on its block', q.playback.ok, q.playback);
+  t.over('played: events checked', q.playback.want, 600);
+  t.eq('copy track: the sound shown', q.copyShown[3], 'COPY SOUND');
+  t.eq('copy track: track 2 gets track 3\'s engine', q.copy.engine, q.copy.from);
+  t.eq('copy track: track 3 is the PSG', q.copy.from, 3);
+  t.eq('copy track: undo puts the 303 back', q.copy.undone, 1);
+  t.eq('normalize: two glitched notes to bake', q.glitched, 2);
+  t.eq('normalize: the job shown', q.normalizeShown[0], 'JOB NORMALIZE');
+  t.yes('normalize: no glitch, swing or humanize left', q.bakedClean);
+  t.atLeast('normalize: the repeats became notes', q.bakedMore, 5);
+  t.yes('normalize: heard the same as unbaked, block for block', q.normalize.same, q.normalize);
+  t.over('normalize: events compared', q.normalize.heard, 600);
+  return { phase: '6', checks: t.list, out };
 }
