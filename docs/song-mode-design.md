@@ -357,6 +357,9 @@ is a few seconds for a large song.
   browser preview.
 - Before the first flash, the stock firmware and any projects are backed up.
 - The firmware is GPL. If it's ever shared, its source goes with it.
+- **Flash for the full device build** (Judah, 10/28): 8 more storage sectors (32 KB) go to code, about 1.4
+  seconds of sample time out of about 19.6. The hardware diagnostics page comes out of the full build once
+  the timing test settles the delivery method.
 
 ## 8e. Glitch (agreed 10/27)
 
@@ -416,7 +419,8 @@ The stock sync and MIDI pages that SEQ used to reach move to the device settings
 | PLAY | Play and stop. Stopping hands every track back to the song |
 
 Launches wait for the launch quantize, a song setting: off, beat, bar (the default), 2 bars or 4 bars.
-Launching while stopped starts playback. The track keys' LEDs show each track: lit while its clip plays,
+Launch points count on the song's bar lines, as in Live, and the song loop's wrap counts as one too, so a loop
+that ends mid-bar keeps launches in time (10/28). Launching while stopped starts playback. The track keys' LEDs show each track: lit while its clip plays,
 blinking while a launch waits. A clip starts from its beginning and loops at its own length, and keeps its
 phase across a song loop or a marker jump.
 
@@ -431,6 +435,10 @@ melody on the song.
 length. Everything there works on the clip: step entry, recording, automation, glitch and the jobs. SEQ goes
 back to the grid. Pasting copied song bars into a cell turns a section already written into a clip, and several
 copied tracks paste across the row onto their own tracks.
+
+The song keeps running while a clip is open, and its tracks keep playing, so a bass clip can be written
+against the song's drums. REC while playing records into the open clip from its next pass, as loop recording,
+while everything else plays on. Recording in the song view still starts from a stop (Judah, 10/28, after 7a).
 
 **Clips in the song are references** (Judah, 10/28). Each track gets a clip lane of blocks, such as "clip 3
 from bar 9 to bar 17", drawn as shaded, numbered blocks on the track's row in the song view. Inside a block the
