@@ -14,7 +14,9 @@ struct song_diag {
     uint32_t check_ticks, check_ms, tick_khz; /* the tick clock against fm1_millis, per second */
     uint32_t late[SONG_DIAG_LATE], late_max, notes;
     uint32_t largest_free, engine_free[6];  /* largest free block, and with each engine on track 6 */
+    uint32_t heap;                         /* the link map's heap, 0 where there is none (the browser) */
     int8_t heaviest;                       /* engine type that leaves least, -1 before the probe */
+    uint8_t outside;                       /* malloc gave a block outside the heap: no result */
     uint8_t at, count, primed;
 };
 extern struct song_diag song_diag;
@@ -24,6 +26,12 @@ void song_diag_poll(uint32_t ticks, uint32_t now_ms, uint32_t blocks);
 void song_diag_late(uint32_t blocks_now, uint32_t due_block);
 /* Window summary: min, average and max, in microseconds and in blocks. */
 void song_diag_window(uint32_t us[3], uint32_t blocks_x10[3]);
-uint32_t song_diag_largest_free(void); /* malloc probe, freed at once */
-int song_diag_engines(void);           /* try each engine on track 6, then put it back */
+/* The memory probe: malloc by binary search, each block freed at once and
+ * never written. It reaches SONG_DIAG_CEILING at most, and in the device
+ * build no more than the heap, and a block only counts when it lies inside
+ * the heap. A result within 16 bytes of the top reads as "or more". */
+enum { SONG_DIAG_CEILING = 1U << 19 };
+uint32_t song_diag_largest_free(void);
+uint32_t song_diag_top(void); /* where the search stops */
+int song_diag_engines(void);  /* try each engine on track 6, then put it back */
 #endif

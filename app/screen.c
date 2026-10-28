@@ -36,6 +36,7 @@ static uint16_t paint_pixels[FM1_SCREEN_WIDTH * PAINT_ROWS];
 static uint8_t paint_left[PAINT_BANDS], paint_right[PAINT_BANDS];
 static unsigned paint_rendering, paint_top, paint_next, paint_x, paint_end;
 static uint32_t paint_priority;
+static unsigned paint_turn, paint_sweep; /* song-mode: paint_flush's turns, and the in-turn cursor */
 static struct fm1_ble_status frame_ble;
 static struct fm1_bluetooth_status frame_radio;
 static unsigned frame_radio_flags, frame_radio_role;
@@ -1239,7 +1240,7 @@ static void leds(const struct groove_view *v, unsigned visible)
         | ((visible == FM_EDIT || visible == TONE_EDIT || visible == FM_QUICK || visible == STEP_EDIT) << EDIT)
         | ((visible == FM_ENV) << ENV) | ((visible == FM_LFO) << LFO)
         | ((visible == PROJECT || visible == SOURCE || (visible == ACTIONS && action_confirm)) << SAVE);
-    bits = song_leds(bits, visible); /* song-mode */
+    bits = 0x3fffU; /* song-mode: every button lit on every page, so its printed label can be read */
     changed = bits ^ button_led_cache;
     for (unsigned key = 0; key < 14; ++key)
         if (changed & (1U << key)) fm1_led_set(key, (bits >> key) & 1U);
@@ -1664,14 +1665,15 @@ static void paint_flush(void)
             if (pending < 0) saved_cache.shown_page = ~0U;
             break;
         }
-        unsigned band = paint_next;
+        unsigned band = paint_turn ? paint_sweep : paint_next; /* song-mode */
         /* Fresh knob/key feedback goes ahead of the rest of a page repaint.
          * Rotate within that set so continuous motion cannot starve its text. */
-        if (paint_priority)
+        if (paint_priority && !paint_turn) /* song-mode: every other band goes in turn, from its own cursor */
             for (unsigned i = 0; i < PAINT_BANDS; ++i) {
                 unsigned candidate = (paint_next + i) % PAINT_BANDS;
                 if (paint_priority & (1U << candidate)) { band = candidate; break; }
             }
+        if (paint_turn) paint_sweep = (band + 1U) % PAINT_BANDS; else /* song-mode */
         paint_next = (band + 1U) % PAINT_BANDS;
         unsigned left = paint_left[band], width = paint_right[band] - left;
         if (left >= paint_right[band]) continue;
@@ -1689,6 +1691,7 @@ static void paint_flush(void)
         paint_left[band] = FM1_SCREEN_WIDTH;
         paint_right[band] = 0;
         paint_priority &= ~(1U << band);
+        paint_turn ^= 1U; /* song-mode: the device sends one band per poll, and steady motion starved the rest */
         /* The DMA borrows paint_pixels. The next iteration/poll must observe
          * completion before composing another band into that same buffer. */
         if (fm1_millis() - started >= 4U) break;
@@ -1795,7 +1798,7 @@ void groove_screen_init(void)
     arp_down = arp_long = 0;
     memset(project_stored, 0, sizeof project_stored);
     cache->shown_page = ~0U;
-    led_cache = button_led_cache = 0;
+    led_cache = 0; button_led_cache = 0x3fffU; /* song-mode: lit below */
     memset(key_note, 0xff, sizeof key_note); project_keys = 0;
     memset(operator_page, 0, sizeof operator_page);
     memset(operator_selected, 0, sizeof operator_selected);
@@ -1809,7 +1812,7 @@ void groove_screen_init(void)
     memset(encoder_direction, 0, sizeof encoder_direction);
     memset(encoder_speed, 0, sizeof encoder_speed);
     fm1_controls_init();
-    for (unsigned key = 0; key < 41; ++key) fm1_led_set(key, 0);
+    for (unsigned key = 0; key < 41; ++key) fm1_led_set(key, key < 14); /* song-mode: buttons lit from the start */
     fm1_screen_init();
     boot_started = fm1_millis();
     boot_active = 1;

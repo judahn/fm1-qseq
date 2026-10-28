@@ -11,16 +11,16 @@ This project is not affiliated with Yamaha, Ableton or M-VAVE.
 
 ## Status
 
-**Nothing has run on hardware yet.** The first hardware session is planned in
-[docs/hardware-test-plan.md](docs/hardware-test-plan.md). It starts with a timing test that decides how song
-notes reach the engine. Until then, treat every device build as untested.
+**Song playback timing has been measured on an FM-1, with the default build.** That timing test chose how
+song notes reach the engine (method B, below). The results are in
+[docs/hardware-test-plan.md](docs/hardware-test-plan.md). **The full build hasn't run on the device yet.**
 
 There are two device builds, and the browser preview:
 
 | Build | What's in it | App size |
 |---|---|---|
-| Default (`./build.sh`) | FM1 Open V14 plus a diagnostics page that plays a built-in test song, for the timing test. To fit, it leaves out the 16 factory preset projects and the workbench's project, sample and voice transfers. Firmware updates still work | 453,896 bytes of 453,921 |
-| Full (`FM1_SONG_DEVICE_FULL=1`) | The whole song mode. It leaves out the stock step and pattern pages (their sync and MIDI pages move to the device settings), the stock project pages, the demo projects, the factory sound sets and the built-in FM factory voices | 522,856 bytes of 548,129 |
+| Default (`./build.sh`) | The hardware test build: FM1 Open V14 plus a diagnostics page that plays a built-in test song and measures its timing. To fit, it leaves out the 16 factory preset projects and the workbench's project, sample and voice transfers. Firmware updates still work | 453,480 bytes of 453,921 |
+| Full (`FM1_SONG_DEVICE_FULL=1`) | The whole song mode, without the diagnostics page. It leaves out the stock step and pattern pages (their sync and MIDI pages move to the device settings), the stock project pages, the demo projects, the factory sound sets and the built-in FM factory voices | 518,472 bytes of 548,129 |
 | Browser preview | The whole song mode on FM1 Open's simulator, in one HTML file | |
 
 ### What installing the full build costs
@@ -31,7 +31,7 @@ slots and the first 8 sectors of the stock sample area. On the device that means
 - The settings sector moves, so the MIDI, clock and Bluetooth settings start from their defaults.
 - The stock projects are overwritten and the stock sample bank is lost. Kits come from the workbench, which
   can send FM1 Open's 8 built-in sounds as a kit.
-- The SDK's settings area (VM) takes the space between the code and the Bluetooth sector, 56 KB at the
+- The SDK's settings area (VM) takes the space between the code and the Bluetooth sector, 60 KB at the
   current size, and the Bluetooth sector moves. Neither has been tried on hardware.
 - The DX7 voice banks and the tuning sector keep their places. Songs and kits share the remaining 101 sectors
   (404 KB).
@@ -46,8 +46,10 @@ The full build and the preview have all of these. The [user guide](docs/user-gui
 - 8 tracks of notes and automation, 4,096 events, 480 clocks per quarter note, up to 999 bars.
 - Tempo changes (20 to 300 BPM) and time signature changes anywhere, markers and a loop region.
 - Swing (8th or 16th) switched on per track, and a key and scale that played notes snap to.
-- The player runs off the audio sample clock, so timing doesn't drift. The timing test settles how its notes
-  reach the engine on the device.
+- The player runs off the audio sample clock, so timing doesn't drift. Its notes reach the engine block by
+  block: while a song plays, the audio interrupt wakes the control loop after every 2.9 ms block to hand over
+  the next block's notes. On the FM-1 that got 1,312 of the test song's 1,361 notes into their block and the
+  rest one block late.
 
 **Step entry**
 - Lengths from a 64th to a whole note, with triplets, dots and double dots.
@@ -96,6 +98,10 @@ The full build and the preview have all of these. The [user guide](docs/user-gui
 - Close, spread and smooth voicing, and a strum (a 64th to an 8th) up, down, alternating or random.
 - Chords record as plain notes. In step entry a root enters its whole chord.
 
+**The panel**
+- Every button light stays on, on every page, so the printed labels can be read. The key lights still show
+  the scale, the swinging tracks and the clips playing.
+
 **The workbench**
 - A "Songs and kits" section in the FM1 Open workbench page, for the device or the page's simulator.
 - Song files, MIDI export and import, kits built from WAV files with per-pad prep, the built-in kit, and
@@ -127,6 +133,7 @@ Then:
 | `./build.sh --firmware` | The firmware and its update image | Also `build/dx7/generated/FM1_OFFICIAL_OPEN.fwsc` |
 | `./build.sh --package` | The firmware, its update image, and a workbench page that carries it and the original V15 | Also `build/official-web/FM1-Official-Open-Source.html` and its `SHA256SUMS.txt` |
 | `./build.sh --preview` | The browser preview | `build/preview/index.html` |
+| `./build.sh --test-preview` | A preview built like the default device build: no song pages, the diagnostics page | `build/preview-test/index.html` |
 | `./build.sh --web` | The same preview, with its source link filled in | `build/preview/index.html` |
 | `./build.sh --help` | Prints this list | |
 
@@ -142,7 +149,7 @@ FM1_SONG_DEVICE_FULL=1 FM1_SOURCE_URL=https://github.com/judahn/fm1-qy/archive/C
 ```
 
 A firmware build prints its size and checks it fits. A package build also prints the flash layout, for example
-`Offline package fits 1 MiB: image 540672, VM 57344, user 442368 bytes`.
+`Offline package fits 1 MiB: image 536576, VM 61440, user 442368 bytes`.
 
 Every firmware build of a kind (default or full) first clears that kind's update image and replaces its
 workbench page with a "Build incomplete" stub. So after a plain `./build.sh`, run `--package` again before
@@ -156,7 +163,8 @@ still here. We haven't tried it with our changes.
 
 ## Installing on the device
 
-This is how FM1 Open's workbench installs firmware. **None of it has been done with these builds yet.**
+This is how FM1 Open's workbench installs firmware. The default build went onto an FM-1 for the timing test.
+**The full build hasn't been installed yet.**
 
 1. Build the page: `./build.sh --package`, or the full build command above.
 2. Open `build/official-web/FM1-Official-Open-Source.html` (or the `-songfull` one) in desktop Chrome or Edge.
@@ -235,18 +243,25 @@ This builds and runs the C tests in `tests/` with the Mac's `cc`, under the addr
 sanitizers. The flash map test and the storage tests then run on the full build's flash layout. Last come the
 workbench's Node tests.
 
+`tests/test_deliver.c` checks note delivery as the full build runs it, against a model of the FM-1's audio
+interrupt and control loop: every note of the test song and of a stress song must render in the block it's
+due.
+
 ```sh
 ./build.sh --preview
+./build.sh --test-preview
 PLAYWRIGHT_MODULE=/path/to/node_modules/playwright node tests/preview_check.mjs
 ```
 
-This drives the preview headless in Playwright's Chromium, phase by phase. It prints each failure with its
-phase, name, actual and expected values, then the totals per phase.
+This drives the previews headless in Playwright's Chromium, phase by phase. The diagnostics phase uses
+`build/preview-test/`, the rest `build/preview/`. Some checks slow the simulated LCD to the device's pace,
+one 16-row band per control poll, which is where a page could be left half painted on the FM-1. It prints
+each failure with its phase, name, actual and expected values, then the totals per phase.
 
 | Variable | Effect |
 |---|---|
 | `PLAYWRIGHT_MODULE` | Where Playwright is, when it isn't installed in this repo |
-| `PREVIEW_PHASES=7b,8` | Run only these phases |
+| `PREVIEW_PHASES=7b,8` | Run only these phases (also `diagnostics` and `panel`) |
 | `PREVIEW_DUMP=1` | Print each phase's full record too |
 
 The checks save screenshots to `docs/`. Screens of the device come out the same on every run. Shots of the

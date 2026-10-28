@@ -30,15 +30,14 @@ SONG_SMALL static void send(unsigned track, unsigned pitch, unsigned velocity)
 #endif
 }
 void song_chord_service(uint32_t block) { song_strum_due(&strum, (uint64_t)(block + 1U) * FM1_BLOCK_FRAMES, send); }
+unsigned song_chord_waiting(void) { return strum.count; }
 void song_chord_forget(void) { ready = 0; } /* a song loaded: smooth and the random strum start again from it */
 /* The chord sounding lets go: what went out ends, what was still to come never plays. */
 SONG_SMALL static void let_go(void)
 {
-    uint32_t state = song_port_lock();
     for (unsigned i = 0; i < count; ++i)
         if (song_strum_drop(&strum, held_track, notes[i])) song_port_chord_drop(held_track, notes[i]);
         else send(held_track, notes[i], 0);
-    song_port_unlock(state);
     count = 0;
     key = 0xff;
 }
@@ -49,10 +48,10 @@ SONG_SMALL static void strike(unsigned t, unsigned k, const uint8_t *pitch, unsi
     uint8_t offset[CHORD_NOTES];
     if (key != 0xff) let_go();
     song_chord_strum(s, t, n, &play[t], offset);
-    uint32_t clock = song_player_clock(p), state = song_port_lock();
+    uint32_t clock = song_player_clock(p);
     song_strum_add(&strum, (uint64_t)song_port_blocks() * FM1_BLOCK_FRAMES, s->tempo[song_tempo_at(s, clock)].bpm100, t, pitch,
                    offset, n, 100);
-    song_port_unlock(state);
+    song_deliver_poll(); /* what is due now goes now, and the wake takes the rest block by block */
     song_port_chord_take(t, pitch, offset, n);
     if (entry) step_chord(entry, pitch, offset, n);
     memcpy(notes, pitch, n);

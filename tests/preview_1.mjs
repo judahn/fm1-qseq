@@ -107,7 +107,8 @@ export async function phase1(browser, root) {
     controls.balancedAfterStop = r.balanced(r.heard());
     // SEQ: the song view to the clip grid and back (phase 7). The stock sync
     // and MIDI pages are in the device settings: SHIFT+GLO opens Bluetooth,
-    // and ALGO turns on to the step page's 5 to 8, then the diagnostics, and back.
+    // and ALGO turns on to the step page's 5 to 8 and stops there (the full build
+    // has no diagnostics page), and back.
     const pages = [r.page()];
     r.tap(B.SEQ); pages.push(r.page());
     r.tap(B.SEQ); r.render(4); pages.push(r.page());
@@ -139,6 +140,6 @@ export async function phase1(browser, root) {
     { atBreak: k.atBreak, inBlock: k.inBlock });
   t.yes('after the jump, bar 7 on plays in time', k.afterJump.ok, k.afterJump);
   t.yes('balanced after stopping the jump', k.balancedAfterStop);
-  t.eq('SEQ grid route and SHIFT+GLO device route pages', k.pages, '19,27,19,7,1,1,1,1,22,1,1,1,1,7,19');
+  t.eq('SEQ grid route and SHIFT+GLO device route pages', k.pages, '19,27,19,7,1,1,1,1,1,1,1,1,7,7,19');
   return { phase: '1', checks: t.list, out };
 }

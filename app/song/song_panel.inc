@@ -136,15 +136,13 @@ static unsigned song_seq_on_steps;
 enum { SONG_HOME = SONG_UI ? SONG : SONG_DIAG }; /* where SEQ goes */
 #if SONG_UI
 /* The device settings (8a): Bluetooth on SHIFT+GLO, then ALGO turns on to
- * the stock sync and MIDI pages (the step page's 5 to 8) and the hardware
- * diagnostics, and back. Within the step page's pages the stock code turns. */
+ * the stock sync and MIDI pages (the step page's 5 to 8), and back. Within
+ * the step page's pages the stock code turns. */
 static int song_device_turn(int turn)
 {
-    unsigned to = turn > 0 && page == BLE ? 4U : turn < 0 && page == STEPS && seq_page == 4 ? 1U
-        : SONG_HW_TEST && turn > 0 && page == STEPS && seq_page == 7 ? 2U : turn < 0 && page == SONG_DIAG ? 7U : 0U;
+    unsigned to = turn > 0 && page == BLE ? 4U : turn < 0 && page == STEPS && seq_page == 4 ? 1U : 0U;
     if (!to) return 0;
     if (to == 1) { page = BLE; ble_view = ble_forget = ble_action = 0; ble_result = 0; }
-    else if (to == 2) page = music_page = SONG_DIAG;
     else { page = STEPS; seq_page = to; step_follow = 1; }
     cache->shown_page = ~0U;
     return 1;
@@ -153,7 +151,7 @@ static int song_device_turn(int turn)
 static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
 {
 #if SONG_UI
-    if ((page == BLE || page == STEPS || page == SONG_DIAG) && song_device_turn(c->encoders[1])) return 1;
+    if ((page == BLE || page == STEPS) && song_device_turn(c->encoders[1])) return 1;
 #endif
     if ((*pressed & BUTTON(SEQ)) && !(c->buttons & BUTTON(HOME))) {
         if (page == STEPS) { song_seq_on_steps = 1; return 0; }

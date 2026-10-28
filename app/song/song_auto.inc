@@ -128,16 +128,16 @@ static void song_auto_draw(void)
     song_footer(s, "CHANGE");
     song_notice_expire();
     if (song_now.glitching) song_stutter_hint(hint);
-    else if (song_auto_conductor && song_auto_mode == 2) strcpy(hint, "FX STUTTERS  SCL DEL  SHIFT+SCL CLEAR");
+    else if (song_auto_conductor && song_auto_mode == 2) strcpy(hint, "FX STUTTERS  SEL DEL  SHIFT+SEL CLEAR");
     else if (song_auto_conductor && !song_auto_mode) {
         unsigned bpm = s->tempo[song_tempo_at(s, song_now.clock)].bpm100;
         strcpy(hint, "TEMPO "); decimal(part, (int)(bpm / 100), 1); strcat(hint, part);
         strcat(hint, "."); decimal(part, (int)(bpm % 100), 2); strcat(hint, part);
-        strcat(hint, "  ALGO SET  SCL DEL");
+        strcat(hint, "  ALGO SET  SEL DEL");
     } else if (song_auto_conductor) {
         const struct song_meter *m = song_meter_at(s, song_bar_at(s, song_now.clock, NULL, NULL));
         strcpy(hint, "TIME SIG "); decimal(part, m->beats, 1); strcat(hint, part); strcat(hint, "/");
-        decimal(part, m->unit, 1); strcat(hint, part); strcat(hint, "  ALGO SET  SCL DEL");
+        decimal(part, m->unit, 1); strcat(hint, part); strcat(hint, "  ALGO SET  SEL DEL");
     } else {
         unsigned lane = song_auto_lane(track);
         int value = song_lane_at(s, track, lane, song_now.clock);

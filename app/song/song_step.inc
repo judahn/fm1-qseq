@@ -125,7 +125,7 @@ static void song_step_draw(void)
         if (cache->seq_cache != 0x57e9U) {
             cache->seq_cache = 0x57e9U;
             paint_fill(0, 168, 240, 24, BACK);
-            text(8, 170, "SCL DEL   ENV BACK DEL   LFO SELECT", 1, DIM, BACK);
+            text(8, 170, "SEL DEL   ENV BACK DEL   LFO SELECT", 1, DIM, BACK);
             text(8, 181, "F5 REST   F#5 REPEAT     G5 TIE", 1, DIM, BACK);
         }
     }

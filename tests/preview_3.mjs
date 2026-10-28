@@ -205,7 +205,7 @@ export async function phase3(browser, root) {
   k.eq('SHIFT+E4 deletes the bars, the tempo change and a marker moving left',
     a.deleted, { end: -span, tempo: -span, markers: -1, tracks: true });
   k.yes('undo puts the deleted bars back', a.deleteUndoOk);
-  k.eq('SCL adds a marker', a.markersAdded, 1);
+  k.eq('SEL adds a marker', a.markersAdded, 1);
   k.eq('undo takes the marker back', a.markersAfterUndo, 0);
   k.eq('REC opens the chooser', t.chooserPage, 23);
   k.eq('chooser: overdub, a bar of count-in, 1/16 at 100%, metronome while recording', t.settings, [2, 1, 5, 100, 2]);

@@ -1,29 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* song-mode: button and key lights on the song pages, and the scale snap
- * for played keys. Included by song_panel.inc. */
+/* song-mode: key lights on the song pages, and the scale snap for played
+ * keys. Included by song_panel.inc. The button lights are all on, all the
+ * time, on every page (screen.c), so the printed labels can be read. */
 
-/* Button lights: the page's own buttons, and PLAY while the song plays. */
-static uint32_t song_leds(uint32_t bits, unsigned visible)
-{
-    const struct song_player *p = song_port_player();
-    if (p->playing) bits |= BUTTON(PLAY);
-    if (visible < SONG) return bits;
-    bits &= ~(BUTTON(HOME) | BUTTON(ENV) | BUTTON(FX) | BUTTON(GLO) | BUTTON(REC) | BUTTON(LFO));
-    if (previous_buttons & BUTTON(FX)) bits |= BUTTON(FX);
-#if SONG_UI
-    bits = song_stuttering() ? bits | BUTTON(ARP) : bits & ~BUTTON(ARP);
-#endif
-    if (visible == SONG) return bits | BUTTON(SEQ) | (p->song->loop_on ? BUTTON(ENV) : 0);
-#if SONG_UI
-    if (visible == SONG_GRID) return bits | BUTTON(SEQ) | (grid_naming ? BUTTON(ENV) : 0);
-#endif
-#if SONG_UI
-    if (visible == SONG_STEP) return bits | BUTTON(REC) | (previous_buttons & BUTTON(LFO)) | (song_glitch_layer ? BUTTON(ARP) : 0);
-#else
-    if (visible == SONG_STEP) return bits | BUTTON(REC) | (previous_buttons & BUTTON(LFO));
-#endif
-    return visible == SONG_SETUP ? bits | BUTTON(GLO) : bits;
-}
 /* Key lights: the scale on pitched tracks, the swinging tracks on the
  * settings page, or in the grid each track key lit while its clip plays and
  * blinking while a launch waits. Held keys stay lit. */

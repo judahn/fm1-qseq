@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* Hardware test measurements. See diag.h. */
+/* Hardware test measurements, in the hardware test build only. See diag.h. */
 #include "diag.h"
 #include "song.h"
 #include "song_config.h"
+#if SONG_HW_TEST
 #include "instrument.h"
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +16,8 @@ SONG_SMALL void song_diag_reset(void)
     memset(&song_diag, 0, sizeof song_diag);
     song_diag.heaviest = kept.heaviest; /* memory results survive a stats reset */
     song_diag.largest_free = kept.largest_free;
+    song_diag.heap = kept.heap;
+    song_diag.outside = kept.outside;
     memcpy(song_diag.engine_free, kept.engine_free, sizeof kept.engine_free);
 }
 SONG_SMALL void song_diag_poll(uint32_t ticks, uint32_t now_ms, uint32_t blocks)
@@ -67,15 +70,49 @@ SONG_SMALL void song_diag_late(uint32_t blocks_now, uint32_t due_block)
     if (late > song_diag.late_max) song_diag.late_max = late;
     ++song_diag.notes;
 }
-/* The largest block malloc will hand out, by binary search. Each probe is
- * freed at once, so nothing stays allocated. */
+
+/* On the FM-1 the first probe read 524,272 bytes free with every engine, the
+ * top of the search, while the link map gives the heap about 213 KB. So
+ * malloc there doesn't return NULL when it runs out, and only a block that
+ * lies inside the heap counts. The heap is _HEAP_BEGIN to _HEAP_END in the
+ * link map (build/dx7/sdk.map). The browser has no such bound. */
+#ifndef FM1_OPEN_WEB
+extern char _HEAP_BEGIN[], _HEAP_END[];
+static uint32_t heap_bytes(void) { return (uint32_t)((uintptr_t)_HEAP_END - (uintptr_t)_HEAP_BEGIN); }
+#endif
+SONG_SMALL uint32_t song_diag_top(void)
+{
+#ifdef FM1_OPEN_WEB
+    return SONG_DIAG_CEILING;
+#else
+    return heap_bytes() < SONG_DIAG_CEILING ? heap_bytes() : SONG_DIAG_CEILING;
+#endif
+}
+SONG_SMALL static int inside(const char *p, uint32_t bytes)
+{
+#ifdef FM1_OPEN_WEB
+    (void)p;
+    (void)bytes;
+    return 1;
+#else
+    uintptr_t at = (uintptr_t)p, begin = (uintptr_t)_HEAP_BEGIN, end = (uintptr_t)_HEAP_END;
+    return at >= begin && at <= end && bytes <= end - at;
+#endif
+}
+/* Each block is freed at once and never written. The first block outside
+ * the heap ends the search, and the probe stays off until a restart. */
 SONG_SMALL uint32_t song_diag_largest_free(void)
 {
-    uint32_t low = 0, high = 1U << 19;
-    while (low + 16U < high) {
+    uint32_t low = 0, high = song_diag_top();
+#ifndef FM1_OPEN_WEB
+    song_diag.heap = heap_bytes();
+#endif
+    while (!song_diag.outside && low + 16U < high) {
         uint32_t mid = (low + high) / 2U;
-        void *p = malloc(mid);
-        if (p) { free(p); low = mid; }
+        char *p = malloc(mid);
+        if (p && !inside(p, mid)) song_diag.outside = 1;
+        free(p);
+        if (p && !song_diag.outside) low = mid;
         else high = mid;
     }
     song_diag.largest_free = low;
@@ -87,10 +124,10 @@ SONG_SMALL uint32_t song_diag_largest_free(void)
 int song_diag_engines(void)
 {
     unsigned keep = groove_source_type(5), least = ~0U;
-    (void)song_diag_largest_free();
-    uint32_t now = song_diag.largest_free;
+    uint32_t now = song_diag_largest_free();
     song_diag.heaviest = -1;
-    for (unsigned type = 0; type < GROOVE_SOURCES && type < 6; ++type) {
+    memset(song_diag.engine_free, 0, sizeof song_diag.engine_free);
+    for (unsigned type = 0; !song_diag.outside && type < GROOVE_SOURCES && type < 6; ++type) {
         song_diag.engine_free[type] = groove_source_set(5, type) ? 0 : song_diag_largest_free();
         if (song_diag.engine_free[type] && song_diag.engine_free[type] < least) {
             least = song_diag.engine_free[type];
@@ -99,5 +136,6 @@ int song_diag_engines(void)
     }
     int result = groove_source_set(5, keep);
     song_diag.largest_free = now;
-    return result;
+    return song_diag.outside ? -1 : result;
 }
+#endif

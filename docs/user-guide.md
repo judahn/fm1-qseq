@@ -1,18 +1,21 @@
 # FM1 QY user guide
 
 This covers the song mode as it is built, in the full device build (`FM1_SONG_DEVICE_FULL=1`) and in the
-browser preview, which has all of it. The default device build has only a diagnostics page, described at the
-end. Nothing here has run on hardware yet.
+browser preview, which has all of it. The default device build is the hardware test build: it has only a
+diagnostics page, described at the end. Song playback timing has been measured on the FM-1 with that build.
+The full build hasn't run on the device yet.
 
-Names are the ones printed on the panel and shown on the screen. Where the screen and the stock manual use
-different names, both are given.
+Names are the ones printed on the panel and shown on the screen.
+
+Every button light is on, all the time, on every page, so the printed labels can be read. The lights don't
+show which page or mode is active. The key lights work as described below.
 
 ## The panel
 
 | Control | Name in this guide | In song mode |
 |---|---|---|
 | Buttons | FX | SHIFT on every song page |
-| | SCL (the stock manual says SEL) | Markers, delete, open a clip, depending on the page |
+| | SEL | Markers, delete, open a clip, depending on the page |
 | | ENV, LFO | Loop and metronome, picking, depending on the page |
 | | EDIT | Sound editing, as in the stock firmware. SHIFT+EDIT opens the edit jobs |
 | | GLO | Song settings. A hold is still the stock mixer |
@@ -38,7 +41,7 @@ The FM-1 starts on the stock overview. SEQ goes to the song view.
 |---|---|---|
 | Song view | SEQ from any stock page, or from the grid | SEQ to the grid, HOME to the stock overview |
 | Clip grid | SEQ in the song view | SEQ back to the song view |
-| A clip in the editor | SCL on a grid cell | SEQ closes it and goes back to the grid |
+| A clip in the editor | SEL on a grid cell | SEQ closes it and goes back to the grid |
 | REC chooser | REC in the song view, stopped | REC or PLAY starts, HOME leaves |
 | Step entry | REC, pick STEP with K1, then REC or PLAY | REC leaves, PLAY leaves and plays from the pointer's bar |
 | Song settings | Tap GLO on a song page | Tap GLO again |
@@ -82,7 +85,7 @@ Tracks are rows, bars run across. The loop region is shaded and is also the sele
 | K4 | Zoom: 16, 8, 4 or 2 bars across. The snap follows: a bar, half a bar, a beat or an 8th |
 | ENV | Loop on or off |
 | SHIFT+ENV | Metronome: off, on, or only while recording |
-| SCL | Add a marker at the playhead (M1, M2 and so on, 16 at most) |
+| SEL | Add a marker at the playhead (M1, M2 and so on, 16 at most) |
 | SHIFT+LFO | The automation view |
 | SHIFT+EDIT | The edit jobs |
 | Hold LFO, tap F3 to F4 | Add or remove tracks 1 to 8 from the selection |
@@ -151,7 +154,7 @@ chooser afterwards requantizes the last take. Undo takes the whole take back.
 | K3 | Gate: 50, 90, 99 or 100% |
 | K4 | Move the pointer one step. SHIFT+K4 jumps note to note |
 | PRESETS | Move the selected notes by scale step, by octave with SHIFT. On drum tracks, from pad to pad |
-| SCL | Delete the notes at the pointer |
+| SEL | Delete the notes at the pointer |
 | ENV | Back-delete: move back one step and delete there |
 | Hold LFO, tap keys | Pick which notes at the pointer K1 to K3 and delete act on |
 | ARP | The glitch layer (below), and ARP again to leave it |
@@ -193,7 +196,7 @@ The song's kit is chosen on the song list (K3).
 ## Device settings
 
 SHIFT+GLO opens the stock Bluetooth and clock page. ALGO turns on to the stock pages that used to live on SEQ:
-SYNC / LOOP, MIDI TRACK, MIDI ROUTING and TRACK ROLE, then the diagnostics page (end of this guide).
+SYNC / LOOP, MIDI TRACK, MIDI ROUTING and TRACK ROLE.
 
 ## Automation view
 
@@ -204,8 +207,8 @@ SHIFT+LFO in the song view. The conductor row sits above track 1. Turning SELECT
 | SELECT | The row: a track, or the conductor |
 | PRESETS | The lane shown: one of the track engine's parameters, or programs. On the conductor: tempo, time signature or the FX lane |
 | ALGO | Stopped: set a change at the playhead. Tempo (SHIFT: hundredths), the time signature from that bar, or a program change |
-| SCL | Delete the change at the playhead |
-| SHIFT+SCL | Clear the shown lanes (or the FX lane's stutters) in the selection |
+| SEL | Delete the change at the playhead |
+| SHIFT+SEL | Clear the shown lanes (or the FX lane's stutters) in the selection |
 | SHIFT+K1 | Move to the next or previous change on the row |
 
 Everything else works as in the song view. Controller lanes are recorded with K1 to K4 during a take.
@@ -268,7 +271,7 @@ track's loop, a beat to 16 bars long. A track plays either the song or a clip, n
 | F3 to F4 | Launch that track's cell in the cursor row. An empty cell stops the track. On the SONG row the track goes back to the song |
 | G4 to G5 | Launch rows 1 to 8 of the page on every track (a scene). Tracks with nothing in the row stop |
 | SHIFT+SEQ | Every track back to the song |
-| SCL | Open the clip at the cursor. An empty cell gets a new one-bar clip |
+| SEL | Open the clip at the cursor. An empty cell gets a new one-bar clip |
 | ENV | Name the row: K1 picks the letter, K2 changes it, ENV or SAVE finishes |
 | SHIFT + F3, G3, A3 or B3, E4 | Copy, cut, paste, paste, delete the cell |
 | PLAY | Play and stop. Launching while stopped starts playback. Stopping gives every track back to the song |
@@ -282,7 +285,7 @@ Pasting copied song bars into a cell turns them into a clip. Several copied trac
 
 ### A clip in the editor
 
-SCL on a cell opens the clip in the song view's editor, looped to its own length. K3, labelled CLIP END,
+SEL on a cell opens the clip in the song view's editor, looped to its own length. K3, labelled CLIP END,
 sets that length. Step entry, recording, automation, glitch and the jobs that stay inside the track all work
 on the clip. SELECT stays on the clip's track, and the markers are hidden. SEQ closes it.
 
@@ -356,17 +359,19 @@ chord at the pointer, strummed when strum is on, and the top three keys stay res
 
 ## Diagnostics page
 
-In the full build it's the last device settings page (SHIFT+GLO, then ALGO). In the default build SEQ opens it
-directly, and SEQ again goes to the stock step page.
+Only in the default device build, the hardware test build, and in the preview `./build.sh --test-preview`
+makes. SEQ opens it from the stock pages, and SEQ again goes to the stock step page. The full build and the
+regular preview don't have it.
 
 | Control | Action |
 |---|---|
 | PLAY | Play and stop the built-in test song (12 bars) |
-| K1 | The note delivery method: A or B. With SHIFT, C, an experiment |
-| SCL | Clear the numbers |
-| ENV | Engine memory probe (stopped) |
+| K1 | The note delivery method, A or B, while stopped. It starts on B |
+| SEL | Clear the numbers |
+| ENV | Memory probe, with each engine on track 6 in turn (stopped) |
 | LFO | Largest free memory block |
-| HOME | Back to the song view (full build) |
+| HOME | Back to the stock overview |
 
-The page shows control loop timing, how late notes land for the method in use, audio health and memory. The
+The page shows control loop timing, how late notes land for the method in use, audio health and memory. A
+memory figure with "+" or "OR MORE" reached the top of the probe's search, so it's that much or more. The
 hardware test plan in `docs/hardware-test-plan.md` says what to write down.

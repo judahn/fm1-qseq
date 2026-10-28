@@ -2,8 +2,10 @@
 /* Song glue: owns the song, the player and step entry, and hands notes to
  * the engine as MIDI on each track's input channel (song_deliver.c says how). */
 #include "song_port.h"
-#include "diag.h"
 #include "instrument.h"
+#if SONG_HW_TEST
+#include "diag.h"
+#endif
 #include <string.h>
 #if SONG_UI
 #include "undo.h"
@@ -99,8 +101,10 @@ SONG_SMALL static void ensure(void)
 #if SONG_UI
     step_init(&step, &song, &output);
 #endif
+#if SONG_HW_TEST
     song_diag_reset();
     song_diag.heaviest = -1;
+#endif
 #if SONG_UI
     song_undo_init(&undo);
     undo.sound = put_sound;
@@ -117,11 +121,13 @@ struct song_player *song_port_player(void) { ensure(); return &player; }
 struct song_step *song_port_step(void) { ensure(); return &step; }
 #endif
 
-/* Each control poll: timing for the diagnostics page, then methods A and B. */
+/* Each control poll: timing for the diagnostics page, then the delivery. */
 SONG_SMALL void song_port_poll(void)
 {
     ensure();
+#if SONG_HW_TEST
     song_diag_poll(song_port_ticks(), fm1_millis(), song_port_blocks());
+#endif
     song_deliver_poll();
 #if SONG_UI
     clip_take();
@@ -137,25 +143,22 @@ SONG_SMALL void song_port_poll(void)
 #endif
 }
 
-/* Device playback is on in the hardware test build (song_config.h). */
 SONG_SMALL int song_port_start(void)
 {
     ensure();
-#if defined(FM1_OPEN_WEB) || SONG_HW_TEST
 #ifdef FM1_OPEN_WEB
     start_block = song_port_blocks();
     start_clock = player.playhead;
 #endif
+#if SONG_HW_TEST
     song_diag_reset();
+#endif
 #if SONG_UI
     player.click = song.metronome == 1;
     pads();
 #endif
     song_deliver_start(0);
     return 0;
-#else
-    return -1;
-#endif
 }
 
 #if SONG_UI
@@ -168,30 +171,24 @@ struct song_recorder *song_port_recorder(void) { ensure(); return &recorder; }
  * track back to what it played. */
 SONG_SMALL void song_port_launch(unsigned track, unsigned to)
 {
-    uint32_t state = song_port_lock();
     song_player_launch(&player, track, to);
-    song_port_unlock(state);
 }
 SONG_SMALL int song_port_clip_open(unsigned cell)
 {
-    uint32_t state = song_port_lock();
     int r = song_clip_open(&song, cell);
     if (!r) {
         player.waiting[cell / SONG_GRID_ROWS] = SONG_FROM_NONE;
         song_player_edit(&player, cell / SONG_GRID_ROWS, 1);
     }
-    song_port_unlock(state);
     return r;
 }
 SONG_SMALL void song_port_clip_close(void)
 {
     if (!song.open) return;
-    uint32_t state = song_port_lock();
     unsigned t = song_editing(&song);
     clip_armed = 0;
     song_clip_close(&song);
     song_player_edit(&player, t, 0);
-    song_port_unlock(state);
 }
 /* REC while playing with a clip open: loop recording into it from its next
  * pass, while everything else plays on. Armed until the clip goes round. */
@@ -252,7 +249,6 @@ SONG_SMALL int song_port_record(unsigned mode, unsigned track)
     start_block = song_port_blocks();
     start_clock = player.playhead;
 #endif
-    song_diag_reset();
     uint64_t now = (uint64_t)song_port_blocks() * FM1_BLOCK_FRAMES;
     pads();
     song_deliver_start(song.count_in);

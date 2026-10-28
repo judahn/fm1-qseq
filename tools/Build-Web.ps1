@@ -4,14 +4,15 @@ param(
     [string]$WasiSdk = $env:FM1_WASI_SDK,
     [string]$PackageJson,
     [string]$SourceUrl = $env:FM1_SOURCE_URL,
-    [switch]$LocalPreview
+    [switch]$LocalPreview,
+    [switch]$TestBuild # song-mode: the hardware test build's configuration, for build/preview-test
 )
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $utf8 = New-Object Text.UTF8Encoding $false
 function Hash([string]$file) { (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() }
 function Build-Simulator {
-    $out = Join-Path $root 'build/web'
+    $out = Join-Path $root $(if ($TestBuild) { 'build/web-test' } else { 'build/web' }) # song-mode
     [IO.Directory]::CreateDirectory($out) | Out-Null
     function Digest([string[]]$items) {
         $algorithm = [Security.Cryptography.SHA256]::Create()
@@ -81,6 +82,7 @@ function Build-Simulator {
         '-std=c11','-O2','-fwrapv','-fno-fast-math','-ffp-contract=off',
         '-DFM1_HOST_TEST','-DFM1_OPEN_WEB','-Wall','-Wextra','-Werror',
         '-Wno-unused-function','-Wno-array-parameter','-mexec-model=reactor')
+    if ($TestBuild) { $options += @('-DSONG_UI=0','-DSONG_HW_TEST=1') } # song-mode: no song pages, the diagnostics page
     foreach ($name in @('web/engine','web/synth','third_party/synth','sdk/include','app/synth','app')) { $options += '-I' + (Join-Path $root $name) }
     foreach ($name in $names) { if ($name.EndsWith('.c') -and !$name.StartsWith('sdk/')) { $options += Join-Path $root $name } }
     $options += @('-Wl,--strip-all','-Wl,-z,stack-size=131072','-Wl,--initial-memory=4194304','-Wl,--max-memory=33554432','-o',$wasm)
@@ -96,12 +98,14 @@ function Build-Simulator {
     [pscustomobject]@{file=$wasm; source_sha256=$sourceHash; cache_hit=$false}
 }
 $output = Join-Path $root $(if ($PackageJson -and $env:FM1_SONG_DEVICE_FULL -eq '1') { 'build/official-web-songfull/FM1-Official-Open-Source.html' } # song-mode
-    elseif ($PackageJson) { 'build/official-web/FM1-Official-Open-Source.html' } else { 'build/preview/index.html' })
+    elseif ($PackageJson) { 'build/official-web/FM1-Official-Open-Source.html' }
+    elseif ($TestBuild) { 'build/preview-test/index.html' } else { 'build/preview/index.html' }) # song-mode
 # Invalidate old output before source URL validation can stop this build.
 foreach ($file in @($output, (Join-Path (Split-Path $output) 'SHA256SUMS.txt'))) {
     if ([IO.File]::Exists($file)) { [IO.File]::Delete($file) }
 }
 if ($LocalPreview -and $PackageJson) { throw 'LocalPreview cannot produce a firmware distribution.' }
+if ($TestBuild -and !$LocalPreview) { throw 'TestBuild is a local preview only.' } # song-mode
 if ([string]::IsNullOrWhiteSpace($SourceUrl) -and !$LocalPreview) {
     throw 'Set FM1_SOURCE_URL or -SourceUrl to the HTTPS URL of the matching source archive.'
 }
@@ -161,4 +165,4 @@ if ($PackageJson) {
     Write-Host "Integrated FM1 workbench: $output"
     [pscustomobject]@{file=$output;sha256=$hash;simulator_sha256=(Hash $compiled.file);
         simulator_source_sha256=$compiled.source_sha256;simulator_bytes=$wasm.Length}
-} else { Write-Host 'Preview: build/preview/index.html' }
+} else { Write-Host ('Preview: ' + $output.Substring($root.Length + 1)) } # song-mode

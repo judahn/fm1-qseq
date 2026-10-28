@@ -85,13 +85,18 @@ int fm1_screen_blit(unsigned x, unsigned y, unsigned w, unsigned h,
     if (w) screen_changed(y, h);
     return 0;
 }
-/* Browser pixel copies complete immediately. */
-int fm1_screen_pending(void) { return 0; }
+/* Browser pixel copies complete immediately. song-mode: unless a check asks
+ * for the device's pace. There the LCD's DMA is still busy right after a
+ * band goes out, so the screen takes one band per control poll. */
+static uint8_t lcd_paced, lcd_busy;
+int fm1_screen_pending(void) { return lcd_busy; }
+EXPORT("sim_lcd_paced") void sim_lcd_paced(unsigned on) { lcd_paced = on != 0; lcd_busy = 0; }
 int fm1_screen_submit(unsigned x, unsigned y, unsigned w, unsigned h,
                       uint16_t *source, size_t count)
 {
     if (!w || !h || w > 240U || h > 240U || w * h > FM1_SCREEN_DMA_PIXELS) return -1;
     int result = fm1_screen_blit(x, y, w, h, source, count);
+    lcd_busy = lcd_paced; /* song-mode */
     if (!result)
         for (unsigned i = 0; i < w * h; ++i)
             source[i] = (uint16_t)((source[i] << 8) | (source[i] >> 8));
@@ -369,7 +374,7 @@ EXPORT("sim_render") const float *sim_render(void)
     fm1_output_mix(previous);
     frames += FM1_BLOCK_FRAMES; uint32_t next = (uint32_t)(frames * 1000U / 44100U);
     unsigned poll = now_ms / 10U != next / 10U; now_ms = next;
-    if (poll) { fm1_web_tick(); fm1_web_control(); }
+    if (poll) { lcd_busy = 0; fm1_web_tick(); fm1_web_control(); } /* song-mode: lcd_busy */
     return output;
 }
 EXPORT("sim_state") const uint8_t *sim_state(void)

@@ -41,7 +41,7 @@ static void song_action(unsigned which, uint32_t now)
         return;
     }
     struct song_place place;
-    uint32_t state = song_port_hold(&place); /* playing goes on in time */
+    song_player_hold(song_port_player(), &place); /* playing goes on in time */
     int r;
     if (which == 0) r = song_copy(s, c, song_selected(), s->loop_start, s->loop_end);
     else if (which == 1) r = song_cut(s, c, song_selected(), s->loop_start, s->loop_end);
@@ -55,7 +55,7 @@ static void song_action(unsigned which, uint32_t now)
     }
     else if (which == 5) r = song_insert_time(s, s->loop_start, s->loop_end - s->loop_start);
     else r = song_delete_time(s, s->loop_start, s->loop_end);
-    song_port_resume(&place, state);
+    song_player_resume(song_port_player(), &place);
     notice = !r ? done[which] : which >= 2 && which <= 3 && !c->length ? "COPY SOMETHING FIRST"
         : r == -2 ? "THAT CLIP IS IN ANOTHER SONG" : "DOESN'T FIT";
     notice_until = now + 1500U;
@@ -86,10 +86,10 @@ static void song_undo_key(uint32_t buttons, uint32_t now)
 {
     unsigned redo = (buttons & BUTTON(FX)) != 0;
     struct song_place place;
-    uint32_t state = song_port_hold(&place);
+    song_player_hold(song_port_player(), &place);
     int r = song_port_recorder()->active ? 1 : redo ? song_redo(song_port_undo(), song_port_song())
                                                     : song_undo(song_port_undo(), song_port_song());
-    song_port_resume(&place, state);
+    song_player_resume(song_port_player(), &place);
     if (r > 0) notice = "STOP RECORDING FIRST";
     else if (r) notice = redo ? "NOTHING TO REDO" : "NOTHING TO UNDO";
     else { notice = redo ? "REDONE" : "UNDONE"; song_port_recorder()->taken = 0; } /* the take can't be requantized now */

@@ -15,6 +15,7 @@ status=0
 for test in "$ROOT"/tests/test_*.c; do
     name=$(basename "$test" .c)
     [ "$name" = test_flash_map ] && continue # full layout only, below
+    [ "$name" = test_deliver ] && continue   # the full build's delivery, below
     # shellcheck disable=SC2086
     $CC $FLAGS -I"$ROOT/app/song" "$test" $SOURCES -o "$OUT/$name"
     "$OUT/$name" || status=1
@@ -28,6 +29,12 @@ for name in test_flash_map test_store test_corrupt test_corrupt_kits test_kit_co
     $CC $FLAGS $FULL -I"$ROOT/app/song" "$ROOT/tests/$name.c" $SOURCES -o "$OUT/${name}_full"
     "$OUT/${name}_full" || status=1
 done
+# Note delivery as the full build runs it (song_deliver.c, method B), with
+# the SDK's declarations and the device model in the test.
+# shellcheck disable=SC2086
+$CC $FLAGS -DSONG_DEVICE_FULL=1 -DFM1_HOST_TEST -I"$ROOT/app/song" -I"$ROOT/sdk/include" \
+    "$ROOT/tests/test_deliver.c" "${DELIVER:-$ROOT/app/song/song_deliver.c}" $SOURCES -o "$OUT/test_deliver"
+"$OUT/test_deliver" || status=1
 # The workbench's file codecs and MIDI (web/workbench), in Node.
 if command -v node >/dev/null 2>&1; then node "$ROOT/tests/workbench_test.mjs" || status=1
 else echo "run_host: node not found, workbench tests skipped"; fi

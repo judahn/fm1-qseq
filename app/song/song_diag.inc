@@ -1,9 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* song-mode: the hardware diagnostics page, with SONG_HW_TEST on. It is the
- * last of the device settings (SHIFT+GLO, then ALGO past the sync and MIDI
- * pages), or SEQ opens it when the song pages are left out.
- * Control loop timing, note lateness per delivery method, audio health and
- * memory, each as one line of text. */
+/* song-mode: the hardware diagnostics page, in the hardware test build
+ * (SONG_HW_TEST), where SEQ opens it. Control loop timing, note lateness
+ * per delivery method, audio health and memory, each as one line of text. */
 #include "diag.h"
 
 static void diag_num(char *out, const char *label, uint32_t value)
@@ -21,6 +19,15 @@ static void diag_tenths(char *out, const char *label, uint32_t x10) /* one decim
     decimal(n, (int)(x10 % 10U), 1);
     strcat(out, n);
 }
+/* A memory probe's result in KB. At the top of the search it shows the top,
+ * with "+": that much or more. Returns 1 there. */
+static int diag_kb(char *out, const char *label, uint32_t bytes)
+{
+    int top = bytes + 16U >= song_diag_top();
+    diag_tenths(out, label, (top ? song_diag_top() : bytes) * 10U / 1024U);
+    if (top) strcat(out, "+");
+    return top;
+}
 /* One text line per row. Rows repaint only when their text changes. */
 static void diag_row(unsigned row, unsigned y, const char *line, uint16_t color)
 {
@@ -34,7 +41,7 @@ static void diag_row(unsigned row, unsigned y, const char *line, uint16_t color)
 }
 static void song_diag_draw(void)
 {
-    static const char *const methods[3] = {"A: CONTROL LOOP", "B: A + WAKE EACH BLOCK", "C: RISKY, POSTS FROM IRQ"};
+    static const char *const methods[2] = {"A: CONTROL LOOP", "B: A + WAKE EACH BLOCK"};
     const struct song_diag *d = &song_diag;
     unsigned method = song_port_method();
     char line[48];
@@ -54,7 +61,7 @@ static void song_diag_draw(void)
     line[0] = 0;
     diag_num(line, "POLLS ", d->polls); diag_tenths(line, "  TIMER CHECK ", d->tick_khz / 100U); strcat(line, " MHZ");
     diag_row(3, 62, line, DIM);
-    diag_row(4, 74, methods[method], method == SONG_DELIVER_C ? AMBER : GREEN);
+    diag_row(4, 74, methods[method & 1U], GREEN);
     line[0] = 0; diag_num(line, "LATE 0:", d->late[0]); diag_num(line, " 1:", d->late[1]);
     diag_num(line, " 2:", d->late[2]); diag_num(line, " 3+:", d->late[3]);
     diag_row(5, 84, line, TEXT);
@@ -73,22 +80,34 @@ static void song_diag_draw(void)
     diag_row(9, 126, line, render.overloads || engine.underruns ? AMBER : TEXT);
     line[0] = 0; diag_num(line, "MIDI DROP ", engine.midi_dropped); diag_num(line, "  BLOCKS ", dma.blocks);
     diag_row(10, 136, line, DIM);
-    line[0] = 0; diag_num(line, "LARGEST FREE ", d->largest_free); strcat(line, " B");
-    diag_row(11, 148, line, TEXT);
-    if (d->heaviest < 0) diag_row(12, 158, "ENV: FREE MEMORY WITH EACH ENGINE ON T6", DIM);
-    for (unsigned half = 0; d->heaviest >= 0 && half < 2; ++half) {
+    /* Memory: what the probe can vouch for, and nothing when malloc gave a
+     * block outside the heap. */
+    line[0] = 0;
+    if (d->outside) strcpy(line, "MALLOC GAVE A BLOCK OUTSIDE THE HEAP");
+    else if (!d->largest_free) strcpy(line, "LARGEST FREE: ENV TO PROBE");
+    else {
+        int top = diag_kb(line, "LARGEST FREE ", d->largest_free);
+        if (top) line[strlen(line) - 1] = 0; /* the words instead of "+" */
+        strcat(line, top ? " KB OR MORE" : " KB");
+    }
+    diag_row(11, 148, line, d->outside ? AMBER : TEXT);
+    line[0] = 0;
+    if (d->heap) { diag_tenths(line, "HEAP ", d->heap * 10U / 1024U); strcat(line, " KB  "); }
+    if (d->heaviest >= 0 && !d->outside) strcat(line, "ENGINES (+ OR MORE)");
+    diag_row(12, 158, line, DIM);
+    for (unsigned half = 0; half < 2; ++half) {
         static const char *const names[6] = {"DX7 ", " 303 ", " 808 ", "PSG ", " PLK ", " SMP "};
         line[0] = 0;
-        for (unsigned t = half * 3; t < half * 3 + 3; ++t) diag_tenths(line, names[t], d->engine_free[t] / 102U);
-        diag_row(12 + half, 158 + half * 10, line, DIM);
+        for (unsigned t = half * 3; d->heaviest >= 0 && !d->outside && t < half * 3 + 3; ++t) diag_kb(line, names[t], d->engine_free[t]);
+        diag_row(13 + half, 168 + half * 10, line, DIM);
     }
     if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
-    knob(0, "METHOD", method == SONG_DELIVER_A ? "A" : method == SONG_DELIVER_B ? "B" : "C!", method == SONG_DELIVER_C ? AMBER : colors[0]);
+    knob(0, "METHOD", method == SONG_DELIVER_A ? "A" : "B", colors[0]);
     knob(1, "SONG", song_port_player()->playing ? "PLAY" : "STOP", colors[1]);
     knob(2, "-", "--", colors[2]);
     knob(3, "-", "--", colors[3]);
     if (notice && (int32_t)(frame_time - notice_until) >= 0) notice = NULL;
-    const char *hint = notice ? notice : "PLAY SONG SCL RESET ENV MEM HOME BACK";
+    const char *hint = notice ? notice : "PLAY SONG SEL RESET ENV MEM HOME BACK";
     uint32_t sig = signature(0, hint, (unsigned)strlen(hint));
     if (sig == cache->hint_cache) return;
     cache->hint_cache = sig;
@@ -96,30 +115,24 @@ static void song_diag_draw(void)
     text(6, 231, hint, 1, DIM, BACK);
 }
 
-/* K1 picks A or B. C needs SHIFT held while turning, and only while stopped. */
+/* K1 picks A or B, while stopped. HOME goes back to the stock overview. */
 static int song_diag_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
 {
     (void)key_down;
     struct song_player *p = song_port_player();
-    unsigned shift = (c->buttons & BUTTON(FX)) != 0;
-#if SONG_UI
-    if (*pressed & BUTTON(HOME)) { page = music_page = SONG; cache->shown_page = ~0U; *pressed &= ~BUTTON(HOME); return 1; }
-#endif
+    if (*pressed & BUTTON(HOME)) { page = music_page = OVERVIEW; cache->shown_page = ~0U; *pressed &= ~BUTTON(HOME); return 1; }
     if (*pressed & BUTTON(PLAY)) { if (p->playing) song_port_stop(); else song_start(now); }
     if (*pressed & BUTTON(SCL)) song_diag_reset();
     if (*pressed & BUTTON(LFO)) (void)song_diag_largest_free();
     if (*pressed & BUTTON(ENV)) {
         if (p->playing) { notice = "STOP THE SONG FIRST"; notice_until = now + 1500U; }
-        else { notice = song_diag_engines() ? "ENGINE PROBE FAILED" : "ENGINE PROBE DONE (KB FREE)"; notice_until = now + 2500U; }
+        else { notice = song_diag_engines() ? "ENGINE PROBE STOPPED" : "ENGINE PROBE DONE (KB FREE)"; notice_until = now + 2500U; }
     }
     *pressed &= ~(BUTTON(PLAY) | BUTTON(FX) | BUTTON(SCL) | BUTTON(ENV) | BUTTON(LFO) | BUTTON(REC) | BUTTON(ARP));
     if (*pressed & (BUTTON(EDIT) | BUTTON(GLO) | BUTTON(SAVE))) return 0;
-    if (c->encoders[2]) {
-        int next = (int)song_port_method() + (c->encoders[2] > 0 ? 1 : -1);
-        if (next > SONG_DELIVER_B && !shift) next = SONG_DELIVER_B;
-        if (next < 0) next = 0;
-        if (next > SONG_DELIVER_C) next = SONG_DELIVER_C;
-        if (song_port_set_method((unsigned)next)) { notice = "STOP THE SONG TO CHANGE METHOD"; notice_until = now + 1500U; }
+    if (c->encoders[2] && song_port_set_method(c->encoders[2] > 0 ? SONG_DELIVER_B : SONG_DELIVER_A)) {
+        notice = "STOP THE SONG TO CHANGE METHOD";
+        notice_until = now + 1500U;
     }
     return 1;
 }

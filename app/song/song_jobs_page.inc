@@ -124,10 +124,10 @@ static void song_job_save(uint32_t now)
     }
     static char done[40];
     struct song_place place;
-    uint32_t state = song_port_hold(&place);
+    song_player_hold(song_port_player(), &place);
     song_undo_step(song_port_undo());
     int r = song_job_go();
-    song_port_resume(&place, state);
+    song_player_resume(song_port_player(), &place);
     song_job_armed = 0;
     if (r > 0) {
         char part[12];

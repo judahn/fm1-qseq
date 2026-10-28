@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception
 // Phase 7a of the preview check: the clip grid through the panel. SEQ opens
-// it, SCL makes a clip and opens it in the song view's editor, step entry
+// it, SEL makes a clip and opens it in the song view's editor, step entry
 // fills it, K3 sets a second clip's length, a track key launches a clip
 // (starting playback), a scene key launches row 1 on every track at the next
 // bar line, checked against exact block arithmetic, then the SONG row and
@@ -25,7 +25,7 @@ export async function phase7(browser, root) {
     const tempo = r.tempo(), blockOf = (start, clock) => tempo.block(start, 0, clock);
     const o = {};
 
-    // 1. SEQ, SEQ: the grid. SCL on the empty cell of track 1, row 1: a new
+    // 1. SEQ, SEQ: the grid. SEL on the empty cell of track 1, row 1: a new
     // one-bar clip in the editor. Step entry: four quarter notes. SEQ back.
     render(32);
     tap(B.SEQ); tap(B.SEQ);
@@ -147,7 +147,7 @@ export async function phase7(browser, root) {
   await page.close();
   const t = checker('7'), q = out;
   t.eq('SEQ, SEQ opens the grid', q.gridPage, 27);
-  t.eq('SCL opens the cell in the song view\'s editor', q.clipPage, 19);
+  t.eq('SEL opens the cell in the song view\'s editor', q.clipPage, 19);
   t.eq('the clip open is track 1, row 1', q.opened, 8);
   t.eq('an empty cell gets a new clip a bar long', q.newLength, 1920);
   t.eq('REC, REC: step entry in the clip', q.stepPage, 20);

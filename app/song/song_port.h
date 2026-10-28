@@ -7,37 +7,39 @@
 
 /* The song and player the panel works with, and their link to the engine.
  * Notes go to the engine as MIDI on each track's input channel. Control
- * task only, except song_port_render in the browser preview. */
+ * task only, the player included. */
 struct song *song_port_song(void);
 struct song_player *song_port_player(void);
 struct song_step *song_port_step(void); /* step entry, previewing through the engine */
-int song_port_start(void);  /* 0, or -1 where playback is not wired yet */
+int song_port_start(void);  /* 0 */
 void song_port_stop(void);
-void song_port_jump(uint32_t clock);                 /* player calls that are safe under method C */
+void song_port_jump(uint32_t clock);
 int song_port_set_tempo(uint32_t clock, unsigned bpm100);
 /* Browser preview: called from sim_render() before the queued MIDI drains,
  * with the first frame of the block about to render. */
 void song_port_render(uint64_t frame);
-/* Control poll: diagnostics timing and delivery methods A and B. */
+/* Control poll: the delivery, and the diagnostics' timing in the test build. */
 void song_port_poll(void);
 /* app/board/audio.c: blocks rendered so far (device only). */
 uint32_t fm1_audio_render_count(void);
 
-/* Note delivery (song_deliver.c). */
-enum { SONG_DELIVER_A, SONG_DELIVER_B, SONG_DELIVER_C };
+/* Note delivery (song_deliver.c): method B, and in the hardware test build
+ * a choice of A or B on the diagnostics page. */
+enum { SONG_DELIVER_A, SONG_DELIVER_B };
+#if SONG_HW_TEST
 unsigned song_port_method(void);
 int song_port_set_method(unsigned method);           /* while stopped */
-uint32_t song_port_blocks(void);                     /* blocks rendered so far */
 uint32_t song_port_ticks(void);                      /* 24 MHz */
-int song_midi_post(const uint8_t *message, size_t bytes); /* live keys: queued under method C */
+#endif
+uint32_t song_port_blocks(void);                     /* blocks rendered so far */
+int song_midi_post(const uint8_t *message, size_t bytes); /* live keys */
 void song_deliver_note(const uint8_t message[3]);
-void song_deliver_poll(void);
+void song_deliver_poll(void);                        /* through the block about to render */
 void song_deliver_start(unsigned count_in);
 void song_deliver_render(uint32_t block);            /* browser preview only */
 /* The audio interrupt reads song_isr_mode after each render: 1 wakes the
- * control loop (method B), 2 calls song_isr_block before rendering (C). */
+ * control loop (method B). */
 extern volatile uint8_t song_isr_mode;
-void song_isr_block(uint32_t block);
 #if SONG_UI
 /* Editing: the undo journal, the clipboard and real-time recording. */
 struct song_undo *song_port_undo(void);
@@ -48,10 +50,6 @@ void song_port_record_stop(void);
 void song_port_key(const uint8_t *message, size_t bytes); /* a live key on its way to the engine */
 int64_t song_port_live_clock(void);                   /* where a key or knob lands now, -1 in a count-in */
 void song_deliver_message(const uint8_t *message, size_t bytes); /* automation, as notes go */
-uint32_t song_port_lock(void);                        /* the player, under delivery method C */
-void song_port_unlock(uint32_t state);
-uint32_t song_port_hold(struct song_place *place);    /* player.h, with the player locked meanwhile */
-void song_port_resume(const struct song_place *place, uint32_t state);
 /* Clips (design 8f, song_port.c): launches, and a clip opened in the editor
  * and closed again, playing on in step with the bar (player.h). */
 void song_port_launch(unsigned track, unsigned to);
@@ -80,6 +78,7 @@ unsigned song_perf_state(void);
  * dropped from it. */
 int song_chord_keys(unsigned track, uint32_t keys, int octave, unsigned mode, struct song_step *entry);
 void song_chord_service(uint32_t block);
+unsigned song_chord_waiting(void); /* strum notes still to go */
 void song_chord_forget(void); /* a song loaded or new */
 void song_port_chord_take(unsigned track, const uint8_t *pitch, const uint8_t *offset, unsigned count);
 void song_port_chord_drop(unsigned track, unsigned pitch);

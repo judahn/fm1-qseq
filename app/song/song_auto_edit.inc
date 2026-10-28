@@ -58,10 +58,10 @@ static void song_auto_delete(struct song *s, unsigned shift, uint32_t now)
         notice = cleared ? "AUTOMATION CLEARED" : "NO AUTOMATION THERE";
     } else if (song_auto_conductor) {
         struct song_place place;
-        uint32_t state = song_port_hold(&place);
+        song_player_hold(song_port_player(), &place);
         notice = (song_auto_mode == 1 ? song_remove_meter(s, song_bar_at(s, at, NULL, NULL)) : song_remove_tempo(s, at))
                      ? "NO CHANGE HERE" : "CHANGE DELETED";
-        song_port_resume(&place, state);
+        song_player_resume(song_port_player(), &place);
     }
     else {
         int i = song_lane_find(s, track, song_auto_lane(track), at);

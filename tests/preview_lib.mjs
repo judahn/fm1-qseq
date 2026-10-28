@@ -35,6 +35,16 @@ function installRig() {
     r.info = (what, track = 0, index = 0) => r.c.sim_song_info(what, track, index) >>> 0;
     r.state = () => new Uint8Array(r.c.memory.buffer, r.c.sim_state(), 225);
     r.page = () => r.state()[1];
+    r.lights = () => Array.from(r.state().subarray(168, 168 + 14)); /* the 14 button lights, 0 or 1 */
+    r.pixels = () => new Uint16Array(r.c.memory.buffer, r.c.sim_pixels(), 240 * 240).slice(); /* the LCD */
+    /* Pixels in [x0, x1) by [y0, y1) that differ from `color`, or from the
+     * same pixels of `other` when it is an LCD from r.pixels(). */
+    r.differ = (lcd, x0, y0, x1, y1, other = 0) => {
+      let n = 0;
+      for (let y = y0; y < y1; y++)
+        for (let x = x0; x < x1; x++) n += lcd[y * 240 + x] !== (typeof other === 'number' ? other : other[y * 240 + x]);
+      return n;
+    };
     r.same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     r.knobs = () => {
       const b = new Uint8Array(r.c.memory.buffer, r.c.sim_knobs(), 128);
@@ -90,10 +100,11 @@ function installRig() {
   };
 }
 
-/* A page with the preview loaded and the rig installed. */
-export async function simPage(browser, root) {
+/* A page with the preview loaded and the rig installed. `file` picks the
+ * hardware test build's preview (build/preview-test) instead. */
+export async function simPage(browser, root, file = 'build/preview/index.html') {
   const page = await browser.newPage();
-  await page.goto(pathToFileURL(path.join(root, 'build/preview/index.html')).href);
+  await page.goto(pathToFileURL(path.join(root, file)).href);
   await page.waitForFunction(() => globalThis.FM1SimulatorCore && typeof FM1_SIMULATOR === 'object');
   await page.evaluate(installRig);
   return page;

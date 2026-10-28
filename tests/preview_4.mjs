@@ -158,7 +158,7 @@ export async function phase4(browser, root) {
     undoKey(); pr.lanesAfterUndo = lane(0, 0, 2).length;
     undoKey(); co.metersAfterUndo = info(32, 1);
     undoKey(); co.temposAfterUndo = info(4);
-    // 8. SHIFT+SCL clears the shown lane in the selection: track 2's cutoff
+    // 8. SHIFT+SEL clears the shown lane in the selection: track 2's cutoff
     // over bars 1 and 2, then undo brings it back.
     r.turn(0, 1);
     r.turn(3, -3); r.turn(4, -4);
@@ -202,7 +202,7 @@ export async function phase4(browser, root) {
   t.eq('undo takes the program change back', pr.lanesAfterUndo, 0);
   t.eq('undo takes the time signature back', co.metersAfterUndo, 1);
   t.eq('undo takes the tempo back', co.temposAfterUndo, 2);
-  t.eq('SHIFT+SCL clears the shown lane in the selection', out.cleared, 0);
+  t.eq('SHIFT+SEL clears the shown lane in the selection', out.cleared, 0);
   t.eq('undo brings the lane back', out.restored, s.recorded);
   return { phase: '4', checks: t.list, out };
 }

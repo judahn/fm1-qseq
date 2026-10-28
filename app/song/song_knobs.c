@@ -103,9 +103,7 @@ static int8_t stutter_drift;
 SONG_SMALL void song_stutter_hold(unsigned slice, int drift)
 {
     struct song_player *p = song_port_player();
-    uint32_t state = song_port_lock();
     song_player_stutter(p, song_slice_clocks(slice), drift);
-    song_port_unlock(state);
     stutter_slice = (uint8_t)slice;
     stutter_drift = (int8_t)drift;
     stutter_on = p->stut_at != 0xffffffffU;
@@ -120,8 +118,7 @@ SONG_SMALL void song_stutter_release(void)
     struct song_player *p = song_port_player();
     if (!stutter_on) return;
     stutter_on = 0;
-    uint32_t state = song_port_lock(), began = song_player_stutter_stop(p), to = p->stut_to;
-    song_port_unlock(state);
+    uint32_t began = song_player_stutter_stop(p), to = p->stut_to;
     if (began != 0xffffffffU && song_port_recorder()->active && to > began)
         (void)song_fx_add(song_port_song(), began, to - began, stutter_slice, stutter_drift);
 }

@@ -9,8 +9,10 @@
 #endif
 /* kind: 0 for a note, else the status of a controller (pitch is its number,
  * velocity its value) or program change (pitch is the program). */
+#if SONG_UI
 uint32_t song_store_probe(unsigned what); /* song_store_list.inc */
 int sim_song_kit_copy_run(void);
+#endif
 struct song_heard { uint32_t block; uint8_t track, pitch, velocity, kind; };
 enum { HEARD = 8192 };
 static struct song_heard heard[HEARD];
@@ -83,15 +85,19 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     case 19: return song.swing | (uint32_t)song.swing_grid << 8 | (uint32_t)song.swing_tracks << 16;
     case 20: return song.key_root | (uint32_t)song.key_scale << 8;
     case 21: return song.tempo[0].bpm100 | (uint32_t)song.meter[0].beats << 16 | (uint32_t)song.meter[0].unit << 24;
+#if SONG_HW_TEST /* the diagnostics page (build.sh --test-preview) */
     case 22: return song_port_method();
     case 23: return index < SONG_DIAG_LATE ? song_diag.late[index] : song_diag.notes;
     case 24: return song_diag.polls;
     case 25: return song_diag.largest_free;
     case 26: return (uint32_t)(int32_t)song_diag.heaviest;
     case 27: return index < 6 ? song_diag.engine_free[index] : 0;
+#endif
+    case 51: return song_isr_mode; /* the wake (method B) */
     default: return 0;
     }
 }
+#if SONG_UI
 SONG_EXPORT("sim_song_kit_copy") int sim_song_kit_copy(void) { return sim_song_kit_copy_run(); }
 /* Phase 5b: the page's stock sample loader sends its bank through the
  * transfer calls, so it lands in the pool as a kit, and templates are
@@ -117,3 +123,4 @@ SONG_EXPORT("sim_song_template") int sim_song_template(unsigned factory)
     if (!r) r = song_store_save(1);
     return r ? r : (int)song.id;
 }
+#endif

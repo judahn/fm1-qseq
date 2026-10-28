@@ -1,17 +1,11 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 #ifndef FM1_SONG_CONFIG_H
 #define FM1_SONG_CONFIG_H
-/* Hardware test build: the diagnostics page (in the device settings) and
- * song playback on the device, through the delivery method picked there.
- * With 0, device playback stays off until a method is settled. */
-#ifndef SONG_HW_TEST
-#define SONG_HW_TEST 1
-#endif
 /* The song view, step entry and settings pages. The device's fixed flash
  * layout has room for the app image only up to 453,921 bytes, and stock V14
- * already uses 453,576, so the device build leaves these pages out until
- * that is settled. SEQ then opens the diagnostics page. The browser preview
- * has no such limit and keeps them. */
+ * already uses 453,576, so the default device build leaves these pages out.
+ * SEQ then opens the diagnostics page. The browser preview has no such
+ * limit and keeps them, as SONG_DEVICE_FULL does. */
 /* SONG_DEVICE_FULL (FM1_SONG_DEVICE_FULL=1 ./build.sh, never the default):
  * full song mode on the device, for a hardware test with Judah's OK. Left
  * out (option 1): (a) the stock step and pattern pages, the MIDI and sync
@@ -50,6 +44,18 @@
 #define SONG_DROP_FM_FACTORY 0
 #define SONG_DROP_SAMPLE_BANK 0
 #endif
+/* The hardware test build (the default device build): the diagnostics page,
+ * where SEQ goes, with a choice of delivery method A or B for the timing
+ * test (song_deliver.c). The full build and the browser preview deliver by
+ * B and have no diagnostics page. build.sh --test-preview builds the
+ * preview this way too (SONG_UI 0, SONG_HW_TEST 1). */
+#ifndef SONG_HW_TEST
+#if SONG_DEVICE_FULL || defined(FM1_OPEN_WEB)
+#define SONG_HW_TEST 0
+#else
+#define SONG_HW_TEST 1
+#endif
+#endif
 /* Room for the hardware test on the device: the stock factory projects
  * (presets.c) and workbench project, sample and voice transfers
  * (transfer.c) are left out of this build. Firmware updates and the V15
@@ -76,5 +82,8 @@
 #else
 #define SONG_UI 0
 #endif
+#endif
+#if !SONG_UI && !SONG_HW_TEST
+#error "Without the song pages SEQ opens the diagnostics page: SONG_UI 0 needs SONG_HW_TEST 1"
 #endif
 #endif

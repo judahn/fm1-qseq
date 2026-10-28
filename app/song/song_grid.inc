@@ -71,7 +71,7 @@ static void song_grid_draw(void)
     if (cache->seq_cache != 0x9a1dU) { /* the function buttons */
         cache->seq_cache = 0x9a1dU;
         paint_fill(0, 180, 240, 12, BACK);
-        text(8, 181, "SCL OPEN  ENV NAME  SHIFT+SEQ SONG", 1, DIM, BACK);
+        text(8, 181, "SEL OPEN  ENV NAME  SHIFT+SEQ SONG", 1, DIM, BACK);
     }
     if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
     char line[12], value[12] = "SONG";
@@ -105,10 +105,8 @@ static void grid_action(unsigned which, uint32_t now)
     struct song *s = song_port_song();
     struct song_clip *c = song_port_clip();
     unsigned cell = song_cell(track, grid_row - 1U);
-    uint32_t state = song_port_lock();
     int r = which == 0 ? song_clip_copy(s, c, cell) : which == 1 ? song_clip_cut(s, c, cell)
         : which <= 3 ? (c->length ? song_clip_paste(s, c, cell) : -2) : song_clip_delete(s, cell);
-    song_port_unlock(state);
     static const char *const done[4] = {"CLIP COPIED", "CLIP CUT", "PASTED", "PASTED"};
     notice = r == -2 ? "COPY SOMETHING FIRST" : r ? which >= 2 && which <= 3 ? "DOESN'T FIT IN A CLIP" : "NO CLIP THERE"
         : which < 4 ? done[which] : "CLIP DELETED";

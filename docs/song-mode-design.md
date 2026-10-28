@@ -25,9 +25,18 @@ is in hand and the panel layout can be checked.
 - Playback runs on the internal clock: the audio sample clock, counted in our own audio interrupt. Tempo and
   position are worked out from samples with the remainder carried, so nothing drifts.
 - Notes reach the engine on the next 2.9 ms audio block, the same grid as the stock sequencer. Our player
-  hands each note over in the block before it is due. Checking that it keeps up while the screen redraws is
-  the first hardware test.
-- The stock step sequencer is not used. It stays as a fallback if that test fails.
+  hands each note over in the block before it is due.
+- **Delivery: method B, chosen by the hardware timing test (10/28).** The control loop hands the notes over,
+  and while a song plays (or a strum waits) the audio interrupt wakes it after every block, so the hand-over
+  comes in the block before. The test build measured the control loop on its own at 9.9 / 10.8 / 12.1 ms
+  (min / average / max), 3 to 5 blocks, with a 13 ms worst run. On its own (method A), 184 notes came in
+  their block, 200 one block late, 230 two late and 162 three or more. With the wake (B), 1,312 of 1,361 notes
+  came in their block and the other 49 one block late, never 2. The audio stayed clean on both (no overrun, underrun,
+  overload or MIDI drop), and B sounded tight. Method C, the interrupt posting the notes itself, wasn't
+  needed and is gone. The full build and the browser preview always deliver by B. The default test build
+  keeps the choice of A or B on its diagnostics page, so the test can be run again. Results:
+  `docs/hardware-test-plan.md`.
+- The stock step sequencer is not used.
 
 ## 3. The song
 
@@ -65,7 +74,7 @@ QY70's function keys:
 | Button | Action |
 |---|---|
 | FX | SHIFT |
-| SCL | Delete the selected notes at the pointer |
+| SEL | Delete the selected notes at the pointer |
 | ENV | Back-delete: move back one length and delete there |
 | LFO | SELECT: hold it and press keys to choose which notes at the pointer to edit |
 
@@ -131,7 +140,7 @@ Long jumps use markers, or zoom out and move by bars. Step mode is separate: its
 length.
 | SELECT | Track |
 | FX | SHIFT |
-| SCL | Add a marker at the playhead |
+| SEL | Add a marker at the playhead |
 | ENV | Loop on or off. With SHIFT, metronome |
 | LFO | SELECT: hold and tap track keys to choose which tracks the selection covers (6a). With SHIFT, automation view on or off |
 | SHIFT + upper white keys F4 to G5 | Jump to markers 1 to 9 |
@@ -292,7 +301,7 @@ tracks follow it:
   purpose (phase 6), and so can a transpose job that moves notes by scale steps.
 
 All of this is our own code and costs a few bytes per song. The stock firmware has no musical scale feature.
-Its SCL button is the FM engine's keyboard level scaling, and its per-track tuning tables are for microtonal
+Its SEL button opens the FM engine's keyboard level scaling, and its per-track tuning tables are for microtonal
 tuning, not keys.
 
 ## 8b. Export and import
@@ -328,7 +337,7 @@ is a few seconds for a large song.
   rename, duplicate and delete. The browser editor keeps an unlimited library on the computer.
 - **New songs from factory sound sets.** The stock firmware's 16 factory projects (Acid Alley, Night Drive, Dub
   Harbour and so on) are 8-track sound setups. A new song can start from one of them, or from blank.
-- **Sound editing.** EDIT enters sound editing. While there, FX, SCL, ENV and LFO go back to their stock jobs
+- **Sound editing.** EDIT enters sound editing. While there, FX, SEL, ENV and LFO go back to their stock jobs
   (effects, FM scaling, envelopes, LFO). Leaving restores the song-mode functions.
 - **Mixer.** The stock overview page on HOME stays: volume per track on K1 to K4 (four tracks per page), mute
   and solo on the white keys, per-track reverb and delay sends, the shared reverb and delay, and the master
@@ -358,8 +367,8 @@ is a few seconds for a large song.
 - Before the first flash, the stock firmware and any projects are backed up.
 - The firmware is GPL. If it's ever shared, its source goes with it.
 - **Flash for the full device build** (Judah, 10/28): 8 more storage sectors (32 KB) go to code, about 1.4
-  seconds of sample time out of about 19.6. The hardware diagnostics page comes out of the full build once
-  the timing test settles the delivery method.
+  seconds of sample time out of about 19.6. The timing test settled the delivery method (B, section 2), so
+  the hardware diagnostics page is out of the full build. The default test build keeps it.
 
 ## 8e. Glitch (agreed 10/27)
 
@@ -413,7 +422,7 @@ The stock sync and MIDI pages that SEQ used to reach move to the device settings
 | Lower white keys, F3 to F4 (the track keys) | Launch that track's cell in the cursor row. An empty cell stops the track. On the SONG row, the track goes back to the song |
 | Upper white keys, G4 to G5 | Launch rows 1 to 8 of the page (Live's scenes). Every track with a clip in the row plays it, and the others stop |
 | SHIFT + SEQ | Every track back to the song (from the song view too) |
-| SCL | Open the clip at the cursor. An empty cell gets a new 1-bar clip |
+| SEL | Open the clip at the cursor. An empty cell gets a new 1-bar clip |
 | SHIFT + lower white keys | The song view's actions (6a) on the cell at the cursor: copy, cut, paste, delete |
 | REC | Record launches into the song (below) |
 | PLAY | Play and stop. Stopping hands every track back to the song |
@@ -431,7 +440,7 @@ and the keys play again.
 song until that track goes back to the song. A free-form melody over a groove is the drums on a clip and the
 melody on the song.
 
-**Editing a clip.** SCL opens it in the song view's editor, looped to the clip, with K3 (loop end) setting its
+**Editing a clip.** SEL opens it in the song view's editor, looped to the clip, with K3 (loop end) setting its
 length. Everything there works on the clip: step entry, recording, automation, glitch and the jobs. SEQ goes
 back to the grid. Pasting copied song bars into a cell turns a section already written into a clip, and several
 copied tracks paste across the row onto their own tracks.
@@ -513,7 +522,8 @@ by its first note, so the strum survives. In step entry a root key enters the wh
 strummed when strum is on.
 
 **Timing.** A strum spreads its notes over a few milliseconds, so live strums go out through the same
-block-accurate delivery as playback, not the control loop. The hardware timing test covers this too.
+block-accurate delivery as playback, not the control loop. Under method B the interrupt's wake runs while a
+strum waits as well as while the song plays, and a strum's first notes go out as the chord is struck.
 
 **Cost:** should be small (12 chord shapes and a strum scheduler), and gets measured against what phase 7 leaves.
 
@@ -562,7 +572,8 @@ costs little memory. HOME plus SAVE stays undo, as in the stock firmware.
    and the Expand job (8f).
 8. **Chord mode** (8g): roots on the left keys, chord types on the right, voicing and strum.
 
-Hardware checkpoints when the FM-1 arrives: the timing test, then saving to flash.
+Hardware checkpoints: the timing test is done and chose method B (section 2). Saving to flash comes with the
+full build.
 
 ## 11. Polyphony
 
@@ -583,6 +594,9 @@ trims voices on its own when it runs out.
 - Copy, cut, paste and duplicate whole bars or marker sections, with the loop region as the selection.
 - Songs export and import through the browser workbench, as our own song files and as standard MIDI files.
 - Patterns work like Ableton Live's session view: clips per track, launched from a grid (10/28).
+- Every button light stays on, on every page, so the printed labels can be read. Lights that showed state are
+  gone, with no setting to bring them back. The key lights are unchanged (10/28).
+- The button printed SEL is SEL on screen too. The stock code's identifier for it is still SCL (10/28).
 - The song holds references to clips, and an Expand job turns them into notes (10/28).
 - Chords are a play setting per track, roots on the left and types on the right, with strum. The QY70's
   chord track is dropped (10/28).
