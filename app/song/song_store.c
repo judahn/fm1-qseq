@@ -177,6 +177,7 @@ SONG_SMALL static int load_from(unsigned type, unsigned id)
     bind(s->kit);
     recovery.saved_crc = type == POOL_SONG ? song_file_crc(s, sounds, SOUNDS) : 0;
     song_port_jump(0);
+    song_chord_forget();
     return r;
 }
 SONG_SMALL int song_store_load(unsigned id) { return load_from(POOL_SONG, id); }
@@ -200,6 +201,7 @@ SONG_SMALL int song_store_new(int factory)
     capture();
     programs(s);
     song_port_jump(0);
+    song_chord_forget();
     return 0;
 }
 /* A stored song copied to `to`, with a new name in its header and payload. */

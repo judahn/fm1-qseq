@@ -47,6 +47,7 @@ static void song_notice_expire(void)
 #include "song_select.inc"
 #include "song_glitch.inc"
 #include "lanes.h"
+#include "chords.h"
 
 static uint32_t song_span(void) { return (16U >> song_zoom) * (uint32_t)SONG_WHOLE; }
 static unsigned song_x(uint32_t clock)

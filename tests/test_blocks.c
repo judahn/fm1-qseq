@@ -285,6 +285,7 @@ static void test_expand(void)
  * a block where it can't be is refused. */
 enum { SECTORS = 16, BYTES = SECTORS * POOL_SECTOR };
 static uint8_t flash[BYTES], first[BYTES];
+enum { CHORD_BYTES = 2 * SONG_TRACKS }; /* version 4's, at the end */
 static int f_read(uint32_t at, void *data, size_t n) { if (at + n > BYTES) return -1; memcpy(data, flash + at, n); return 0; }
 static int f_write(uint32_t at, const void *data, size_t n) { if (at + n > BYTES) return -1; memcpy(flash + at, data, n); return 0; }
 static int f_erase(uint32_t at) { if (at >= BYTES) return -1; memset(flash + at, 0xff, POOL_SECTOR); return 0; }
@@ -323,7 +324,7 @@ static void test_files(void)
     data = write_song(&song, &length);
     CHECK(data != NULL);
     memcpy(first, data, length);
-    CHECK_EQ(first[0], 3);
+    CHECK_EQ(first[0], 4);
     CHECK_EQ(song_file_read(&other, first, length, &sound, &n), 0);
     CHECK(other.events == song.events && !memcmp(other.event, song.event, song.events * sizeof song.event[0]));
     CHECK(!memcmp(other.count, song.count, sizeof song.count));
@@ -333,25 +334,28 @@ static void test_files(void)
     CHECK_EQ(song_file_crc(&other, sounds, sizeof sounds), song_file_crc(&song, sounds, sizeof sounds));
     data = write_song(&other, &bytes);
     CHECK(bytes == length && !memcmp(data, first, length));   /* back to the same bytes */
-    /* The same blocks marked version 2: refused, a block isn't a version 2 event. */
+    /* As version 3, without version 4's chord bytes: it loads. Marked version
+     * 2: refused, a block isn't a version 2 event. */
+    first[0] = 3;
+    CHECK_EQ(song_file_check(first, length - CHORD_BYTES, &sound, &n), 0);
     first[0] = 2;
-    CHECK_EQ(song_file_check(first, length, &sound, &n), -1);
-    /* Versions 2 and 1 of a song without blocks still load, and write back as version 3. */
+    CHECK_EQ(song_file_check(first, length - CHORD_BYTES, &sound, &n), -1);
+    /* Versions 2 and 1 of a song without blocks still load, and write back as version 4. */
     for (unsigned t = 0; t < SONG_TRACKS; ++t)
         for (unsigned i = song.count[t]; i-- > 0;) if (song_is_block(&song.event[song.first[t] + i])) song_remove(&song, t, i);
     data = write_song(&song, &length);
     memcpy(first, data, length);
     first[0] = 2;
-    CHECK_EQ(song_file_read(&other, first, length, &sound, &n), 0);
+    CHECK_EQ(song_file_read(&other, first, length - CHORD_BYTES, &sound, &n), 0);
     CHECK(other.events == song.events && !memcmp(other.event, song.event, song.events * sizeof song.event[0]));
     data = write_song(&other, &bytes);
-    CHECK(data && data[0] == 3 && bytes == length);
+    CHECK(data && data[0] == 4 && bytes == length);
     memset(song.clip_length, 0, sizeof song.clip_length);
     for (unsigned p = SONG_TRACKS; p < SONG_PARTS; ++p) while (song.count[p]) song_remove(&song, p, 0);
     data = write_song(&song, &length);
     memcpy(first, data, length);
     first[0] = 1;
-    CHECK_EQ(song_file_read(&other, first, length - 3U, &sound, &n), 0);
+    CHECK_EQ(song_file_read(&other, first, length - 3U - CHORD_BYTES, &sound, &n), 0);
     CHECK(other.events == song.events && other.launch_q == 2);
     /* A block in a clip, one of no length, and one past the grid's rows: refused. */
     song_clear(&song, 4, 12000);

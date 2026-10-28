@@ -248,7 +248,7 @@ export async function phase7b(browser, root) {
   t.over('the other tracks played on throughout', q.othersPlayed, 20);
   t.eq('SEQ closes the clip', q.closed, 0);
   t.eq('the clip keeps its notes and the new ones', q.clipNotes, 4);
-  t.eq('the workbench reads it as version 3', w.version, 3);
+  t.eq('the workbench reads it at the current version', w.version, S.VERSION);
   t.match('the clips listed', w.list.join(' | '), /T1 row 1, 1 bar, 4 events \| T1 row 2, 1 bar, 4 events \| T2 row 1, 1 bar, 4 events/);
   t.eq('picking a clip picks its own cell to copy into', w.target, ['0', '1']);
   t.match('copied into the other song', w.copied, /Clip copied into .*track 4 row 6/);

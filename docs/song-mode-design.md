@@ -517,6 +517,28 @@ block-accurate delivery as playback, not the control loop. The hardware timing t
 
 **Cost:** should be small (12 chord shapes and a strum scheduler), and gets measured against what phase 7 leaves.
 
+**As built in phase 8** (10/28):
+- **The type keys.** White keys: F4 in key, G4 major, A4 minor, B4 7, C5 m7, D5 maj7, E5 6. Black keys: F#4 sus2,
+  G#4 sus4, A#4 dim, C#5 aug, D#5 add9. A new song starts on in key.
+- **The top three keys** in real-time play: F5 plays the last chord again, F#5 an octave down and G5 an octave
+  up, each strummed afresh. In step entry they stay rest, repeat and tie.
+- **In key** is the root and the second and fourth notes of the song's scale above it, whether the root is in
+  the scale or not. So in C major D gives D minor and C# gives C# dim. A pentatonic or blues scale gives its own
+  stacked shapes, and with no key set it's major.
+- **Spread** lifts the close chord's second note an octave: root, fifth and tenth for a triad, and root, fifth,
+  seventh and tenth for a 7.
+- **Smooth** tries each inversion of the close chord, and each of those an octave down, and keeps the one whose
+  notes sit nearest the last chord's, each note counted to the nearest one there. A tie goes to root position,
+  and the first chord on a track is close.
+- **The strum** spaces the notes evenly from the first to the last. Alternating starts up. Random draws each
+  chord's order from the song's seed, so it repeats the same way from a load.
+- **Playing.** One chord sounds at a time, while its key is held, at velocity 100, and a new root ends the last.
+  Chord mode plays on the song pages. The stock pages play single notes as before.
+- **The settings** are the fifth page of the song settings, beside the recording knobs and humanize, for the
+  track SELECT picks. Like the recording settings they're preferences, not edits, so undo leaves them.
+- **Recording.** A chord let go mid-strum keeps only the notes that sounded. Song file version 4 holds the
+  settings.
+
 ## 9. Undo
 
 Several levels, stored as what each edit added and removed rather than as whole copies of the song, so it

@@ -77,7 +77,7 @@ const file2 = S.wrap(payload2);
 check(file2[4] === 2 && B.same(S.unwrap(file2), payload2), 'a version 2 file');
 const v1 = song(); v1.version = 1;
 const payload1 = S.encode(v1);
-check(payload1[0] === 1 && payload1.length === payload.length - 3 && B.same(S.encode(S.decode(payload1)), payload1), 'version 1 writes back as version 1');
+check(payload1[0] === 1 && payload1.length === payload.length - 3 - 16 && B.same(S.encode(S.decode(payload1)), payload1), 'version 1 writes back as version 1');
 const back1 = S.decode(payload1);
 check(back1.clips.length === 0 && back1.rows.length === 0 && back1.launchQ === 2, 'version 1 reads with an empty grid');
 const file1 = S.wrap(payload1);
@@ -103,8 +103,28 @@ withBlocks.clips = [{ cell: 2, length: 960, events: [S.event(0, S.KIND.NOTE, 72,
 withBlocks.tracks[0] = withBlocks.tracks[0].concat([S.block(1920, 2400, 2)]).sort(byClock);
 withBlocks.tracks[3] = [S.event(0, S.KIND.NOTE, 40, 100, 3000), S.block(960, 960, 15), S.block(2880, 100000, 16)];
 const payload3 = S.encode(withBlocks), back3 = S.decode(payload3);
-check(payload3[0] === 3 && B.same(S.encode(back3), payload3) && back3.tracks[0].filter(S.isBlock).length === 1 &&
-  S.blockLength(back3.tracks[3][2]) === 100000 && back3.tracks[3][2].a === 0xff, 'version 3 keeps the blocks, long ones and stops');
+check(payload3[0] === 4 && B.same(S.encode(back3), payload3) && back3.tracks[0].filter(S.isBlock).length === 1 &&
+  S.blockLength(back3.tracks[3][2]) === 100000 && back3.tracks[3][2].a === 0xff, 'the blocks round trip, long ones and stops');
+const asThree = S.encode({ ...withBlocks, version: 3 });
+check(asThree[0] === 3 && asThree.length === payload3.length - 16 && B.same(S.encode(S.decode(asThree)), asThree), 'version 3 still reads and writes back as itself');
+// Version 4 (phase 8): each track's chord settings and type, at the end. Version 3 reads with
+// chord mode off. Settings out of range are refused.
+const withChords = song();
+withChords.chords = Uint8Array.of(1, 1 | 1 << 1 | 4 << 3 | 2 << 6, 0, 2 << 1 | 3 << 6, 0, 0, 0, 1 | 3 << 3);
+withChords.chordTypes = Uint8Array.of(0, 11, 0, 5, 0, 0, 0, 2);
+const payload4 = S.encode(withChords), back4 = S.decode(payload4);
+check(payload4[0] === 4 && B.same(back4.chords, withChords.chords) && B.same(back4.chordTypes, withChords.chordTypes) &&
+  B.same(S.encode(back4), payload4), 'chord settings round trip');
+const chordsOff = S.decode(S.encode({ ...withChords, version: 3 }));
+check(chordsOff.chords.every(c => !c) && chordsOff.chordTypes.every(t => !t), 'version 3 reads with chord mode off');
+for (const [what, chords, types] of [['a voicing past smooth', Uint8Array.of(3 << 1, 0, 0, 0, 0, 0, 0, 0), new Uint8Array(8)],
+  ['a strum past an 8th', Uint8Array.of(5 << 3, 0, 0, 0, 0, 0, 0, 0), new Uint8Array(8)], ['a type past add9', new Uint8Array(8), Uint8Array.of(0, 12, 0, 0, 0, 0, 0, 0)]])
+  throws(() => S.decode(S.encode({ ...withChords, chords, chordTypes: types })), 'chord settings refused: ' + what);
+throws(() => S.decode(Uint8Array.from([...payload4.slice(0, payload4.length - 16), 0])), 'version 4 cut short is refused');
+const badCc = song(); badCc.tracks[2] = [S.event(0, S.KIND.CONTROL, 200, 5, 0)];
+throws(() => S.decode(S.encode(badCc)), 'a controller number past 127 is refused');
+const badVelocity = song(); badVelocity.tracks[2] = [S.event(0, S.KIND.NOTE, 60, 130, 10)];
+throws(() => S.decode(S.encode(badVelocity)), 'a velocity past 127 is refused');
 throws(() => S.decode(S.encode({ ...withBlocks, version: 2 })), 'a block in a version 2 payload is refused');
 const blockInClip = song(); blockInClip.clips = [{ cell: 1, length: 480, events: [S.block(0, 480, 0)] }];
 throws(() => S.decode(S.encode(blockInClip)), 'a block inside a clip is refused');

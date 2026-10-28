@@ -18,7 +18,7 @@ uploading the file gives the device the same bytes back, so device to file to de
 | Offset | Size | Field |
 |---|---|---|
 | 0 | 4 | Magic `FMSG` (`46 4D 53 47`) |
-| 4 | 2 | File version, the payload's: 1, 2 or 3 |
+| 4 | 2 | File version, the payload's: 1 to 4 |
 | 6 | 2 | Flags, 0 |
 | 8 | 4 | Payload length |
 | 12 | 4 | CRC-32 of the payload |
@@ -50,8 +50,9 @@ An event's `at` holds its clock in bits 0 to 23, its kind in bits 24 and 25 (0 n
 change, 3 FX lane stutter), and a note's glitch table index in bits 26 to 30. Bit 31 is always 0 in a file.
 A note keeps pitch in a, velocity in b and its length in clocks (1 to 65535). A controller keeps its number in
 a and value in b, a program change its program in a, both with length 0. The clock is 480 per quarter note.
-Events on each track are in clock order. The device checks all of this before it stores a song, and refuses
-the whole upload if anything is out of range.
+Events on each track are in clock order. A note's pitch and velocity, a controller's number and value, and a
+program are 0 to 127. The device checks all of this before it stores a song, and refuses the whole upload if
+anything is out of range.
 
 Size: 2,127 bytes with one tempo, one time signature and nothing else, plus 8 per event, 6 per extra tempo,
 4 per extra time signature, 12 per marker and 5 per glitch entry. On the device a song takes
@@ -94,9 +95,27 @@ Inside it, the track plays the clip from the block's start, pass after pass, or 
 own events stay quiet. Blocks sit only on the tracks, never in a clip, and a version 1 or 2 payload with one
 is refused.
 
-The device saves every song as version 3 and reads all three. The workbench reads all three, writes a song
-back in the version it came in, and wraps each payload in a file of the same version, so an older song file
-keeps its bytes. A block costs 8 bytes.
+A block costs 8 bytes.
+
+### Song payload, version 4 (phase 8, chord mode)
+
+Version 4 is version 3 with the payload version byte 4 and 16 bytes at the very end: each track's chord
+setting (8, one byte per track), then each track's chord type (8).
+
+| Bits of the setting | Field |
+|---|---|
+| 0 | Chord mode on |
+| 1 and 2 | Voicing: 0 close, 1 spread, 2 smooth |
+| 3 to 5 | Strum, first note to last: 0 off, 1 a 64th, 2 a 32nd, 3 a 16th, 4 an 8th |
+| 6 and 7 | Direction: 0 up, 1 down, 2 alternating, 3 random |
+
+The type is 0 in key, 1 major, 2 minor, 3 7, 4 m7, 5 maj7, 6 6, 7 sus2, 8 sus4, 9 dim, 10 aug or 11 add9. A
+voicing past smooth, a strum past an 8th or a type past add9 is refused. A version 3 song loads with chord
+mode off on every track.
+
+The device saves every song as version 4 and reads all four. The workbench reads all four, writes a song back
+in the version it came in, and wraps each payload in a file of the same version, so an older song file keeps
+its bytes.
 
 ## Kit file (`.fm1kit`)
 

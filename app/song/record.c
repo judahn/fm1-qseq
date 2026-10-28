@@ -51,17 +51,17 @@ SONG_SMALL static int at_pitch(const struct song *s, unsigned track, uint32_t cl
 SONG_SMALL static void commit(struct song_recorder *r, unsigned held, uint32_t off)
 {
     struct song *s = r->song;
-    uint32_t on = r->held[held].at, length;
+    uint32_t on = r->held[held].at, length, lead = r->held[held].lead;
     if (off >= on) length = off - on;
     else length = s->loop_end > on ? s->loop_end - on : 1; /* past a loop seam */
-    uint32_t at = song_quantize(s, on);
+    uint32_t at = song_quantize(s, on - lead) + lead; /* a chord moves as a whole, by its first note */
     if (r->mode == SONG_REC_PUNCH && at + length > s->loop_end) length = s->loop_end > at ? s->loop_end - at : 1;
     length = length < 1 ? 1 : length > 0xffff ? 0xffff : length;
     int same = at_pitch(s, r->track, at, r->held[held].pitch); /* the same note again replaces it */
     if (same >= 0) (void)song_remove(s, r->track, (unsigned)same);
     const struct song_event e = {at | SONG_FRESH, r->held[held].pitch, r->held[held].velocity, (uint16_t)length};
     if (!song_add_event(s, r->track, &e) && r->taken < SONG_TAKE)
-        r->take[r->taken++] = (struct song_take_note){on, at, (uint16_t)length, e.a, e.b};
+        r->take[r->taken++] = (struct song_take_note){on | lead << 24, at, (uint16_t)length, e.a, e.b};
     r->held[held] = r->held[--r->held_count];
 }
 SONG_SMALL static void reach(struct song_recorder *r, uint32_t clock)
@@ -70,6 +70,15 @@ SONG_SMALL static void reach(struct song_recorder *r, uint32_t clock)
     if (clock > r->reach) r->reach = clock;
 }
 SONG_SMALL void song_rec_note(struct song_recorder *r, unsigned pitch, unsigned velocity, uint32_t clock)
+{
+    song_rec_lead(r, pitch, velocity, clock, 0);
+}
+SONG_SMALL void song_rec_drop(struct song_recorder *r, unsigned pitch)
+{
+    for (unsigned i = 0; i < r->held_count; ++i)
+        if (r->held[i].pitch == pitch) { r->held[i] = r->held[--r->held_count]; return; }
+}
+SONG_SMALL void song_rec_lead(struct song_recorder *r, unsigned pitch, unsigned velocity, uint32_t clock, unsigned lead)
 {
     if (!r->active || pitch > 127) return;
     const struct song *s = r->song;
@@ -81,6 +90,7 @@ SONG_SMALL void song_rec_note(struct song_recorder *r, unsigned pitch, unsigned 
                (r->mode != SONG_REC_REPLACE || clock >= r->from) &&
                (r->mode != SONG_REC_PUNCH || (clock >= s->loop_start && clock < s->loop_end))) {
         r->held[r->held_count].at = clock;
+        r->held[r->held_count].lead = (uint8_t)(lead < clock ? lead : clock);
         r->held[r->held_count].pitch = (uint8_t)pitch;
         r->held[r->held_count++].velocity = (uint8_t)velocity;
     }
@@ -123,7 +133,7 @@ SONG_SMALL int song_rec_requantize(struct song_recorder *r)
     int moved = 0;
     for (unsigned k = 0; s && !r->active && k < r->taken; ++k) {
         struct song_take_note *n = &r->take[k];
-        uint32_t at = song_quantize(s, n->raw);
+        uint32_t raw = n->raw & 0xffffffU, lead = n->raw >> 24, at = song_quantize(s, raw - lead) + lead;
         int i = at_pitch(s, r->track, n->at, n->pitch);
         if (at == n->at || i < 0 || at_pitch(s, r->track, at, n->pitch) >= 0) continue;
         struct song_event e = s->event[s->first[r->track] + (unsigned)i];

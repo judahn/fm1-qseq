@@ -124,6 +124,9 @@ struct song {
     char row_name[SONG_GRID_ROWS][SONG_MARKER_NAME];
     uint32_t kept_start, kept_end;
     uint8_t kept_on, launch_q, open;
+    /* Chord mode (design 8g, chords.h): each track's settings and the type
+     * picked last. */
+    uint8_t chord[SONG_TRACKS], chord_type[SONG_TRACKS];
 #endif
 };
 #if SONG_UI

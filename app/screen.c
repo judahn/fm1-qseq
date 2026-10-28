@@ -2552,6 +2552,9 @@ controls_done:
                 else toggle_step(first + i);
             }
     }
+#if SONG_UI
+    if (song_chord_panel(keys, mode)) keys = 0; /* song-mode: chord mode plays the keys */
+#endif
     for (unsigned key = 0; key < 27; ++key) {
         unsigned note = groove_key_note(track, key, octave);
         note = song_key_note(note); /* song-mode: scale */

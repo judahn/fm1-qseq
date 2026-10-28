@@ -3,7 +3,7 @@
  * and the kit table's power-loss test (test_kit_copies.c): a
  * RAM flash and pool (ram_flash.h, so they run on the full device build's
  * layout too), a seeded random, a song with something of everything a file
- * holds (clip blocks too), the device's load path, what a loaded song promises, and a stock
+ * holds (clip blocks and chord settings too), the device's load path, what a loaded song promises, and a stock
  * bank with the transfer path's import. */
 #ifndef FM1_TEST_CORRUPT_HARNESS_H
 #define FM1_TEST_CORRUPT_HARNESS_H
@@ -13,6 +13,7 @@
 #include "kits.h"
 #include "clips.h"
 #include "blocks.h"
+#include "chords.h"
 #include "glitch.h"
 #include "lanes.h"
 #include <stddef.h>
@@ -63,6 +64,10 @@ static void build(struct song *s, unsigned variant)
     s->launch_q = 3;
     song_block_put(s, 3, 1920, 5760, 5);      /* clips in the song (phase 7b): a block, and a stop */
     song_block_put(s, 0, 3840, 4800, SONG_BLOCK_STOP);
+    for (unsigned t = 0; t < SONG_TRACKS; ++t) { /* chord mode (phase 8) */
+        s->chord[t] = song_chord_setting(t & 1U, t % 3U, (t + variant) % 5U, t % 4U);
+        s->chord_type[t] = (uint8_t)((t * 5U + variant) % CHORD_TYPES);
+    }
 }
 static int save(const struct song *s, unsigned id)
 {
@@ -82,7 +87,8 @@ static int load(unsigned id, struct song *into)
 }
 
 /* What a loaded song promises: parts back to back and in clock order, notes
- * in range, the maps in order, and clip events only where a cell has a length. */
+ * in range, the maps in order, clip events only where a cell has a length,
+ * and chord settings in range. */
 static int whole(const struct song *s)
 {
     unsigned at = 0;
@@ -96,6 +102,9 @@ static int whole(const struct song *s)
         at += s->count[p];
     }
     if (at != s->events || at > SONG_EVENTS || !s->bars || s->bars > SONG_MAX_BARS || s->open || s->launch_q > 4) return 0;
+    for (unsigned t = 0; t < SONG_TRACKS; ++t) /* chord settings each in range */
+        if (s->chord_type[t] >= CHORD_TYPES || s->chord[t] != song_chord_setting(s->chord[t], s->chord[t] >> 1 & 3U,
+                                                                                 s->chord[t] >> 3 & 7U, s->chord[t] >> 6)) return 0;
     if (!s->tempos || s->tempos > SONG_TEMPOS || s->tempo[0].clock || !s->meters || s->meters > SONG_METERS || s->meter[0].bar ||
         s->markers > SONG_MARKERS || s->loop_start > s->loop_end) return 0;
     for (unsigned k = 0; k < s->tempos; ++k)

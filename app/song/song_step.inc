@@ -161,7 +161,8 @@ static void song_step_draw(void)
 
 /* Step entry input. Keys F3 to E5 enter notes, and a chord goes in when
  * every key is up. F5, F#5 and G5 rest, repeat and tie. SHIFT plus the lower
- * keys picks the length, and holding LFO picks notes in a chord. */
+ * keys picks the length, and holding LFO picks notes in a chord. In chord
+ * mode the roots enter their chords and F4 to E5 pick the type. */
 static uint32_t step_held; /* entry keys down for the chord being built */
 static unsigned song_key_note(unsigned note);
 
@@ -240,8 +241,10 @@ static int song_step_input(const struct fm1_controls *c, uint32_t *pressed, uint
         if ((down & (1U << 25)) && step_repeat(st)) { notice = "NOTHING TO REPEAT OR SONG FULL"; notice_until = now + 1500U; }
         if ((down & (1U << 26)) && step_tie(st)) { notice = "TIE ONLY RIGHT AFTER A NOTE"; notice_until = now + 1500U; }
         blocked_keys |= key_down & (7U << 24);
+        unsigned chords = song_chord_on(st->song, track) && !groove_pad_count(track); /* roots and types (song_chord_panel) */
         for (unsigned key = 0; key < 24; ++key)
-            if (down & (1U << key)) {
+            if (chords) { if ((down >> key & 1U) && key < 12) step_held |= 1U << key; }
+            else if (down & (1U << key)) {
                 unsigned pitch = song_key_note(groove_key_note(track, key, octave));
                 if (pitch > 127) continue;
                 if (picking) step_pick(st, pitch);

@@ -6,8 +6,9 @@
  * Version 2 (phase 7) adds the clip grid after the tracks: the launch
  * quantize, the row names and the clips. Version 3 lets the tracks hold
  * clip blocks (an FX event with bit 7 of `a` set, the row or 0xff for a
- * stop, and a 24-bit length, bits 16 to 23 in `b`). Versions 1 and 2 still
- * read and write back as themselves. */
+ * stop, and a 24-bit length, bits 16 to 23 in `b`). Version 4 (phase 8)
+ * adds each track's chord settings and chord type at the end. Older
+ * versions still read and write back as themselves. */
 (function (root) {
   'use strict';
   const ns = root.FM1SongWorkbench = root.FM1SongWorkbench || {};
@@ -15,7 +16,7 @@
 
   const LIMITS = { tracks: 8, events: 4096, tempos: 32, meters: 32, markers: 16, bars: 999, clock: 0xffffff,
     tempoMin: 2000, tempoMax: 30000, sounds: 1999, preset: 223, rows: 16, cells: 128 };
-  const VERSION = 3;
+  const VERSION = 4;
   const KIND = { NOTE: 0, CONTROL: 1, PROGRAM: 2, FX: 3 };
   const ENGINES = ['DX7', '303', '808', 'PSG', 'PLUCK', 'SAMPLER'];
   const MAGIC = 0x47534d46; /* "FMSG" */
@@ -34,7 +35,8 @@
     const count = r.u16(), list = [];
     for (let i = 0, last = 0; i < count; i++) {
       const e = { at: r.u32(), a: r.u8(), b: r.u8(), length: r.u16() };
-      check(clockOf(e) >= last && (kindOf(e) !== KIND.NOTE || (e.a <= 127 && e.length > 0)), 'Bad event on ' + what);
+      check(clockOf(e) >= last && (kindOf(e) !== KIND.NOTE || e.length > 0) && (kindOf(e) === KIND.FX || (e.a <= 127 && e.b <= 127)),
+        'Bad event on ' + what);
       check(!isBlock(e) || (blocks && blockLength(e) > 0 && (e.a === 0xff || e.a < 0x90)), 'Bad clip block on ' + what);
       last = clockOf(e);
       list.push(e);
@@ -115,6 +117,13 @@
         song.clips.push({ cell, length, events: events(r, 'track ' + ((cell >> 4) + 1) + ', row ' + ((cell & 15) + 1), false) });
       }
     }
+    song.chords = new Uint8Array(8);
+    song.chordTypes = new Uint8Array(8);
+    if (version > 3) {
+      song.chords = r.take(8).slice();
+      song.chordTypes = r.take(8).slice();
+      check(song.chords.every(c => (c >> 1 & 3) < 3 && (c >> 3 & 7) < 5) && song.chordTypes.every(t => t < 12), 'Chord settings out of range');
+    }
     check(eventCount(song) <= LIMITS.events, 'More events than a song holds');
     check(!r.left, 'Song data has extra bytes');
     return song;
@@ -140,6 +149,7 @@
       w.u8(clips.length);
       for (const c of clips) { w.u8(c.cell).u16(c.length); putEvents(w, c.events); }
     }
+    if (version > 3) w.put(song.chords || new Uint8Array(8)).put(song.chordTypes || new Uint8Array(8));
     return w.done();
   }
   const eventCount = song => song.tracks.reduce((n, list) => n + list.length, 0) +

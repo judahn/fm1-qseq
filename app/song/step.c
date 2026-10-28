@@ -86,21 +86,23 @@ static void advance(struct song_step *st, uint32_t clocks)
     while (st->pointer >= song_end(s) && s->bars < SONG_MAX_BARS) ++s->bars;
     if (st->pointer > song_end(s)) st->pointer = song_end(s);
 }
-/* All or nothing: a chord that doesn't fit leaves the song as it was. */
-SONG_SMALL static int enter(struct song_step *st, const uint8_t *pitches, unsigned count)
+/* All or nothing: a chord that doesn't fit leaves the song as it was. Each
+ * note starts its offset after the pointer, and ends with the others. */
+SONG_SMALL static int enter(struct song_step *st, const uint8_t *pitches, const uint8_t *offsets, unsigned count)
 {
     struct song *s = st->song;
-    uint32_t step = step_clocks(st), length = step_gate_clocks(st, step);
+    uint32_t step = step_clocks(st), gate = step_gate_clocks(st, step);
     unsigned fresh = 0;
-    for (unsigned i = 0; i < count; ++i) fresh += find_note(st, st->pointer, pitches[i]) < 0;
+    for (unsigned i = 0; i < count; ++i) fresh += find_note(st, st->pointer + offsets[i], pitches[i]) < 0;
     if (s->events + fresh > SONG_EVENTS) return -1;
     int glitch = song_glitch_intern(s, st->glitch); /* entered notes get the entry glitch */
     uint32_t flags = (uint32_t)(glitch > 0 ? glitch : 0) << SONG_GLITCH_SHIFT;
     for (unsigned i = 0; i < count; ++i) {
         unsigned velocity = step_entry_velocity(st);
-        int at = find_note(st, st->pointer, pitches[i]);
+        uint32_t start = st->pointer + offsets[i], length = gate > offsets[i] ? gate - offsets[i] : 1;
+        int at = find_note(st, start, pitches[i]);
         if (at < 0) {
-            const struct song_event e = {st->pointer | flags, pitches[i], (uint8_t)velocity, (uint16_t)length};
+            const struct song_event e = {start | flags, pitches[i], (uint8_t)velocity, (uint16_t)length};
             (void)song_add_event(s, st->track, &e);
         } else {
             struct song_event e = s->event[at]; /* the same pitch again replaces it */
@@ -110,7 +112,7 @@ SONG_SMALL static int enter(struct song_step *st, const uint8_t *pitches, unsign
             step_change(st, (unsigned)at, &e);
         }
     }
-    if (pitches != st->last) memcpy(st->last, pitches, count);
+    if (pitches != st->last) { memcpy(st->last, pitches, count); memcpy(st->last_strum, offsets, count); }
     st->last_count = (uint8_t)count;
     st->last_at = st->pointer;
     st->tie_ok = 1;
@@ -122,18 +124,27 @@ SONG_SMALL void step_key(struct song_step *st, unsigned pitch)
     if (pitch > 127 || st->chord_count >= STEP_CHORD) return;
     for (unsigned i = 0; i < st->chord_count; ++i)
         if (st->chord[i] == pitch) return;
+    st->strum[st->chord_count] = 0;
     st->chord[st->chord_count++] = (uint8_t)pitch;
+}
+SONG_SMALL void step_chord(struct song_step *st, const uint8_t *pitch, const uint8_t *offset, unsigned count)
+{
+    st->chord_count = 0;
+    for (unsigned i = 0; i < count; ++i) {
+        step_key(st, pitch[i]);
+        st->strum[i] = offset[i];
+    }
 }
 SONG_SMALL int step_commit(struct song_step *st)
 {
     if (!st->chord_count) return -1;
-    int result = enter(st, st->chord, st->chord_count);
+    int result = enter(st, st->chord, st->strum, st->chord_count);
     st->chord_count = 0;
     return result;
 }
 SONG_SMALL int step_repeat(struct song_step *st)
 {
-    return st->last_count ? enter(st, st->last, st->last_count) : -1;
+    return st->last_count ? enter(st, st->last, st->last_strum, st->last_count) : -1;
 }
 SONG_SMALL int step_rest(struct song_step *st)
 {
@@ -148,8 +159,8 @@ SONG_SMALL int step_tie(struct song_step *st)
     if (!st->tie_ok || !st->last_count) return -1;
     uint32_t step = step_clocks(st), span = st->pointer - st->last_at + step_gate_clocks(st, step);
     for (unsigned i = 0; i < st->last_count; ++i) {
-        int at = find_note(st, st->last_at, st->last[i]);
-        if (at >= 0) set_length(st, (unsigned)at, span);
+        int at = find_note(st, st->last_at + st->last_strum[i], st->last[i]);
+        if (at >= 0) set_length(st, (unsigned)at, span > st->last_strum[i] ? span - st->last_strum[i] : 1U);
     }
     ++st->song->revision;
     advance(st, step);

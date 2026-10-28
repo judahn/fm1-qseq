@@ -18,6 +18,7 @@ struct song_step {
     uint16_t serial;              /* counts previews, so the panel can time them out */
     uint8_t track, length, triplet, dots, gate, velocity, random_level, picked;
     uint8_t chord[STEP_CHORD], chord_count;   /* keys held for the next entry */
+    uint8_t strum[STEP_CHORD], last_strum[STEP_CHORD]; /* each note's start after the pointer (chord mode) */
     uint8_t last[STEP_CHORD], last_count, tie_ok;
     uint8_t preview[STEP_CHORD], preview_count, preview_track;
     uint32_t glitch;              /* the entry glitch word (glitch.h) */
@@ -30,6 +31,10 @@ void step_begin(struct song_step *st, unsigned track, uint32_t pointer);
 uint32_t step_clocks(const struct song_step *st);  /* current step length */
 uint32_t step_gate_clocks(const struct song_step *st, uint32_t step);
 void step_key(struct song_step *st, unsigned pitch); /* an entry key went down */
+/* Chord mode's root key (design 8g): the whole chord is the next entry,
+ * each note `offset` clocks after the pointer, its end where the others'
+ * is, so a strum enters as played. */
+void step_chord(struct song_step *st, const uint8_t *pitch, const uint8_t *offset, unsigned count);
 int step_commit(struct song_step *st);              /* every entry key is up */
 int step_rest(struct song_step *st);
 int step_repeat(struct song_step *st);

@@ -57,6 +57,23 @@ static uint32_t song_key_leds(uint32_t bits, unsigned visible)
     return bits;
 #endif
 }
+#if SONG_UI
+/* Chord mode plays the keys on the song pages (song_chord.c): 1 when it
+ * took them. In step entry each root's chord is the entry. A type key
+ * names the type it picked. The stock pages play the keys as ever. */
+static int song_chord_panel(uint32_t keys, unsigned mode)
+{
+    const struct song *s = song_port_song();
+    unsigned before = s->chord_type[track];
+    if (page < SONG) { (void)song_chord_keys(track, 0, octave, 1, NULL); return 0; } /* the stock pages play single notes */
+    int took = song_chord_keys(track, keys, octave, mode, page == SONG_STEP ? song_port_step() : NULL);
+    if (took && s->chord_type[track] != before) {
+        notice = song_chord_names[s->chord_type[track]];
+        notice_until = frame_time + 1500U;
+    }
+    return took;
+}
+#endif
 /* Out-of-scale keys snap up to the next scale note on pitched tracks. */
 static unsigned song_key_note(unsigned note)
 {

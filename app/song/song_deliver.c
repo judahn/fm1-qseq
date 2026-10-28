@@ -104,6 +104,16 @@ SONG_SMALL void song_deliver_note(const uint8_t message[3])
 SONG_SMALL void song_deliver_message(const uint8_t *message, size_t bytes) { (void)song_midi_post(message, bytes); }
 #endif
 
+#if SONG_UI
+/* Chord mode's strums, due before block `block` ends, as notes are. */
+SONG_SMALL static void strums(uint32_t block)
+{
+    emitting = 1;
+    due_block = block;
+    song_chord_service(block);
+    emitting = 0;
+}
+#endif
 SONG_SMALL static void advance_to(uint32_t last)
 {
     struct song_player *p = song_port_player();
@@ -118,6 +128,9 @@ SONG_SMALL static void advance_to(uint32_t last)
 /* Methods A and B: from the control loop, through the block about to render. */
 SONG_SMALL void song_deliver_poll(void)
 {
+#if SONG_UI
+    if (method != SONG_DELIVER_C) strums(song_port_blocks());
+#endif
     if (method != SONG_DELIVER_C && song_port_player()->playing) advance_to(song_port_blocks());
 }
 /* Method C, and the browser's render callback: just before block `block`
@@ -130,6 +143,9 @@ __attribute__((noinline)) void song_isr_block(uint32_t block)
         (void)fm1_midi_post(queue[at].data, queue[at].count);
         queue_tail = (uint8_t)((at + 1U) % 64U);
     }
+#if SONG_UI
+    strums(block);
+#endif
     if (method == SONG_DELIVER_C && song_port_player()->playing) advance_to(block);
     in_isr = 0;
 }

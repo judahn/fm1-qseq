@@ -216,6 +216,16 @@ SONG_SMALL static void clip_take(void)
     clip_live = 1;
 }
 unsigned song_port_clip_armed(void) { return clip_armed; }
+/* Chord mode's notes into the take, each with its lead after the chord's
+ * first, so input quantize moves the chord as a whole. */
+SONG_SMALL void song_port_chord_take(unsigned track, const uint8_t *pitch, const uint8_t *offset, unsigned count)
+{
+    clip_take();
+    int64_t clock = live_clock();
+    for (unsigned i = 0; recorder.active && clock >= 0 && track == recorder.track && i < count; ++i)
+        song_rec_lead(&recorder, pitch[i], 100, (uint32_t)clock + offset[i], offset[i]);
+}
+void song_port_chord_drop(unsigned track, unsigned pitch) { if (track == recorder.track) song_rec_drop(&recorder, pitch); }
 
 /* Live keys on the take track, at the clock playing now. */
 SONG_SMALL void song_port_key(const uint8_t *m, size_t bytes)

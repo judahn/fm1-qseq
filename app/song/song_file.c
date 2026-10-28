@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* Songs as stored. See song_file.h. */
 #include "song_file.h"
+#include "chords.h"
 #include "song_config.h"
 #include <string.h>
 #if SONG_UI
@@ -57,6 +58,8 @@ SONG_SMALL void song_file_write(struct pool_writer *w, const struct song *s, con
     put8(w, clips);
     for (unsigned c = 0; c < SONG_CELLS; ++c)
         if (s->clip_length[c]) { put8(w, c); put16(w, s->clip_length[c]); put_part(w, s, SONG_TRACKS + c); }
+    pool_put(w, s->chord, sizeof s->chord); /* version 4: chord mode */
+    pool_put(w, s->chord_type, sizeof s->chord_type);
 }
 SONG_SMALL uint32_t song_file_bytes(const struct song *s, uint32_t sounds_bytes)
 {
@@ -101,7 +104,8 @@ SONG_SMALL static int get_part(struct reader *r, struct song *s, unsigned part, 
     for (unsigned i = 0; i < count; ++i) {
         struct song_event e;
         e.at = get32(r); e.a = (uint8_t)get8(r); e.b = (uint8_t)get8(r); e.length = (uint16_t)get16(r);
-        if (song_event_start(&e) < last || (song_is_note(&e) && (e.a > 127 || !e.length))) r->bad = 1;
+        if (song_event_start(&e) < last || (song_is_note(&e) && !e.length) ||
+            (song_event_kind(&e) != SONG_FX && (e.a > 127 || e.b > 127))) r->bad = 1; /* MIDI's 7 bits, and a lane's number */
         if (song_is_block(&e) && (r->version < 3 || part >= SONG_TRACKS || !song_block_length(&e) ||
                                   (e.a != SONG_BLOCK_STOP && e.a >= SONG_BLOCK + SONG_GRID_ROWS))) r->bad = 1; /* blocks: tracks only */
         last = song_event_start(&e);
@@ -204,6 +208,14 @@ SONG_SMALL static int parse(struct song *s, const uint8_t *data, uint32_t bytes,
             if (apply) s->clip_length[cell] = (uint16_t)length;
             total = get_part(&r, to, SONG_TRACKS + cell, (unsigned)total);
         }
+    }
+    if (version > 3) {
+        uint8_t chord[2 * SONG_TRACKS];
+        copy(&r, chord, sizeof chord, 1);
+        for (unsigned t = 0; t < SONG_TRACKS; ++t)
+            if (song_chord_setting(chord[t], chord[t] >> 1 & 3U, chord[t] >> 3 & 7U, chord[t] >> 6) != chord[t] ||
+                chord[SONG_TRACKS + t] >= CHORD_TYPES) r.bad = 1;
+        if (apply) { memcpy(s->chord, chord, SONG_TRACKS); memcpy(s->chord_type, chord + SONG_TRACKS, SONG_TRACKS); }
     }
     if (r.bad || r.left || total < 0) return -1;
     for (; apply && cell < SONG_CELLS; ++cell) s->first[SONG_TRACKS + cell] = (uint16_t)total;

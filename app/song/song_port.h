@@ -72,6 +72,17 @@ int song_perf_arm(void);
 void song_perf_end(void);
 void song_perf_poll(void);
 unsigned song_perf_state(void);
+/* Chord mode on the keys (song_chord.c, design 8g). The panel hands over
+ * the keys held each poll: 1 when chord mode took them (on, on a pitched
+ * track). In step entry each root's chord becomes the entry. The delivery
+ * sends the strums' notes due before block `block` ends. A chord's notes go
+ * into a take with their offsets, and a note let go before it sounded is
+ * dropped from it. */
+int song_chord_keys(unsigned track, uint32_t keys, int octave, unsigned mode, struct song_step *entry);
+void song_chord_service(uint32_t block);
+void song_chord_forget(void); /* a song loaded or new */
+void song_port_chord_take(unsigned track, const uint8_t *pitch, const uint8_t *offset, unsigned count);
+void song_port_chord_drop(unsigned track, unsigned pitch);
 /* K1 to K4 while recording (song_knobs.c): each drives a lane on the take
  * track, chosen per track (lanes.h), recorded in touch style. */
 unsigned song_port_engine(unsigned track);
