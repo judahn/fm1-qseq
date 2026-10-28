@@ -11,7 +11,7 @@ is in hand and the panel layout can be checked.
 |---|---|---|
 | Song shape | Free-form, linear, up to 999 measures | Same |
 | Resolution | 480 clocks per quarter, `measure:beat:clock` | Same. Every length below is a whole number of clocks |
-| Tracks | 16 sequence tracks plus pattern, chord and tempo tracks | 8 tracks, one per FM-1 sound slot, plus tempo and marker tracks. Pattern and chord tracks come with pattern mode |
+| Tracks | 16 sequence tracks plus pattern, chord and tempo tracks | 8 tracks, one per FM-1 sound slot, plus tempo and marker tracks. Clips per track come in phase 7 (8f), and chords are a play setting (8g) |
 | Step lengths | 32nd to whole, three triplets, no 64th, no dots (p. 84) | 64th to whole, triplet on any of them, dot and double dot |
 | Step controls | On-screen fields changed with -1/+1, four function keys: del, back-delete, rest, tie | Lengths on SHIFT plus keys, and on a knob. Four context buttons for del, back-delete, rest, tie, as on the QY70 |
 | Quantize | Only as an edit job afterwards, plus groove quantize at playback | Edit job as on the QY70, plus input quantize while recording |
@@ -40,7 +40,7 @@ is in hand and the panel layout can be checked.
   Recording inside a loop is how you build up a section, like a pattern, without leaving song mode.
 - **Sounds:** each song stores its 8 sound setups and mix, so loading a song brings its sounds with it.
 - **Clips and clip lanes** (8f, phase 7): looping clips per track, and blocks on each track saying which clip
-  plays where. A chord track comes later (8g).
+  plays where. Chords are a play setting per track (8g).
 
 **Memory.** Notes are stored compactly, roughly 4 to 6 bytes each, and automation only stores changes. There
 is about 247 KB of working memory, shared with the sound engines. The real budget gets measured in the browser
@@ -456,23 +456,39 @@ glitch tools.
 **Cost:** measured in the build. The full device build had about 10 KB of flash left after phase 6, so phase 7
 gets measured against that before anything else is cut.
 
-## 8g. The chord track (later, phase 8)
+## 8g. Chord mode (phase 8, agreed 10/28)
 
-Moved out of phase 7 on 10/28, since it isn't part of the clip model. The design stays as proposed.
+Judah, 10/28: chords are a play setting on each instrument track, not the QY70's chord track. The QY approach
+(a chord track, phrase types and chord following) is dropped.
 
-A song-level lane, alongside the conductor lane: at most one chord per beat, with an optional 8th or 16th
-anticipation and a slash bass, using the QY70's 25 chord types plus root-only.
-- **Entry:** the lower 12 keys pick the root, and the upper 12 keys pick the type, with a second press for the
-  key's second type, as on the QY70. SHIFT plus a key sets the slash bass, and a knob sets anticipation.
-  Entering a chord can play it on a chosen track, and the key LEDs light its notes.
-- **Following chords:** each clip has a phrase type and a source chord (C major by default). Bypass is for drums
-  and never changes. Parallel moves everything by the root difference. Chord 1 maps each note from its role in
-  the source chord (root, third, fifth, seventh, or a scale step between) to the same role in the new chord.
-  Chord 2 does the same but picks the inversion closest to the previous voicing, for smooth changes. Bass works
-  like Chord 1, but the first note after a change is the root, or the slash note. Low and high limits per track
-  fold notes by octaves to stay in range. The QY70 manual only describes these in prose, so the exact tables are
-  ours, tuned by ear.
-- **Free-form tracks** ignore the chord track by default. A per-track "follow chords" switch could come later.
+**Playing.** With chord mode on, a track's keyboard splits in two:
+- **Roots on the lower 12 keys,** F3 to E4. Each key plays a full chord on that root. The octave buttons move
+  the roots.
+- **Chord types on the next 12 keys,** F4 to E5. A press picks the type, and it stays picked, so chords play
+  with one hand. Picking a type while a root is held changes the chord that's sounding. The same keys hold the
+  types in step mode, where the top three keys stay rest, repeat and tie.
+- **Types (proposed):** major, minor, 7, maj7, m7, sus2, sus4, dim, aug, 6, add9 and "in key". In key builds
+  each root's chord from the song's key and scale (8a), so in C major the D key plays D minor. The common types
+  sit on the white keys and the color ones on the black keys. The exact layout gets tuned on the device.
+- Drum tracks ignore chord mode.
+
+**Settings,** per track and saved with the song:
+- Chord mode on or off.
+- Voicing: close or spread, plus smooth, which picks the inversion nearest the last chord so changes move
+  less.
+- Strum length: off, or the time from the first note to the last, in note lengths from a 64th to an 8th so it
+  follows the tempo.
+- Strum direction: up, down, alternating (like a guitar's down and up strokes) or random.
+
+**Recording.** A chord records as plain notes, strum offsets included, as played. Editing, the jobs, glitch and
+MIDI export all work on it, and the player needs nothing new. Input quantize moves a strummed chord as a whole,
+by its first note, so the strum survives. In step entry a root key enters the whole chord at the pointer,
+strummed when strum is on.
+
+**Timing.** A strum spreads its notes over a few milliseconds, so live strums go out through the same
+block-accurate delivery as playback, not the control loop. The hardware timing test covers this too.
+
+**Cost:** should be small (12 chord shapes and a strum scheduler), and gets measured against what phase 7 leaves.
 
 ## 9. Undo
 
@@ -495,7 +511,7 @@ costs little memory. HOME plus SAVE stays undo, as in the stock firmware.
 6. **Edit jobs:** quantize, transpose, copy, insert and delete bars, velocity and gate changes.
 7. **Clips,** like Live's session view: the grid, launching, clip lanes in the song, recording a performance
    and the Expand job (8f).
-8. **The chord track** (8g), later.
+8. **Chord mode** (8g): roots on the left keys, chord types on the right, voicing and strum.
 
 Hardware checkpoints when the FM-1 arrives: the timing test, then saving to flash.
 
@@ -519,6 +535,8 @@ trims voices on its own when it runs out.
 - Songs export and import through the browser workbench, as our own song files and as standard MIDI files.
 - Patterns work like Ableton Live's session view: clips per track, launched from a grid (10/28).
 - The song holds references to clips, and an Expand job turns them into notes (10/28).
+- Chords are a play setting per track, roots on the left and types on the right, with strum. The QY70's
+  chord track is dropped (10/28).
 - A song settings page with swing, key and scale. Out-of-scale notes snap up to the next scale note, and the
   pitch knob moves selected notes by scale step.
 
