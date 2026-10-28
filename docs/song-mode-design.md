@@ -273,7 +273,10 @@ is a few seconds for a large song.
   so nothing is ever written during playback.
 - **Sound editing.** EDIT enters sound editing. While there, FX, SCL, ENV and LFO go back to their stock jobs
   (effects, FM scaling, envelopes, LFO). Leaving restores the song-mode functions.
-- **Mute and solo.** The stock overview page on HOME stays, where the white keys mute and solo tracks.
+- **Mixer.** The stock overview page on HOME stays: volume per track on K1 to K4 (four tracks per page), mute
+  and solo on the white keys, per-track reverb and delay sends, the shared reverb and delay, and the master
+  knob. Pan gets added. The engine supports it, but the stock screens only use pan as an LFO target. The mix
+  saves with the song, and volume, pan and sends can be automated.
 - **Tempo and sound changes mid-song.** Tempo and program (sound) changes are lanes in the automation view,
   entered like any other automation.
 - **External MIDI keyboard.** Recording takes notes from an external keyboard with real velocity, which also
