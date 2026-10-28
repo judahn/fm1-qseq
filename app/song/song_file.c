@@ -109,23 +109,28 @@ SONG_SMALL static int parse(struct song *s, const uint8_t *data, uint32_t bytes,
     }
     unsigned meters = get8(&r);
     if (!meters || meters > SONG_METERS) return -1;
-    for (unsigned m = 0; m < meters; ++m) {
+    for (unsigned m = 0, previous = 0; m < meters; ++m) {
         unsigned bar = get16(&r), beats = get8(&r), unit = get8(&r);
-        if (!beats || beats > 16 || (unit != 4 && unit != 8 && unit != 16)) r.bad = 1;
+        if (!beats || beats > 16 || (unit != 4 && unit != 8 && unit != 16) || (m ? bar <= previous : bar != 0)) r.bad = 1;
+        previous = bar;
         if (apply) s->meter[m] = (struct song_meter){(uint16_t)bar, (uint8_t)beats, (uint8_t)unit};
     }
     unsigned markers = get8(&r);
     if (markers > SONG_MARKERS) return -1;
-    for (unsigned i = 0; i < markers; ++i) {
+    for (unsigned i = 0, previous = 0; i < markers; ++i) {
         uint32_t clock = get32(&r);
+        if (clock > SONG_MAX_CLOCK || clock < previous) r.bad = 1;
+        previous = clock;
         if (apply) s->marker[i].clock = clock;
-        copy(&r, s->marker[i].name, SONG_MARKER_NAME, apply);
+        copy(&r, apply ? s->marker[i].name : NULL, SONG_MARKER_NAME, apply);
     }
     uint32_t loop_start = get32(&r), loop_end = get32(&r);
     unsigned loop_on = get8(&r);
     uint8_t settings[10], knobs[SONG_TRACKS * 4];
     copy(&r, settings, sizeof settings, 1);
     copy(&r, knobs, sizeof knobs, 1);
+    if (settings[0] > 50 || settings[3] > 11 || settings[4] >= SONG_SCALES || settings[5] > 4 || settings[6] > 2 ||
+        settings[7] > 2 || settings[8] > 14 || settings[9] > 100 || loop_start > loop_end) r.bad = 1; /* files from outside */
     if (apply) {
         s->meters = (uint8_t)meters; s->markers = (uint8_t)markers;
         s->loop_start = loop_start; s->loop_end = loop_end; s->loop_on = (uint8_t)loop_on;
@@ -140,8 +145,8 @@ SONG_SMALL static int parse(struct song *s, const uint8_t *data, uint32_t bytes,
         if (!at || at > 31) r.bad = 1;
         else if (apply) s->glitch[at] = word;
     }
-    copy(&r, s->humanize_time, sizeof s->humanize_time, apply);
-    copy(&r, s->humanize_velocity, sizeof s->humanize_velocity, apply);
+    copy(&r, apply ? s->humanize_time : NULL, SONG_TRACKS, apply);
+    copy(&r, apply ? s->humanize_velocity : NULL, SONG_TRACKS, apply);
     uint32_t seed = get32(&r);
     if (apply) s->seed = seed;
     unsigned total = 0;
@@ -167,9 +172,13 @@ SONG_SMALL static int parse(struct song *s, const uint8_t *data, uint32_t bytes,
     }
     return 0;
 }
+SONG_SMALL int song_file_check(const uint8_t *data, uint32_t bytes, const uint8_t **sounds, uint32_t *sounds_bytes)
+{
+    return data ? parse(NULL, data, bytes, 0, sounds, sounds_bytes) : -1;
+}
 SONG_SMALL int song_file_read(struct song *s, const uint8_t *data, uint32_t bytes, const uint8_t **sounds, uint32_t *sounds_bytes)
 {
-    if (!data || parse(s, data, bytes, 0, sounds, sounds_bytes)) return -1;
+    if (song_file_check(data, bytes, sounds, sounds_bytes)) return -1;
     return parse(s, data, bytes, 1, sounds, sounds_bytes);
 }
 

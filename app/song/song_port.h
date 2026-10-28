@@ -70,7 +70,7 @@ void song_stutter_release(void);
 unsigned song_stuttering(void);
 /* Storage (song_store.c, phase 5a): songs, kits and the recovery copy in
  * the flash pool. Writes happen only while stopped. 0, or an error. */
-enum { SONG_STORE_FULL = -20, SONG_STORE_PLAYING = -21 };
+enum { SONG_STORE_FULL = -20, SONG_STORE_PLAYING = -21, SONG_STORE_BUSY = -22 };
 void song_store_init(void);
 void song_store_poll(uint32_t now);          /* a recovery copy after playback stops */
 int song_store_save(unsigned as_new);        /* the working song, to its slot or a new one */
@@ -94,5 +94,17 @@ int song_store_restore(void);
 void song_store_skip_recovery(void);
 struct song_gauge { uint32_t pool, songs, samples, free; unsigned events; };
 void song_store_gauge(struct song_gauge *g);
+/* Transfers to and from a computer (song_store_io.inc, phase 5b). */
+struct song_pool;
+struct song_pool *song_store_pool(void);
+unsigned song_store_busy(void);              /* 1 while a kit is coming in */
+/* A song payload from a computer, checked whole, then stored as `id`, or
+ * as a new song for 0. The stored copy is the payload, byte for byte. */
+int song_store_put(unsigned id, const uint8_t *data, uint32_t bytes, unsigned *made);
+/* Ends a kit sent through the sample calls as a library kit, named, with
+ * pad settings if given. The pads keep the kit they have. */
+int song_store_kit_finish(const char name[16], const uint8_t *params, unsigned *made);
+int song_store_kit_set(unsigned id, const char name[16], const uint8_t *params); /* NULL: no pad settings */
+void song_store_clear(void);                 /* every song and the recovery copy */
 #endif
 #endif

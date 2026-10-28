@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* Modified 2026-10-17: reserve the final flash sector during sample imports. */
+/* song-mode (2026-10-28): transfer requests from the workbench, and samples through the pool. */
 (() => {
   'use strict';
   // One portable C instance owns the panel, project and sound state. Before
@@ -76,8 +77,26 @@
             if(!(message.data instanceof Uint8Array)||message.data.length!==4096)throw Error('音色库长度无效');
             new Uint8Array(c.memory.buffer,c.sim_file(),4096).set(message.data);result=c.sim_library_write(message.bank);break;
           case 'clear': c.sim_clear(); break;
+          case 'protocol': { /* song-mode: transfer requests in turn, each with the frames it sent back */
+            if (!Array.isArray(message.frames) || message.frames.length>256) throw Error('MIDI 数据无效');
+            data=[];
+            for (const frame of message.frames) {
+              if (!(frame instanceof Uint8Array) || frame.length<6 || frame.length>192) throw Error('MIDI 数据无效');
+              c.sim_midi_capture(1);
+              new Uint8Array(c.memory.buffer,c.sim_file(),frame.length).set(frame);
+              const replies=[];
+              if (!c.sim_midi(frame.length)) for (let out; (out=c.sim_midi_output());) replies.push(new Uint8Array(c.memory.buffer,c.sim_file(),out&255).slice());
+              c.sim_midi_capture(0); data.push(replies);
+            }
+            break;
+          }
           case 'samples': {
             if (!(message.data instanceof Uint8Array) || message.data.length<512 || message.data.length>446464) throw Error('采样库长度无效');
+            if (c.sim_song_bank) { /* song-mode: through the transfer calls into the pool, never the old region */
+              const at=c.sim_song_buffer(message.data.length);if(!at)throw Error('内存不足，当前项目保持不变');
+              new Uint8Array(c.memory.buffer,at,message.data.length).set(message.data);
+              result=c.sim_song_bank(message.data.length);c.sim_song_buffer(0);break;
+            }
             const flash=new Uint8Array(c.memory.buffer,c.sim_flash()+69632,466944),previous=flash.slice();
             // Keep the final 20480 bytes (DX7 library and per-project tuning). The full backup
             // still permits rollback of a pre-cap bank on validation failure.
@@ -305,6 +324,7 @@
     });
   }
   globalThis.FM1SamplePreview = data => request('samples', {data});
+  globalThis.FM1SimProtocol = frames => request('protocol', {frames}); /* song-mode: the workbench's songs and kits */
   async function select(track,source) {
     try {await request('select',{track,source});}
     catch(error){

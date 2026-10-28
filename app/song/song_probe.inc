@@ -81,3 +81,27 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     }
 }
 SONG_EXPORT("sim_song_kit_copy") int sim_song_kit_copy(void) { return sim_song_kit_copy_run(); }
+/* Phase 5b: the page's stock sample loader sends its bank through the
+ * transfer calls, so it lands in the pool as a kit, and templates are
+ * songs made from the factory sound sets, saved so they can be read out. */
+#include <stdlib.h>
+static uint8_t *sim_buffer;
+SONG_EXPORT("sim_song_buffer") uint8_t *sim_song_buffer(unsigned bytes)
+{
+    free(sim_buffer);
+    sim_buffer = bytes && bytes <= 1048576U ? malloc(bytes) : NULL;
+    return sim_buffer;
+}
+SONG_EXPORT("sim_song_bank") int sim_song_bank(unsigned bytes)
+{
+    int r = sim_buffer ? groove_samples_begin(bytes) : -1;
+    for (unsigned at = 0; !r && at < bytes; at += 128)
+        r = groove_samples_write(at, sim_buffer + at, bytes - at < 128 ? bytes - at : 128);
+    return r ? r : groove_samples_finish();
+}
+SONG_EXPORT("sim_song_template") int sim_song_template(unsigned factory)
+{
+    int r = song_store_new((int)factory);
+    if (!r) r = song_store_save(1);
+    return r ? r : (int)song.id;
+}

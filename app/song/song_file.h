@@ -20,6 +20,8 @@ uint32_t song_file_crc(const struct song *s, const uint8_t *sounds, uint32_t sou
  * Then fills the song, keeping its undo journal pointer, and points
  * `sounds` at the sounds block inside `data`. 0 or -1. */
 int song_file_read(struct song *s, const uint8_t *data, uint32_t bytes, const uint8_t **sounds, uint32_t *sounds_bytes);
+/* Only the check, for a payload sent from a computer (phase 5b). */
+int song_file_check(const uint8_t *data, uint32_t bytes, const uint8_t **sounds, uint32_t *sounds_bytes);
 
 /* The recovery copy: written when playback stops, if the song is not what
  * was last written or saved and the last write is at least `gap` ms old. */

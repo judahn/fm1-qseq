@@ -94,10 +94,16 @@ static uint32_t get32(const uint8_t *p)
 { return p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24; }
 static void put32(uint8_t *p, uint32_t value)
 { for (unsigned i = 0; i < 4; ++i) p[i] = (uint8_t)(value >> (i * 8U)); }
+#if SONG_UI /* song-mode: songs and kits, commands 32 to 63 (song/song_transfer.c) */
+int song_transfer_command(unsigned cmd, const uint8_t *data, unsigned n, uint8_t *out, unsigned *count);
+#endif
 static int command(unsigned cmd, const uint8_t *data, unsigned n, uint8_t *out, unsigned *count)
 {
     int r = GROOVE_PROJECT_INVALID;
     *count = 0;
+#if SONG_UI /* song-mode */
+    if (cmd >= 32 && cmd < 64) return song_transfer_command(cmd, data, n, out, count);
+#endif
     /* Additive capability reply; command 21 retains its old exact layout. */
     if (cmd == 22 && !n) {
         out[0]=1; out[1]=128; out[2]=4; out[3]=(uint8_t)groove_fm_library_available();

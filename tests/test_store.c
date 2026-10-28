@@ -106,6 +106,17 @@ static void test_round_trip(void)
     CHECK_EQ(song_file_read(&b, broken, e->length, &s, &n), -1);
     CHECK(!memcmp(&keep, &b, sizeof b));
     CHECK_EQ(song_file_read(&b, f_map(pool_address(e), e->length), e->length - 1, &s, &n), -1);
+    /* Phase 5b: a payload from a computer, checked alone. Meters must rise
+     * and settings stay in range (a has 2 tempos, 2 meters, 1 marker). */
+    const uint32_t meters = 1 + 2 + sizeof sounds + 12 + 2 + 8 + 2 + 1 + 2 * 6, settings = meters + 1 + 2 * 4 + 1 + 12 + 9;
+    memcpy(broken, f_map(pool_address(e), e->length), e->length);
+    CHECK_EQ(song_file_check(broken, e->length, &s, &n), 0);
+    CHECK(s == broken + 3 && n == sizeof sounds && broken[meters] == 2 && broken[meters + 5] == a.meter[1].bar && broken[settings] == a.swing);
+    broken[meters + 5] = 0, broken[meters + 6] = 0; /* the second meter on bar 0 too */
+    CHECK_EQ(song_file_check(broken, e->length, &s, &n), -1);
+    memcpy(broken, f_map(pool_address(e), e->length), e->length);
+    broken[settings] = 51; /* swing over 50 */
+    CHECK_EQ(song_file_check(broken, e->length, &s, &n), -1);
 }
 
 /* Song A is saved. Saving A' is cut off after every byte in turn. After

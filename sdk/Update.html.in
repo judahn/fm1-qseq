@@ -558,7 +558,8 @@ button{border-radius:7px;background:#223039;border-color:#3b4b54;color:#d6e3e6;f
   globalThis.FM1Workbench={state:()=>deviceState,read:()=>deviceProject(l=>l.download(0)),write:bytes=>deviceProject(l=>l.upload(0,0,bytes)),save:openSave,
     sampleInfo:()=>deviceProject(l=>l.query(11)),
     samplesRead:progress=>deviceProject(l=>l.samplesRead(progress)),
-    samplesWrite:(data,progress,signal)=>writeDeviceSamples(data,progress,signal)};
+    samplesWrite:(data,progress,signal)=>writeDeviceSamples(data,progress,signal),
+    session:action=>deviceProject(action)}; /* song-mode: the songs and kits sections run their transfers in one session */
   async function refreshLibrary(initial=false) {
     libraryReady=false;
     const info=await library.query(0);

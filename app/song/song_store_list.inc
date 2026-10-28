@@ -137,10 +137,11 @@ SONG_SMALL int groove_samples_begin(unsigned bytes)
 SONG_SMALL int groove_samples_write(unsigned offset, const uint8_t *data, unsigned bytes)
 {
     if (!importing || !data || !bytes || bytes > 128) return GROOVE_PROJECT_INVALID;
-    if (!kit_import_write(&import, &pool, offset, data, bytes)) return 0;
+    int r = kit_import_write(&import, &pool, offset, data, bytes);
+    if (!r) return 0;
     kit_import_cancel(&import, &pool);
     importing = 0;
-    return GROOVE_PROJECT_INVALID;
+    return r == SONG_STORE_FULL ? r : GROOVE_PROJECT_INVALID; /* full is worth telling apart */
 }
 SONG_SMALL int groove_samples_finish(void)
 {

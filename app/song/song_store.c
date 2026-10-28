@@ -46,17 +46,27 @@ SONG_SMALL static void capture(void)
     memcpy(at, p->arp, sizeof p->arp); at += sizeof p->arp;
     memcpy(at, tuning, sizeof tuning);
 }
-SONG_SMALL static int apply(const uint8_t *data, uint32_t bytes)
+/* The sounds block over the scratch project, checked. The tuning, or NULL. */
+SONG_SMALL static const uint8_t *fill(struct groove_project *p, const uint8_t *data, uint32_t bytes)
 {
-    struct groove_project *p = groove_project_scratch();
-    if (bytes != SOUNDS || data[0] != 1) return -1;
+    if (bytes != SOUNDS || data[0] != 1) return NULL;
     (void)groove_project_capture(p);
     const uint8_t *at = data + 1;
     memcpy(p->preset, at, sizeof p->preset); at += sizeof p->preset;
     p->mute = *at++; p->solo = *at++;
     memcpy(p->effects, at, 4); at += 4;
     memcpy(p->arp, at, sizeof p->arp); at += sizeof p->arp;
-    if (!groove_project_valid(p) || groove_project_apply(p)) return GROOVE_PROJECT_MEMORY;
+    if (groove_project_valid(p)) return at;
+    memset(p->step, 0, sizeof p->step); /* stock pattern steps that don't fit these sounds: song mode doesn't play them */
+    memset(p->sequence.lock, 255, sizeof p->sequence.lock);
+    return groove_project_valid(p) ? at : NULL;
+}
+SONG_SMALL static int apply(const uint8_t *data, uint32_t bytes)
+{
+    struct groove_project *p = groove_project_scratch();
+    const uint8_t *at = fill(p, data, bytes);
+    if (!at) return -1;
+    if (groove_project_apply(p)) return GROOVE_PROJECT_MEMORY;
     struct groove_tuning tuning[GROOVE_TRACKS];
     memcpy(tuning, at, sizeof tuning);
     (void)groove_arrangement_tuning_apply(tuning);
@@ -108,6 +118,7 @@ SONG_SMALL void song_store_init(void)
 /* Saving and loading. */
 SONG_SMALL static int room(unsigned sectors)
 {
+    if (importing) return SONG_STORE_BUSY; /* a kit is coming in */
     if (pool_largest(&pool) >= sectors) return 0;
     if (pool_free(&pool) < sectors) return SONG_STORE_FULL;
     int r = pool_compact(&pool, sectors); /* samples may move: the pads bind again */
@@ -161,6 +172,8 @@ SONG_SMALL static int load_from(unsigned type, unsigned id)
     memcpy(sounds, block, SOUNDS);
     song_undo_init(song_port_undo());
     if (type == POOL_SONG) s->id = (uint16_t)id;
+    struct kit k;
+    if (!s->kit || kit_read(&pool, s->kit, &k)) s->kit = (uint16_t)kit_id; /* a kit not here: keep the one in use */
     bind(s->kit);
     recovery.saved_crc = type == POOL_SONG ? song_file_crc(s, sounds, SOUNDS) : 0;
     song_port_jump(0);
@@ -181,6 +194,7 @@ SONG_SMALL int song_store_new(int factory)
     song_undo_init(undo);
     memcpy(s->name, "NEW SONG    ", 12);
     const char *name = factory >= 0 ? groove_factory_name((unsigned)factory) : NULL;
+    if (name) memset(s->name, ' ', 12);
     for (unsigned i = 0; name && name[i] && i < 12; ++i) s->name[i] = name[i];
     s->kit = (uint16_t)kit_id;
     capture();
@@ -237,4 +251,5 @@ SONG_SMALL int song_store_delete(unsigned id)
     return pool_delete(&pool, POOL_SONG, id);
 }
 #include "song_store_list.inc"
+#include "song_store_io.inc"
 #endif

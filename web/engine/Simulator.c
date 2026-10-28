@@ -257,7 +257,12 @@ EXPORT("sim_clear") void sim_clear(void)
     /* Clear project slots and their staging sector, not the sample bank.
      * Keep the monitor setting when restarting the browser instruments. */
     unsigned level = controls.knob;
+#if SONG_UI /* song-mode: songs go through the pool, kits stay, sectors 15 and 16 are stock */
+    song_store_clear();
+    memset(flash + SONG_POOL_SKIP_FIRST * 4096, 255, (SONG_POOL_SKIP_END - SONG_POOL_SKIP_FIRST) * 4096); ++flash_revision;
+#else
     memset(flash, 255, GROOVE_SAMPLE_OFFSET); ++flash_revision;
+#endif
     sim_boot(0);
     sim_control(3, 0, (int)level);
 }
