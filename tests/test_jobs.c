@@ -231,18 +231,18 @@ static void test_events(void)
     before = song;
     CHECK_EQ(song_job_ramp(&song, &bars4, SONG_JOB_TEMPO, 120, 60, 30, 0), -1);
     CHECK(same_song(&song, &before));
-    /* Whole tracks: copy over, merge, clear. The FX lane stays put. */
-    const struct song_event fx = {960U | (uint32_t)SONG_FX << 24, 2, 64, 240};
-    song_undo_begin(&undo, &song); song_add_event(&song, 0, &fx); song_undo_end(&undo, &song);
+    /* Whole tracks: copy over, merge, clear. A clip block stays put. */
+    const struct song_event stop = {960U | (uint32_t)SONG_FX << 24, SONG_BLOCK_STOP, 0, 240};
+    song_undo_begin(&undo, &song); song_add_event(&song, 0, &stop); song_undo_end(&undo, &song);
     note(3, 0, 30, 100, 10);
-    CHECK_EQ(JOB(song_job_copy_track(&song, 0, 3)), 8); /* all but the stutter */
+    CHECK_EQ(JOB(song_job_copy_track(&song, 0, 3)), 8); /* all but the block */
     CHECK_EQ(song.count[3], 8);
     undo_redo();
     CHECK_EQ(JOB(song_job_merge(&song, 3, 4)), 8);
     CHECK(song.count[3] == 0 && song.count[4] == 8);
     undo_redo();
     CHECK_EQ(JOB(song_job_clear(&song, 1 | 16)), 16);
-    CHECK_EQ(song.count[0], 1);                  /* the stutter */
+    CHECK_EQ(song.count[0], 1);                  /* the block */
     undo_redo();
     CHECK_EQ(song_job_copy_track(&song, 2, 2), -1);
 }

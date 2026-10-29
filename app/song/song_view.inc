@@ -6,8 +6,9 @@
  * The header, playhead and recording knobs are in song_header.inc, step
  * entry in song_step.inc, settings in song_setup.inc, REC's chooser in
  * song_rec.inc, arranging in song_select.inc, the automation view in
- * song_auto.inc, the clip grid in song_grid.inc, YES and NO in song_ask.inc
- * and input in song_panel.inc.
+ * song_auto.inc, the clip grid in song_grid.inc, YES and NO in song_ask.inc,
+ * and input in song_panel.inc (with song_view_input.inc for this view and
+ * song_buttons.inc for SAVE, FX, ARP and PLAY across the pages).
  * A clip open in the editor (design 8f) is its track's row here, looped,
  * with the other tracks and the markers out of the way. */
 #include "song_port.h"
@@ -26,11 +27,12 @@ static uint32_t song_window = ~0U, song_drawn_x = ~0U, song_ranged = ~0U;
 static uint8_t song_low[SONG_TRACKS], song_high[SONG_TRACKS];
 static struct {
     uint32_t clock, target, ghost_from, ghost_to;
-    uint8_t playing, jumping, shift, recording, selected, ghost_tracks, glitching;
+    uint8_t playing, jumping, shift, recording, selected, ghost_tracks;
 } song_now; /* taken by the marking pass, used by every band */
 static void select_track(int delta);
 static void song_start(uint32_t now);
 #if SONG_UI
+static void song_save_press(void); /* song_buttons.inc */
 /* The bottom line of a song page, drawn only when it changes, and the
  * notice there, which runs out on its own. */
 static void song_hint(const char *hint)
@@ -196,7 +198,7 @@ static void song_draw(void)
     else if (song_now.recording) {
         strcpy(selection, "REC ");
         strcat(selection, song_rec_modes[song_port_recorder()->mode]);
-        strcat(selection, "  PLAY OR REC STOPS");
+        strcat(selection, "  PLAY OR REC ENDS");
     } else {
         uint32_t length = s->loop_end - s->loop_start;
         strcpy(selection, "SEL ");
@@ -208,9 +210,7 @@ static void song_draw(void)
         else for (unsigned t = 0; t < SONG_TRACKS && strlen(selection) < 34; ++t)
             if (picked >> t & 1U) { strcat(selection, " T"); decimal(part, (int)t + 1, 1); strcat(selection, part); }
     }
-    char glitch[40];
-    const char *hint = notice ? notice : song_now.glitching ? song_stutter_hint(glitch)
-        : song_now.jumping ? "JUMP WAITS FOR THE NEXT BAR"
+    const char *hint = notice ? notice : song_now.jumping ? "JUMP WAITS FOR THE NEXT BAR"
         : song_now.shift ? "F3-E4 EDIT  F#-A# MANGLE  EDIT JOBS"
         : (previous_buttons & BUTTON(LFO)) ? "LFO + F3-F4 TRACKS  G4 ALL" : selection;
     song_hint(hint);

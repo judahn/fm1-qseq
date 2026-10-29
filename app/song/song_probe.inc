@@ -57,11 +57,12 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     case 16: return song.loop_on | (uint32_t)player.jumping << 1;
 #if SONG_UI
     case 17: return step.pointer;
-    case 28: return (uint32_t)live_clock(); /* a key's clock now */
+    case 28: return (uint32_t)song_port_live_clock(); /* a key's clock now */
     case 29: { /* recording, undo and clipboard state, by index */
-        const uint32_t v[] = {recorder.active, recorder.taken, recorder.passes, song.rec_mode, song.count_in,
+        const struct song_recorder *r = song_port_recorder();
+        const uint32_t v[] = {r->active, r->taken, r->passes, song.rec_mode, song.count_in,
                               song.quantize, song.strength, song.metronome, player.click, song_undo_count(&undo, 0),
-                              song_undo_count(&undo, 1), clip.length, clip.tracks, song.bars, player.mute_track};
+                              song_undo_count(&undo, 1), clip.length, clip.tracks, song.bars, player.mute_track, r->track};
         return index < sizeof v / sizeof v[0] ? v[index] : 0;
     }
     case 30: return index < count ? song_event_kind(&e[index]) : 0;
@@ -71,7 +72,6 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     case 33: return player.touch_track | (uint32_t)player.touch_lane[index & 3U] << 8;
     case 34: return song_port_engine(track);
     case 35: return index < count ? song_glitch_word(&song, &e[index]) : 0;
-    case 36: return index ? player.stut_to : player.stut_at;
     case 37: return song.humanize_time[track & 7U] | (uint32_t)song.humanize_velocity[track & 7U] << 8;
     case 38: return song_store_probe(index);
     case 39: return index < SONG_CELLS ? song.clip_length[index] : 0; /* clips (phase 7), by cell */
@@ -82,11 +82,15 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     case 44: return player.base[track & 7U];
     case 45: return player.launch_at[track & 7U];
     case 46: { uint32_t v; memcpy(&v, song.row_name[index & 15U], 4); return v; }
-    case 47: return song_perf_state() | (uint32_t)song_port_clip_armed() << 8 | (uint32_t)clip_live << 16; /* phase 7b */
+    case 36: return song_grid_rec_state() | song_grid_rec_cell() << 8; /* a cell's take (0.3.0) */
+    case 47: return song_perf_state() | (uint32_t)song_port_clip_armed() << 8 | (uint32_t)song_port_clip_live() << 16; /* phase 7b */
     case 49: return song.chord[track & 7U] | (uint32_t)song.chord_type[track & 7U] << 8; /* phase 8 */
     case 50: return song_port_blocks();
     case 52: { char n[17]; uint32_t v; song_store_name(song_store_id(index), n); memcpy(&v, n, 4); return v; } /* a stored name */
     case 53: { static const char q[16] = FM1_QY_VERSION; uint32_t v; memcpy(&v, q + (index & 3U) * 4U, 4); return v; } /* the release */
+    case 54: return groove_tempo_saved() | groove_tempo_current() << 16; /* the engine's tempo (0.3.0) */
+    case 55: return song_port_battery_shown();
+    case 56: return groove_arp_enabled(track & 7U);
 #endif
     case 18: return index < count ? e[index].b : 0;
     case 19: return song.swing | (uint32_t)song.swing_grid << 8 | (uint32_t)song.swing_tracks << 16;

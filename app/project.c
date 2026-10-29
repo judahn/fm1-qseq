@@ -534,7 +534,9 @@ int groove_project_info(unsigned slot, char name[13])
         return GROOVE_PROJECT_INVALID;
     unsigned sector = slot;
     uint32_t generation = 0;
-    int r = latest(sector, &sector, &generation);
+    /* song-mode: without the stock project pages their sectors are code
+     * (song_flash.h), so every slot is empty and flash is never read. */
+    int r = SONG_DROP_PROJECTS ? GROOVE_PROJECT_EMPTY : latest(sector, &sector, &generation);
     if (!r)
         r = read_project(sector);
     memcpy(name, r ? "EMPTY       " : record.project.name, 12);
@@ -543,7 +545,7 @@ int groove_project_info(unsigned slot, char name[13])
 }
 int groove_project_save_slot(unsigned slot)
 {
-    if (slot >= GROOVE_PROJECT_SLOTS)
+    if (SONG_DROP_PROJECTS || slot >= GROOVE_PROJECT_SLOTS) /* song-mode: no stock slots to save to */
         return GROOVE_PROJECT_INVALID;
     int r = tuning_can_save();
     if (!r)
@@ -589,7 +591,7 @@ int groove_project_load_slot(unsigned slot)
         return GROOVE_PROJECT_INVALID;
     unsigned sector = slot;
     uint32_t generation = 0;
-    int r = latest(sector, &sector, &generation);
+    int r = SONG_DROP_PROJECTS ? GROOVE_PROJECT_EMPTY : latest(sector, &sector, &generation); /* song-mode: as info */
     if (!r)
         r = read_project(sector);
     uint32_t key[3] = {record.header.generation, record.header.crc, 0};

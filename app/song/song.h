@@ -43,8 +43,9 @@ static inline uint32_t song_rate(unsigned bpm100) { return 480U * bpm100; }
 /* Event kinds. A note keeps its pitch in a, velocity in b and its length in
  * clocks (1..65535). A controller keeps its number in a and value in b, a
  * program change its program in a, and both have length 0. Controllers
- * and program changes are automation (lanes.h). A stutter on the FX lane
- * (glitch.h) sits on track 1, slice in a, drift in b, for its length. */
+ * and program changes are automation (lanes.h). SONG_FX holds clip blocks
+ * (below). Before 0.3.0 it also held the FX lane's stutters, on track 1
+ * with `a` below 0x80, and loading drops those (song_file.c). */
 enum { SONG_NOTE, SONG_CONTROL, SONG_PROGRAM, SONG_FX };
 #define SONG_FRESH 0x80000000U /* flag in `at`: recorded in the take that is running */
 /* Start clock in bits 0..23 of `at`, kind in bits 24..25, a note's glitch
@@ -64,11 +65,9 @@ static inline int song_is_note(const struct song_event *e) { return song_event_k
 
 /* A clip block (design 8f, blocks.h) is an FX event in a track's own part
  * with bit 7 of `a` set: the clip's row in the low bits, or all set for a
- * stop, and a 24-bit length whose bits 16 to 23 are in `b`. The FX lane's
- * stutters (glitch.h) keep `a` below 0x80. */
+ * stop, and a 24-bit length whose bits 16 to 23 are in `b`. */
 enum { SONG_BLOCK = 0x80, SONG_BLOCK_STOP = 0xff };
 static inline int song_is_block(const struct song_event *e) { return song_event_kind(e) == SONG_FX && (e->a & SONG_BLOCK); }
-static inline int song_is_stutter(const struct song_event *e) { return song_event_kind(e) == SONG_FX && !(e->a & SONG_BLOCK); }
 static inline uint32_t song_block_length(const struct song_event *e) { return e->length | (uint32_t)e->b << 16; }
 static inline void song_block_resize(struct song_event *e, uint32_t length)
 {

@@ -114,8 +114,11 @@ export async function phase3(browser, root) {
     t.recordingPng = r.png();
     play(7, 29, 30);
     r.render(40);
-    r.tap(B.PLAY);                                 // PLAY ends the take
-    t.stopped = [state(0), info(7), state(8), r.page()];
+    r.tap(B.PLAY);                                 // PLAY ends the take, and playing goes on
+    t.ended = [state(0), info(7), state(8), r.page()];
+    r.render(40);
+    r.tap(B.PLAY);                                 // PLAY again stops
+    t.stopped = info(7);
     t.taken = state(1);
     t.countInClock = countInClock;
     const quantized = raw => { const bar = Math.floor(raw / 1920) * 1920; return bar + Math.floor((raw - bar + 60) / 120) * 120; };
@@ -212,7 +215,8 @@ export async function phase3(browser, root) {
   k.eq('REC again goes back to the song view', t.page, 19);
   k.eq('the take is recording', t.recording, 1);
   k.eq('overdub keeps the old notes playing (no quiet track)', t.quiet, 255);
-  k.eq('PLAY ends the take: not recording, stopped, no clicks, song view', t.stopped, [0, 0, 0, 19]);
+  k.eq('PLAY ends the take: not recording, still playing, no clicks, song view', t.ended, [0, 1, 0, 19]);
+  k.eq('PLAY again stops', t.stopped, 0);
   k.eq('four notes taken', t.taken, 4);
   k.yes('the take is quantized to 16ths, lengths as played', t.quantizedOk, { raw: t.raw, notes: t.notes });
   k.yes('the count-in is a bar of clicks, accented on one', t.countInOk, { velocities: t.clickVelocities, frames: t.countInFrames });

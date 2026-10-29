@@ -14,114 +14,8 @@ static void song_start(uint32_t now)
 }
 
 #if SONG_UI
-/* The song view: transport, snap and zoom, loop and markers. */
-static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
-{
-    struct song *s = song_port_song();
-    struct song_player *p = song_port_player();
-    unsigned shift = (c->buttons & BUTTON(FX)) != 0, clip = s->open != 0; /* a clip in the editor: no markers */
-    unsigned picking = (c->buttons & BUTTON(LFO)) != 0 && !clip;
-    unsigned glitching = song_stutter_input(c, *pressed, key_down, now);
-    if (*pressed & BUTTON(SAVE)) { /* SAVE saves the song, SHIFT+SAVE opens the list */
-        *pressed &= ~BUTTON(SAVE);
-        if (shift) { song_list_open(); return 1; }
-        song_save_key(now);
-    }
-    if ((song_port_recorder()->active || song_port_clip_armed()) && (*pressed & (BUTTON(PLAY) | BUTTON(REC)))) {
-        song_port_record_end(!(*pressed & BUTTON(PLAY))); /* PLAY or REC ends the take, REC in a clip playing on */
-        *pressed &= ~(BUTTON(PLAY) | BUTTON(REC));
-    }
-    if (*pressed & BUTTON(PLAY)) {
-        if (shift) song_port_jump(s->loop_on ? s->loop_start : 0);
-        else if (p->playing) song_port_stop();
-        else song_start(now);
-    }
-    if (*pressed & BUTTON(REC)) { /* the mode chooser */
-        *pressed &= ~BUTTON(REC);
-        if (!p->playing) { page = music_page = SONG_REC; cache->shown_page = ~0U; return 1; }
-        notice = clip && !song_port_record_clip() ? "REC FROM THE CLIP'S NEXT PASS" : "STOP FIRST TO RECORD";
-        notice_until = now + 2000U;
-    }
-    if (*pressed & BUTTON(ENV)) {
-        if (!shift) s->loop_on ^= 1U;
-        else { /* SHIFT+ENV: metronome off, on, while recording */
-            static const char *const clicks[3] = {"METRONOME OFF", "METRONOME ON", "METRONOME WHILE RECORDING"};
-            s->metronome = (uint8_t)((s->metronome + 1U) % 3U);
-            p->click = s->metronome == 1 || (s->metronome && song_port_recorder()->active);
-            notice = clicks[s->metronome];
-            notice_until = now + 1500U;
-        }
-    }
-    if ((*pressed & BUTTON(LFO)) && shift) { /* SHIFT+LFO: the automation view */
-        page = music_page = SONG_AUTO;
-        cache->shown_page = ~0U;
-        return 1;
-    }
-    if ((*pressed & BUTTON(SCL)) && !clip) song_marker_key(now);
-    if ((*pressed & BUTTON(EDIT)) && shift) { /* SHIFT+EDIT: the edit jobs (EDIT alone stays sound editing) */
-        *pressed &= ~BUTTON(EDIT);
-        song_job_open();
-        return 1;
-    }
-    *pressed &= ~(BUTTON(PLAY) | BUTTON(FX) | BUTTON(ENV) | BUTTON(ARP) | BUTTON(SCL) | BUTTON(LFO));
-    if (*pressed & (BUTTON(HOME) | BUTTON(EDIT) | BUTTON(SAVE)))
-        return 0;
-    octave = clamp(octave + !!(*pressed & BUTTON(OCT_UP)) - !!(*pressed & BUTTON(OCT_DOWN)), -2, 2);
-    select_track(c->encoders[0]);
-    if (song_port_recorder()->active) { /* K1 to K4 record parameters on the take track */
-        for (unsigned k = glitching; k < 4; ++k) /* K1 drifts the stutter while GLITCH is down */
-            if (c->encoders[2 + k]) song_knob_turn(k, fm_encoder_delta(2 + k, c->encoders[2 + k]), now);
-        return 1;
-    }
-    int move = glitching ? 0 : c->encoders[2];
-    if (move && shift && !clip) {
-        /* Marker to marker, from a pending jump or the playhead. */
-        uint32_t at = p->playing ? (p->jumping ? p->jump : song_player_clock(p)) : p->playhead;
-        int direction = move > 0 ? 1 : -1, found = -1;
-        for (; move; move -= direction) {
-            int next = song_marker_step(s, at, direction);
-            if (next < 0) break;
-            found = next;
-            at = s->marker[next].clock;
-        }
-        if (found >= 0) song_port_jump(at);
-    } else if (move && !shift)
-        song_port_jump(song_snap_move(s, song_player_target(p), song_zoom, move));
-    if (c->encoders[3] && shift) { if (!clip) song_sections(c->encoders[3]); }
-    else if (c->encoders[3]) {
-        uint32_t at = song_snap_move(s, s->loop_start, song_zoom, c->encoders[3]);
-        if (at < s->loop_end) s->loop_start = at;
-    }
-    if (c->encoders[4]) {
-        uint32_t at = song_snap_move(s, s->loop_end, song_zoom, c->encoders[4]);
-        if (at > s->loop_start) s->loop_end = at;
-    }
-    if (c->encoders[5]) {
-        unsigned zoom = (unsigned)clamp((int)song_zoom + c->encoders[5], 0, SONG_ZOOMS - 1);
-        if (zoom != song_zoom) { song_zoom = zoom; song_window = ~0U; }
-    }
-    uint32_t down = key_down & ~blocked_keys;
-    if (shift) {
-        /* SHIFT + the lower white keys, F3 to E4: copy, cut, paste inserting,
-         * paste over, duplicate, insert bars, delete bars. The upper ones,
-         * F4 to G5: markers 1 to 9. */
-        for (unsigned i = 0; i < 7; ++i)
-            if (down & (1U << white_keys[i])) song_action(i, now);
-        static const uint8_t mangle_keys[3] = {1, 3, 5}; /* F#3, G#3, A#3 */
-        for (unsigned i = 0; i < 3; ++i)
-            if (down & (1U << mangle_keys[i])) song_mangle(i, now);
-        for (unsigned i = 0; i < 9 && !clip; ++i)
-            if (down & (1U << white_keys[7 + i])) {
-                if (i < s->markers) song_port_jump(s->marker[i].clock);
-                else { notice = "NO MARKER THERE"; notice_until = now + 1500U; }
-            }
-        blocked_keys |= key_down; /* SHIFT keys never play notes */
-    } else if (picking) {
-        song_pick_tracks(down);
-        blocked_keys |= key_down;
-    }
-    return 1;
-}
+#include "song_buttons.inc"
+#include "song_view_input.inc"
 #endif
 
 /* Panel input. Returns 1 when a song page consumed this poll. SEQ opens the
@@ -156,13 +50,13 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
     if ((*pressed & BUTTON(SEQ)) && !(c->buttons & BUTTON(HOME))) {
         if (page == STEPS) { song_seq_on_steps = 1; return 0; }
 #if SONG_UI
+        if (song_port_recorder()->active || song_grid_rec_state()) { notice = "STOP RECORDING FIRST"; notice_until = now + 1500U; return 1; }
         if (page >= SONG && (c->buttons & BUTTON(FX))) { /* SHIFT+SEQ: every track back to the song */
             for (unsigned t = 0; t < SONG_TRACKS; ++t) song_port_launch(t, SONG_FROM_SONG);
             notice = "EVERY TRACK BACK TO THE SONG";
             notice_until = now + 1500U;
             return 1;
         }
-        if (song_port_recorder()->active) { notice = "STOP RECORDING FIRST"; notice_until = now + 1500U; return 1; }
         unsigned from = page;
         if (page == SONG_STEP) song_step_leave(0, now);
         if (song_port_song()->open) { song_port_clip_close(); page = SONG_GRID; }
@@ -211,12 +105,11 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
     if (page < SONG) {
         if ((*pressed & BUTTON(PLAY)) && song_port_player()->playing) { song_port_stop(); *pressed &= ~BUTTON(PLAY); }
 #if SONG_UI
-        /* SAVE on the stock pages saves the song too, never a stock project
-         * slot, which now lies in the song pool. */
+        /* SAVE on the stock pages opens the song list too, as it comes up,
+         * never a stock project slot, which now lies in the song pool. */
         if ((*pressed & BUTTON(SAVE)) && page != PROJECT && page != BLE && page != SOURCE && page != ACTIONS) {
             *pressed &= ~BUTTON(SAVE);
-            if (c->buttons & BUTTON(FX)) song_list_open();
-            else song_save_key(now);
+            song_save_press();
             return 1;
         }
 #endif
@@ -240,17 +133,27 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
     return 0;
 #endif
 }
-/* Every poll's edits are one undo step. A take keeps its own step open. */
+/* Every poll's edits are one undo step. A take keeps its own step open.
+ * The engine's tempo and the song's meet here (song_tempo.c): a change
+ * made to the engine's since the last poll goes into the song first, and
+ * after the page's input the engine follows the song. */
 static int song_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
 {
 #if SONG_UI
-    if (page >= SONG) arp_down = 0; /* ARP is GLITCH here, never the stock arpeggiator page */
     if (!(c->buttons & (BUTTON(HOME) | BUTTON(SAVE)))) song_combo_from = 0;
     else if ((*pressed & (BUTTON(HOME) | BUTTON(SAVE))) && page >= SONG) song_combo_from = page;
+    song_port_battery(c->battery, now);
     song_undo_begin(song_port_undo(), song_port_song());
-    int result = song_input_pages(c, pressed, key_down, now);
+    song_tempo_adopt();
+    song_play_ends_take(pressed);
+    int result = song_save_release(c, now);
+    result |= song_fx_tap(c, *pressed, key_down, now);
+    result |= song_arp(c, pressed, now);
+    if (!result) result = song_input_pages(c, pressed, key_down, now);
+    if (song_port_take_full()) { notice = "SONG FULL, RECORDING ENDED"; notice_until = now + 2500U; }
     if (page != song_open_page) song_ask_close(); /* leaving a page drops its question or naming */
     song_clip_follow(song_port_song()); /* an open clip's length is its loop end */
+    song_tempo_follow(1);
     song_undo_end(song_port_undo(), song_port_song());
     return result;
 #else

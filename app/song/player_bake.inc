@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* song-mode: Normalize's capture (phase 6), included by player.c. A private
- * player runs the song from the top one clock at a time, with no loop,
- * metronome or FX lane, and every note it sends on the tracks asked for is
+ * player runs the song from the top one clock at a time, with no loop or
+ * metronome, and every note it sends on the tracks asked for is
  * written down at the clock it went out, ending at the clock its note-off
  * went out. Played back as plain notes they land on the same blocks: a
  * block sends what is due before its end, and nothing on a plain track

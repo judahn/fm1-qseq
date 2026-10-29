@@ -94,7 +94,7 @@ SONG_SMALL static void note_on(struct song_player *p, unsigned t, const struct s
 SONG_SMALL static void play(struct song_player *p, unsigned t, const struct song_event *e, uint32_t at)
 {
     if (song_is_lane(e)) lane_out(p, t, song_event_lane(e), song_event_value(e), 0);
-    else if (song_is_note(e) && !QUIET(p, t, e)) glitch_note(p, t, e, at); /* the FX lane plays in emit */
+    else if (song_is_note(e) && !QUIET(p, t, e)) glitch_note(p, t, e, at);
 }
 #endif
 SONG_SMALL static uint32_t onset(const struct song_player *p, unsigned t, const struct song_event *e)
@@ -113,8 +113,8 @@ SONG_SMALL static uint32_t onset(const struct song_player *p, unsigned t, const 
  * repeats still due come in time order too, and a note can come early (a
  * flam's grace hit, humanize). */
 #if SONG_UI
-#include "player_clips.inc"   /* each track's source, launches and clips */
-#include "player_stutter.inc" /* the emitter with glitch, the stutter and the FX lane */
+#include "player_clips.inc" /* each track's source, launches and clips */
+#include "player_emit.inc"  /* the emitter with glitch */
 #else
 SONG_SMALL static void emit(struct song_player *p, uint32_t end)
 {
@@ -165,11 +165,6 @@ SONG_SMALL static void relocate(struct song_player *p, uint32_t clock, uint64_t 
 #if SONG_UI
     p->shift += p->next - clock; /* the transport runs on */
     ++p->pass; /* each pass rolls its own chances */
-    if (p->stut_at != NEVER) { /* a loop or jump: a stutter goes on in step */
-        uint32_t delta = clock - p->next;
-        p->stut_at += delta;
-        if (p->stut_to != NEVER) p->stut_to += delta;
-    }
 #endif
     p->next = clock;
     p->revision = s->revision;
@@ -199,7 +194,6 @@ SONG_SMALL void song_player_init(struct song_player *p, struct song *s, const st
     p->click_off = NEVER;
     p->touch_track = 0xff;
     memset(p->program, 0xff, sizeof p->program);
-    p->stut_at = NEVER;
     memset(p->from, SONG_FROM_SONG, sizeof p->from);
     memset(p->waiting, SONG_FROM_NONE, sizeof p->waiting);
     memset(p->blk, SONG_FROM_NONE, sizeof p->blk);
@@ -215,7 +209,6 @@ SONG_SMALL void song_player_start(struct song_player *p, uint64_t frame)
     uint32_t from = timeline(p), length = s->open ? s->clip_length[s->open - SONG_TRACKS] : 0;
     if (from >= song_bar_clock(s, s->bars)) from = 0;
     if (p->playhead >= (s->open ? length : song_end(s))) p->playhead = s->open ? 0 : from;
-    p->stut_at = NEVER;
     p->next = from; /* the transport starts at the song's place */
     p->shift = s->open ? p->playhead : 0;
     p->edit_base = from;
@@ -250,7 +243,6 @@ SONG_SMALL void song_player_stop(struct song_player *p)
     all_off(p);
     p->playing = p->jumping = 0;
 #if SONG_UI
-    p->stut_at = NEVER;
     memset(p->hits, 0, sizeof p->hits);
     memset(p->from, SONG_FROM_SONG, sizeof p->from); /* every track back to the song */
     memset(p->waiting, SONG_FROM_NONE, sizeof p->waiting);

@@ -194,6 +194,11 @@ SONG_SMALL void song_player_launch(struct song_player *p, unsigned track, unsign
     p->waiting[track] = (uint8_t)to;
     p->launch_at[track] = p->playing ? launch_point(p, p->next) + p->shift : 0;
 }
+SONG_SMALL void song_player_launch_rec(struct song_player *p, unsigned track, unsigned row)
+{
+    song_player_launch(p, track, row);
+    if (track < SONG_TRACKS && p->playing && !p->song->launch_q) p->launch_at[track] = next_beat(p->song, p->next) + p->shift;
+}
 SONG_SMALL uint32_t song_player_transport(const struct song_player *p) { return timeline(p) + p->shift; }
 SONG_SMALL void song_player_edit(struct song_player *p, unsigned t, unsigned opening)
 {
@@ -204,13 +209,17 @@ SONG_SMALL void song_player_edit(struct song_player *p, unsigned t, unsigned ope
         else p->playhead = p->song_at;
         return;
     }
-    uint32_t now = p->next + p->shift, start;
-    song_player_cut(p, t);
-    if (opening) {
+    uint32_t now = p->next + p->shift, start, launched = p->from[t] < SONG_GRID_ROWS ? s->clip_length[t * SONG_GRID_ROWS + p->from[t]] : 0;
+    unsigned row = s->open ? (s->open - SONG_TRACKS) % SONG_GRID_ROWS : SONG_FROM_NONE;
+    /* The clip the track plays as launched goes on in its pass, open or not. */
+    unsigned same = opening ? p->from[t] == row : launched && (p->edit_base - p->base[t]) % launched == 0;
+    if (!same) song_player_cut(p, t);
+    if (opening && same) p->edit_base = p->base[t];
+    else if (opening) {
         uint32_t length = s->clip_length[s->open - SONG_TRACKS];
         song_bar_at(s, p->next, &start, NULL);
         p->edit_base = now - (length ? (p->next - start) % length : 0);
     }
     refind(p, t, now);
-    chase_track(p, t, p->next);
+    if (!same) chase_track(p, t, p->next);
 }

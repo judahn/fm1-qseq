@@ -152,10 +152,9 @@ static int song_job_input(const struct fm1_controls *c, uint32_t *pressed, uint3
         return 1;
     }
     if (*pressed & BUTTON(PLAY)) { if (song_port_player()->playing) song_port_stop(); else song_start(now); }
-    if ((*pressed & BUTTON(SAVE)) && !song_asking()) { /* the song, as on the other song pages */
+    if ((*pressed & BUTTON(SAVE)) && !song_asking()) { /* the song list as SAVE comes up, as on the other song pages */
         *pressed &= ~BUTTON(SAVE);
-        if (shift) { song_list_open(); return 1; }
-        song_save_key(now);
+        song_save_press();
     }
     *pressed &= ~(BUTTON(PLAY) | BUTTON(SAVE) | BUTTON(FX) | BUTTON(REC) | BUTTON(ARP) | BUTTON(ENV) | BUTTON(SCL) | BUTTON(LFO));
     if (*pressed & BUTTON(GLO)) return 0;

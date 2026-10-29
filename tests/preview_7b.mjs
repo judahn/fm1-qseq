@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception
 // Phase 7b of the preview check: clips in the song. Three clips made in the
-// grid, then REC there records a performance: launches at the bar quantize,
+// grid, then SHIFT+REC there records a performance: launches at the bar quantize,
 // a stop and a return to the song become blocks on tracks 1 and 2, one undo
 // step, and playing the song back plays what was played, note for note in
 // exact blocks. The Expand job turns the blocks into notes that play the
@@ -43,9 +43,9 @@ export async function phase7b(browser, root) {
     o.clips = [info(39, 0, cell(0, 0)), info(39, 0, cell(1, 0)), info(39, 0, cell(0, 1))];
     turn(2, -1);
 
-    // 2. A performance: REC arms it, PLAY starts it, then launches.
+    // 2. A performance: SHIFT+REC arms it, PLAY starts it, then launches.
     const before = undos();
-    tap(B.REC);
+    held(B.FX, () => tap(B.REC));
     o.armed = perf();
     c.sim_song_capture(1);
     tap(B.PLAY);
@@ -59,8 +59,9 @@ export async function phase7b(browser, root) {
     launch(2, 1);                                   // track 2, row 2: empty, a stop
     o.takePng = png();
     turn(2, -2); launch(0, 0);                      // track 1 back to the song
+    tap(B.PLAY);                                    // PLAY ends the take, and playing goes on
+    o.afterStop = [perf(), info(7)];
     tap(B.PLAY);
-    o.afterStop = perf();
     const live = on(r.heard(), [0, 1]).map(h => [h.block - start, h.track, h.pitch]);
     o.launches = launches;
     o.blocks = [blocks(0), blocks(1)];
@@ -146,6 +147,12 @@ export async function phase7b(browser, root) {
     tap(B.REC);
     o.stillPlaying = info(7);
     o.recordedTake = info(0, 1) - notesBefore;
+    tap(B.REC);                                     // again, and PLAY ends that one, playing on
+    guard = 0;
+    while (!taking() && guard++ < 2000) render(1);
+    o.clipAgain = taking();
+    tap(B.PLAY);
+    o.playEnds = [taking(), armed(), info(7)];
     render(300);
     const around = r.heard().slice(opened);
     o.othersPlayed = on(around, [0, 2, 3, 4, 5, 6, 7]).length;
@@ -217,10 +224,10 @@ export async function phase7b(browser, root) {
   const t = checker('7b'), q = out, clip3 = (song.clips.find(c => c.cell === 1) || { events: [] }).events.map(e => e.a);
   t.eq('the grid', q.gridPage, 27);
   t.eq('three one-bar clips made', q.clips, [1920, 1920, 1920]);
-  t.eq('REC in the grid arms a performance', q.armed, 1);
+  t.eq('SHIFT+REC in the grid arms a performance', q.armed, 1);
   t.eq('PLAY starts the take', q.taking, 2);
   t.yes('each launch waits for a bar line', q.launches.every(l => l % 1920 === 0), q.launches);
-  t.eq('PLAY again ends the take', q.afterStop, 0);
+  t.eq('PLAY again ends the take, and playing goes on', q.afterStop, [0, 1]);
   const [l1, l2, l3, l4, l5] = q.launches;
   t.eq('track 1\'s blocks: row 1, then row 2 until its return to the song', q.blocks[0], [[l1, l3 - l1, 0], [l3, l5 - l3, 1]]);
   t.eq('track 2\'s blocks: row 1, then the stop until the take ended', q.blocks[1].map(b => [b[0], b[2]]), [[l2, 0], [l4, 'stop']]);
@@ -245,6 +252,8 @@ export async function phase7b(browser, root) {
   t.yes('from the top of the pass', q.passTop);
   t.eq('two notes recorded into the clip', q.recordedTake, 2);
   t.eq('REC again: still playing', q.stillPlaying, 1);
+  t.eq('REC once more records into the clip again', q.clipAgain, 1);
+  t.eq('PLAY ends that take, and playing goes on', q.playEnds, [0, 0, 1]);
   t.over('the other tracks played on throughout', q.othersPlayed, 20);
   t.eq('SEQ closes the clip', q.closed, 0);
   t.eq('the clip keeps its notes and the new ones', q.clipNotes, 4);

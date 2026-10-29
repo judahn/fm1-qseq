@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* Glitch: attribute words and the table, repeats and flams at exact blocks,
- * chance and the other random choices, the stutter and the FX lane, and
- * the mangle jobs with undo. */
+ * chance and the other random choices, and the mangle jobs with undo. */
 #include "harness.h"
 #include "glitch.h"
 #include "mangle.h"
@@ -184,63 +183,6 @@ static void test_random(void)
     CHECK(balanced());
 }
 
-/* A held stutter repeats the slice before its grid line on every track,
- * then playing rejoins exactly where the song is. An FX lane stutter at the
- * same place plays the same. */
-static struct heard live[CAPTURE];
-static unsigned live_count;
-static void test_stutter(void)
-{
-    fresh();
-    for (unsigned i = 0; i < 64; ++i) note(0, i * 120U, 48 + i % 24, 100, 0);
-    for (unsigned i = 0; i < 16; ++i) note(3, i * 480U + 60, 70, 400, 0);
-    song_player_init(&player, &song, &listener);
-    reset_capture();
-    block_now = 0;
-    song_player_start(&player, 0);
-    run_blocks(&player, 0, 120);
-    song_player_stutter(&player, 240, 1);
-    uint32_t g = player.stut_at;
-    CHECK_EQ(g % 240, 0);
-    run_blocks(&player, 120, 360);
-    uint32_t began = song_player_stutter_stop(&player), to = player.stut_to;
-    CHECK_EQ(began, g);
-    run_blocks(&player, 480, 500);
-    song_player_stop(&player);
-    CHECK(balanced());
-    unsigned bad = 0, replays = 0, after = 0;
-    for (unsigned i = 0; i < heard_count; ++i) {
-        const struct heard *h = &heard[i];
-        if (!h->velocity || h->track != 0) continue;
-        uint32_t lo = exact_block(&song, 0, 0, g), hi = exact_block(&song, 0, 0, to);
-        if (h->block < lo) continue;
-        if (h->block < hi) { /* repeat k of [g - 240, g): 16ths, a semitone up each time */
-            uint32_t k = replays / 2U, at = g + k * 240U + (replays % 2U) * 120U, src = g - 240U + (replays % 2U) * 120U;
-            bad += h->block != exact_block(&song, 0, 0, at) || h->pitch != 48 + (src / 120U) % 24U + k;
-            ++replays;
-        } else { /* back in time with the song */
-            uint32_t at = (to + 119U) / 120U * 120U + after * 120U;
-            bad += h->block != exact_block(&song, 0, 0, at) || h->pitch != 48 + (at / 120U) % 24U;
-            ++after;
-        }
-    }
-    CHECK(replays >= 6);
-    CHECK(after >= 10);
-    CHECK_EQ(bad, 0);
-    memcpy(live, heard, heard_count * sizeof heard[0]);
-    live_count = heard_count;
-    /* The same stutter written on the FX lane. */
-    CHECK_EQ(song_fx_add(&song, g, to - g, 1, 1), 0);
-    play_from(0, 980);
-    CHECK_EQ(heard_count, live_count);
-    CHECK(!memcmp(live, heard, live_count * sizeof heard[0]));
-    /* Looping across it: each pass stutters again. */
-    song.loop_start = 0; song.loop_end = 3840; song.loop_on = 1;
-    play_from(0, 2000);
-    CHECK(balanced());
-    song.loop_on = 0;
-}
-
 static void test_mangle(void)
 {
     fresh();
@@ -292,16 +234,14 @@ static void test_mangle(void)
     CHECK(fingerprint() == before);
 }
 
-/* Copy and paste keep glitch through another table, and the FX lane comes
- * along with a copy of other tracks. */
+/* Copy and paste keep glitch through another table. */
 static void test_travel(void)
 {
     fresh();
     uint32_t w = song_glitch_turn(word(GLITCH_REPEATS, 4), GLITCH_FLAM, 1);
     note(2, 480, 60, 240, w);
-    song_fx_add(&song, 960, 240, 2, 0);
     CHECK_EQ(song_copy(&song, &clip, 1U << 2, 0, 1920), 0);
-    CHECK_EQ(clip.count, 2);
+    CHECK_EQ(clip.count, 1);
     memset(song.glitch, 0, sizeof song.glitch);
     song.glitch[1] = 12345; /* another song's table */
     CHECK_EQ(song_paste(&song, &clip, 3840, 5, 0), 0);
@@ -309,8 +249,6 @@ static void test_travel(void)
     const struct song_event *e = song_track(&song, 5, &n);
     CHECK_EQ(n, 1);
     CHECK_EQ(song_glitch_word(&song, &e[0]), w);
-    e = song_track(&song, 0, &n);
-    CHECK(n == 2 && song_event_kind(&e[1]) == SONG_FX && song_event_start(&e[1]) == 3840 + 960);
 }
 
 int main(void)
@@ -318,7 +256,6 @@ int main(void)
     test_words();
     test_repeats();
     test_random();
-    test_stutter();
     test_mangle();
     test_travel();
     return report("test_glitch");

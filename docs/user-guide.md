@@ -14,13 +14,13 @@ show which page or mode is active. The key lights work as described below.
 
 | Control | Name in this guide | In song mode |
 |---|---|---|
-| Buttons | FX | SHIFT on every song page |
+| Buttons | FX | SHIFT on every song page while held. A tap opens the effects page from the song view, the grid, the automation view and the settings |
 | | SEL | Markers, delete, open a clip, depending on the page |
 | | ENV, LFO | Loop and metronome, picking, depending on the page |
 | | EDIT | Sound editing, as in the stock firmware. SHIFT+EDIT opens the edit jobs |
 | | GLO | Song settings. A hold is still the stock mixer |
-| | HOME, SAVE | Leave to the stock overview, and save |
-| | ARP | GLITCH: the stutter, and the glitch layer in step entry |
+| | HOME, SAVE | Leave to the stock overview, and the song list |
+| | ARP | The arpeggiator, as on the stock pages: a tap turns it on or off, a hold opens its settings. In step entry, the glitch layer |
 | | SEQ | The song view, and from there the clip grid |
 | | PLAY, REC | Transport and recording |
 | | OCT- / OCT+ | Move the keys an octave, two at most each way. On the song list, the edit jobs and while naming they are NO and YES |
@@ -54,16 +54,18 @@ OCT- and OCT+ still move the keyboard's octave.
 | Device settings | SHIFT+GLO on a song page (or HOME+GLO anywhere) | HOME, or SEQ |
 | Automation view | SHIFT+LFO in the song view | SHIFT+LFO again |
 | Edit jobs | SHIFT+EDIT in the song view | HOME, EDIT or NO (OCT-) |
-| Song list | SHIFT+SAVE on any page | HOME or NO (OCT-) |
+| Song list | SAVE on any page | HOME or NO (OCT-) |
 | Sound editing | EDIT | EDIT again returns to the song page |
+| Effects | Tap FX on the song view, the grid, the automation view or the settings | FX goes back, SEQ goes to the song view |
+| Arpeggiator settings | Hold ARP on those pages | HOME goes back |
 
 These work on every song page:
 
 | Buttons | Action |
 |---|---|
-| SAVE | Save the song to flash, in the song view, the automation view, the grid, the song list and the edit jobs. Not while a question or a naming is open |
-| SHIFT+SAVE | The song list |
-| HOME+SAVE | Undo, up to 64 steps (fewer when steps are large) |
+| SAVE | The song list, which opens as SAVE comes up, from the song view, the automation view, the grid, the edit jobs and the stock pages. There SAVE saves the song, so a save is SAVE, SAVE. Not while a question or a naming is open, or while recording |
+| SHIFT+SAVE | The same |
+| HOME+SAVE | Undo, up to 64 steps (fewer when steps are large). HOME or SAVE can go down first, and the song list doesn't open |
 | SHIFT+HOME+SAVE | Redo |
 | HOME+PLAY | Stop everything and go to the stock overview |
 | SHIFT+SEQ | Every track back to the song (clips, see below) |
@@ -71,7 +73,7 @@ These work on every song page:
 | OCT- / OCT+ | The keyboard's octave. NO and YES on the song list, the edit jobs and while naming |
 
 Each poll's edits are one undo step, so a knob turned over many moves undoes as one. A recording take is one
-step. Flash writes happen only while stopped. A recovery copy of an unsaved song is written after playback
+step, and so is a take into a cell of the grid, with the clip it made. Flash writes happen only while stopped. A recovery copy of an unsaved song is written after playback
 stops, at most every 15 seconds, and the song list offers it after a restart.
 
 ## Song view
@@ -80,9 +82,9 @@ Tracks are rows, bars run across. The loop region is shaded and is also the sele
 
 | Control | Action |
 |---|---|
-| PLAY | Play and stop |
+| PLAY | Play and stop. During a take, end the recording and play on |
 | SHIFT+PLAY | Back to the loop start, or the song start when the loop is off |
-| REC | Stopped: the REC chooser. Playing with a clip open: record into the clip (below) |
+| REC | Stopped: the REC chooser. Playing with a clip open: record into the clip (below). During a take, end the recording and play on |
 | K1 | Move the playhead one snap step. While playing, a jump waits for the next bar line |
 | SHIFT+K1 | Marker to marker |
 | K2 | Loop start |
@@ -141,12 +143,12 @@ During a take:
 
 | Control | Action |
 |---|---|
-| PLAY or REC | End the take and stop |
+| PLAY or REC | End the take. Playing goes on, and PLAY again stops. In the count-in, before anything is recorded, they call the take off and stop |
 | K1 to K4 | Record their parameters on the take track. Which parameter each knob drives is on settings page 3 |
-| Hold ARP (GLITCH) | Stutter, recorded on the FX lane (see Glitch) |
 
 Recorded notes are stored already quantized. The take keeps its raw timing, so turning K3 or K4 in the
-chooser afterwards requantizes the last take. Undo takes the whole take back.
+chooser afterwards (stopped) requantizes the last take. Undo takes the whole take back. If the song's memory
+fills during a take, the take ends there and says so.
 
 ## Step entry
 
@@ -199,6 +201,12 @@ Tap GLO on a song page. ALGO turns the five pages. They're saved with the song.
 On pages 1 and 2 the keys F3 to F4 switch swing per track, and their lights show which tracks swing. Pages 3,
 4 and 5 are for the track SELECT picks. Tempo and time signature here are the song's starting values.
 
+The stock instrument keeps a tempo of its own, in whole BPM from 30 to 300, for the arpeggiator, the synced
+delay, the stock pages' tempo and MIDI clock out. It follows the song's tempo where the playhead is, rounded: as
+playing crosses a tempo change, after a jump, and whenever the song's tempo changes. A tempo set on a stock page
+(the effects page's delay, the clock settings) or by tap tempo goes into the song instead: the starting tempo,
+or the tempo change the playhead is past. With MIDI clock coming in, neither changes.
+
 Scales: chromatic (no snapping), major, minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian, harmonic minor,
 melodic minor, major pentatonic, minor pentatonic and blues. With a scale set, played keys outside it move up
 to the next scale note on pitched tracks, the key lights show the scale, and the pitch knob in step entry
@@ -218,10 +226,10 @@ SHIFT+LFO in the song view. The conductor row sits above track 1. Turning SELECT
 | Control | Action |
 |---|---|
 | SELECT | The row: a track, or the conductor |
-| PRESETS | The lane shown: one of the track engine's parameters, or programs. On the conductor: tempo, time signature or the FX lane |
+| PRESETS | The lane shown: one of the track engine's parameters, or programs. On the conductor: tempo or time signature |
 | ALGO | Stopped: set a change at the playhead. Tempo (SHIFT: hundredths), the time signature from that bar, or a program change |
 | SEL | Delete the change at the playhead |
-| SHIFT+SEL | Clear the shown lanes (or the FX lane's stutters) in the selection |
+| SHIFT+SEL | Clear the shown lanes in the selection |
 | SHIFT+K1 | Move to the next or previous change on the row |
 
 Everything else works as in the song view. Controller lanes are recorded with K1 to K4 during a take.
@@ -229,15 +237,26 @@ Tempo runs 20 to 300 BPM. Time signatures run 1/4 to 8/4, 1/8 to 16/8 and 1/16 t
 
 ## Glitch
 
+Per-note glitch is in step entry: ARP there turns on the glitch layer (see Step entry). Mangle is SHIFT+F#3,
+G#3 and A#3 in the song view: scramble the 16ths, reverse the note order, or shuffle notes between the selected
+tracks. Humanize per track is on settings page 4. Swing is on page 1.
+
+The live stutter and the FX lane are gone since 0.3.0. A song saved with FX lane events still loads, without
+them.
+
+## Arpeggiator and effects
+
+On the song view, the grid, the automation view and the settings, ARP and FX work as on the stock pages:
+
 | Control | Action |
 |---|---|
-| Hold ARP (GLITCH) while playing | Stutter: every track repeats the last slice |
-| While holding: F3 G3 A3 B3 C4 | Slice: 1/4, 1/8, 1/16, 1/32, 1/64 |
-| While holding: F#3 | Triplet slice |
-| While holding: K1 | Drift each repeat's pitch, up to 12 semitones |
+| Tap ARP | The arpeggiator on or off for the track |
+| Hold ARP | Its settings page. HOME comes back to the song page |
+| Tap FX | The effects page: the track's sends, the shared effects, and the delay, which PRESETS turns between. FX comes back, SEQ goes to the song view. On the delay page SEQ taps the tempo, as on the stock pages |
+| Hold FX | SHIFT, as everywhere on the song pages |
 
-Letting go rejoins the song where it has got to. A stutter played during a take goes on the FX lane and plays
-back. Per-note glitch is in step entry. Humanize per track is on settings page 4. Swing is on page 1.
+A tap is a press and release within 600 ms with no other button, key or knob used meanwhile. In step entry,
+the song list, the edit jobs and the REC chooser FX is only SHIFT, and ARP opens no settings.
 
 ## Edit jobs
 
@@ -245,7 +264,7 @@ SHIFT+EDIT in the song view. K1 picks the job. K2 to K4 set its settings, ALGO t
 SHIFT moves a setting by ten. YES (OCT+) asks first, with how many events the job takes on
 (`QUANTIZE 120 EVENTS?`), and says when it is too big to undo. YES again runs it as one undo step. NO cancels
 the question, and so does changing the job, a setting, the track or the picked tracks. With no question open
-NO goes back to the song view, as HOME and EDIT do. SAVE saves the song. PLAY plays. Hold LFO and tap keys to
+NO goes back to the song view, as HOME and EDIT do. SAVE opens the song list. PLAY plays. Hold LFO and tap keys to
 pick tracks, as in the song view. RANGE is the selection or the whole song.
 
 Jobs: QUANTIZE, VELOCITY, CRESCENDO, GATE TIME, TRANSPOSE, FIT TO SCALE, SHIFT CLOCK, CHORD SORT, STRUM,
@@ -254,8 +273,10 @@ and EXPAND CLIPS. With a clip open, the jobs that reach other tracks or the song
 
 ## Song list
 
-SHIFT+SAVE. A memory gauge shows songs, kits and free space, and the header shows the firmware's version, as the
-boot screen does. K2 picks an action and YES does it. The line at the bottom always says what YES will do and to
+SAVE on any page, as SAVE comes up. A memory gauge shows songs, kits and free space, and the header shows the
+firmware's version, as the boot screen does. Under it are the battery's reading from its sensor, for example
+`BAT 812`, smoothed and updated at most once a second, and a bar. The bar's empty and full readings are guesses
+until they are measured on a device. K2 picks an action and YES does it. The line at the bottom always says what YES will do and to
 what, for example `OCT+ LOAD VERSE   OCT- BACK`.
 
 | Control | Action |
@@ -266,7 +287,7 @@ what, for example `OCT+ LOAD VERSE   OCT- BACK`.
 | K4 | NEW FROM: what a new song starts from |
 | YES (OCT+) | Do the action |
 | NO (OCT-) | Cancel a question or a naming. With nothing open, back to the song view |
-| SAVE | Save the song being worked on. Not while a question or a naming is open |
+| SAVE | Save the song being worked on, so a save anywhere is SAVE, SAVE. Not while a question or a naming is open |
 | HOME | Back to the song view |
 
 What YES does:
@@ -298,6 +319,7 @@ track's loop, a beat to 16 bars long. A track plays either the song or a clip, n
 |---|---|
 | SELECT | The track (column) |
 | K1 | The row cursor, the SONG row first |
+| K2 | REC LENGTH: 1, 2, 4, 8 or 16 bars, or FREE. It starts on 4 bars and keeps the last pick while the FM-1 is on |
 | K4 | Launch quantize: off, beat, bar, 2 bars or 4 bars |
 | F3 to F4 | Launch that track's cell in the cursor row. An empty cell stops the track. On the SONG row the track goes back to the song |
 | G4 to G5 | Launch rows 1 to 8 of the page on every track (a scene). Tracks with nothing in the row stop |
@@ -305,14 +327,37 @@ track's loop, a beat to 16 bars long. A track plays either the song or a clip, n
 | SEL | Open the clip at the cursor. An empty cell gets a new one-bar clip |
 | ENV | Name the row: K1 picks the letter, K2 changes it, YES (OCT+) keeps the name, NO (OCT-) leaves the old one. SAVE does nothing while naming |
 | SHIFT + F3, G3, A3 or B3, E4 | Copy, cut, paste, paste, delete the cell |
-| PLAY | Play and stop. Launching while stopped starts playback. Stopping gives every track back to the song |
-| REC | Record a performance (below) |
+| PLAY | Play and stop. Launching while stopped starts playback. Stopping gives every track back to the song. During a take, end the recording and play on |
+| REC | Record into the cell at the cursor (below). REC again ends it |
+| SHIFT+REC | Record a performance (Clips in the song) |
 
 Launches wait for the launch quantize, counted on the song's bar lines. The loop's wrap and the song's end
 count as launch points too. A clip starts from its beginning and keeps its phase through song loops and
 jumps. The track keys light while their clip plays and blink while a launch waits.
 
 Pasting copied song bars into a cell turns them into a clip. Several copied tracks paste across the row.
+
+### Recording into a cell
+
+REC records into the cell at the cursor, on the cursor's track. The cell blinks red while it's armed and is red
+while it records, with how far it has got. The bottom line says what is happening.
+
+- **An empty cell** becomes a clip of the REC length. Playing, it launches on its track at the launch quantize
+  (with the launch quantize off, at the next beat), and recording starts there. The track leaves the song or
+  its other clip, as with any launch. Stopped, REC starts playing with the REC chooser's count-in, and
+  recording starts after it. With a length set, recording ends by itself at the end of the clip, and the clip
+  plays on, launched. With FREE, REC ends it at the next bar line (it can run to 16 bars), and the clip is
+  that many bars long.
+- **A cell with a clip** is overdubbed as loop recording, from its next pass (from its first if it launches for
+  the take), until REC or PLAY.
+- While a cell is armed or recording, the keys play its track (at the keyboard's octave, with chord mode when
+  the track has it) and go into the take, instead of launching. OCT- and OCT+ move the octave. SELECT stays on
+  the track, and the SHIFT keys, SEL and ENV wait. The keys launch again when the take ends.
+- PLAY or REC ends the take, and playing goes on. In the count-in, before anything is recorded, PLAY or REC
+  calls it off, stops, and an empty cell stays empty.
+
+The REC chooser's input quantize applies, and the metronome when it is set to play while recording. The take,
+and a new clip with it, is one undo step. SEQ waits until the take is over.
 
 ### A clip in the editor
 
@@ -321,8 +366,8 @@ sets that length. Step entry, recording, automation, glitch and the jobs that st
 on the clip. SELECT stays on the clip's track, and the markers are hidden. SEQ closes it.
 
 The song keeps playing while a clip is open, so a part can be written against the other tracks. REC while
-playing records into the clip as loop recording from its next pass, and the rest plays on. REC again ends the
-recording and playing goes on. PLAY stops both. Recording from a stop works as in the song view.
+playing records into the clip as loop recording from its next pass, and the rest plays on. REC or PLAY ends the
+recording and playing goes on, and PLAY again stops. Recording from a stop works as in the song view.
 
 ## Clips in the song
 
@@ -331,10 +376,10 @@ loops from the block's start and the track's own notes stay quiet. A stop block 
 the song view blocks show as shaded bars with the clip's row number, and a stop shows an X. A block ends at
 its length or where the next one on its track starts. Editing a clip changes it everywhere it's used.
 
-**Recording a performance.** In the grid, REC arms it. The take starts with the next launch, or with PLAY.
+**Recording a performance.** In the grid, SHIFT+REC arms it. The take starts with the next launch, or with PLAY.
 Each launch writes a block for its track from the launch point to that track's next launch, stop or return
 to the song. Tracks left on the song are untouched. The song's loop is ignored and the song grows to hold
-the take. REC again or stopping ends it, and the whole take is one undo step.
+the take. REC, PLAY or stopping ends it, PLAY with playing going on, and the whole take is one undo step.
 
 **By hand.** Copy a cell in the grid (SHIFT+F3), go to the song view, and paste with SHIFT+A3 or SHIFT+B3. The
 block lands at the playhead, the clip's length long, and becomes the selection. SHIFT+C4 (Duplicate) then
@@ -388,6 +433,25 @@ One chord sounds at a time, at velocity 100, while its key is held. A chord reco
 strum. Input quantize moves a strummed chord as a whole, by its first note. In step entry a root enters its
 chord at the pointer, strummed when strum is on, and F5, F#5 and G5 enter the last chord again, an octave down
 or an octave up. Rest, tie and repeat stay on SHIFT there.
+
+## The workbench
+
+The workbench page (README.md, The workbench) has the Songs and kits section. Two of its buttons fill the
+device from what FM1 Open's page carries:
+
+| Button | What it does |
+|---|---|
+| Send the built-in kit | FM1 Open's 8 built-in sounds as a kit named BUILT-IN, unless they are on the device already |
+| Send the factory DX7 voices | M-VAVE's 128 factory DX7 voices into the 4 banks of the DX7 library |
+
+The full build leaves the factory voices out of the firmware, so until the DX7 library holds voices every DX7
+preset there is blank. Sending them puts them in the library, in the user area, where they stay through
+firmware updates. The workbench reads the 4 banks first, and when a bank holds voices of its own (saved
+earlier, not the factory's) it asks before replacing it. It reads every bank back after writing and says if
+one doesn't match. The new voices play at once, with no restart.
+
+On the full build the page's project library tab connects, but it has no project slots: they show as empty, and
+saving to one is refused. Songs and kits take their place.
 
 ## Diagnostics page
 

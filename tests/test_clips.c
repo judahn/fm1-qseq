@@ -114,6 +114,26 @@ static void test_undo_parts(void)
     song.undo = NULL;
 }
 
+/* A cell's length set through the journal comes and goes with undo and
+ * redo, the way a grid take's new clip does. */
+static void test_resize(void)
+{
+    song_clear(&song, 8, 12000);
+    song_undo_init(&undo);
+    song.undo = &undo;
+    unsigned cell = song_cell(5, 9);
+    song_undo_begin(&undo, &song);
+    clip_note(cell, 0, 60, 100);
+    song_clip_resize(&song, cell, 3840);
+    song_undo_end(&undo, &song);
+    CHECK_EQ(song.clip_length[cell], 3840);
+    CHECK_EQ(song_undo(&undo, &song), 0);
+    CHECK(song.clip_length[cell] == 0 && song.count[song_cell_part(cell)] == 0);
+    CHECK_EQ(song_redo(&undo, &song), 0);
+    CHECK(song.clip_length[cell] == 3840 && song.count[song_cell_part(cell)] == 1);
+    song.undo = NULL;
+}
+
 static void test_cells(void)
 {
     song_clear(&song, 20, 12000);
@@ -241,11 +261,52 @@ static void test_file(void)
     CHECK_EQ(song_file_check(first, length, &block, &n), -1);
 }
 
+/* A file from before 0.3.0 with stutters on the FX lane (track 1, kind FX,
+ * `a` below 0x80): it loads, they are dropped, and everything else, a clip
+ * block included, comes in as it was, so saving it again leaves them out. */
+static void test_fx_lane_file(void)
+{
+    static uint8_t old[BYTES];
+    const uint8_t *data, *block;
+    uint32_t length, n;
+    song_clear(&song, 8, 12000);
+    for (unsigned t = 0; t < SONG_TRACKS; ++t) song_add_note(&song, t, t * 10U, 40 + t, 100, 100);
+    song.clip_length[song_cell(0, 2)] = 1920;
+    clip_note(song_cell(0, 2), 0, 60, 100);
+    const struct song_event stop = {3840U | (uint32_t)SONG_FX << 24, SONG_BLOCK_STOP, 0, 960};
+    song_add_event(&song, 1, &stop);
+    struct song_event stutter = {1920U | (uint32_t)SONG_FX << 24, 1, 66, 240}; /* a 1/8 slice, drift +2 */
+    data = write_song(&song, &length);
+    const uint32_t clean = song_file_crc(&song, sounds, sizeof sounds), events = song.events;
+    CHECK(data != NULL);
+    song_add_event(&song, 0, &stutter);
+    stutter.at = 2400U | (uint32_t)SONG_FX << 24;
+    stutter.a = 1 | 8; /* a triplet slice */
+    song_add_event(&song, 0, &stutter);
+    data = write_song(&song, &length);
+    memcpy(old, data, length);
+    CHECK_EQ(song_file_check(old, length, &block, &n), 0);
+    CHECK_EQ(song_file_read(&other, old, length, &block, &n), 0);
+    CHECK_EQ(other.events, events);
+    CHECK_EQ(other.count[0], 1);                          /* track 1's note, the stutters gone */
+    CHECK(consistent(&other));
+    unsigned count, blocks = 0, fx = 0;
+    for (unsigned p = 0; p < SONG_PARTS; ++p) {
+        const struct song_event *e = song_track(&other, p, &count);
+        for (unsigned i = 0; i < count; ++i) { blocks += song_is_block(&e[i]); fx += song_event_kind(&e[i]) == SONG_FX; }
+    }
+    CHECK(blocks == 1 && fx == 1);                         /* the block stays */
+    CHECK_EQ(other.count[song_cell_part(song_cell(0, 2))], 1);
+    CHECK_EQ(song_file_crc(&other, sounds, sizeof sounds), clean); /* as if they had never been there */
+}
+
 int main(void)
 {
     test_open_close();
     test_undo_parts();
+    test_resize();
     test_cells();
     test_file();
+    test_fx_lane_file();
     return report("test_clips");
 }

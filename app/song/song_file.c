@@ -94,13 +94,14 @@ static void copy(struct reader *r, void *to, uint32_t n, unsigned apply)
     const uint8_t *b = take(r, n);
     if (b && apply) memcpy(to, b, n);
 }
-/* A part's events into the pool after `total`, in clock order. The new total, or -1. */
+/* A part's events into the pool after `total`, in clock order. The FX
+ * lane's stutters, from before 0.3.0, are read and dropped. The new total,
+ * or -1. */
 SONG_SMALL static int get_part(struct reader *r, struct song *s, unsigned part, unsigned total)
 {
-    unsigned count = get16(r);
+    unsigned count = get16(r), kept = 0;
     uint32_t last = 0;
     if (total + count > SONG_EVENTS) return -1;
-    if (s) { s->first[part] = (uint16_t)total; s->count[part] = (uint16_t)count; }
     for (unsigned i = 0; i < count; ++i) {
         struct song_event e;
         e.at = get32(r); e.a = (uint8_t)get8(r); e.b = (uint8_t)get8(r); e.length = (uint16_t)get16(r);
@@ -109,9 +110,12 @@ SONG_SMALL static int get_part(struct reader *r, struct song *s, unsigned part, 
         if (song_is_block(&e) && (r->version < 3 || part >= SONG_TRACKS || !song_block_length(&e) ||
                                   (e.a != SONG_BLOCK_STOP && e.a >= SONG_BLOCK + SONG_GRID_ROWS))) r->bad = 1; /* blocks: tracks only */
         last = song_event_start(&e);
-        if (s) s->event[total + i] = e;
+        if (song_event_kind(&e) == SONG_FX && !song_is_block(&e)) continue; /* a stutter */
+        if (s) s->event[total + kept] = e;
+        ++kept;
     }
-    return (int)(total + count);
+    if (s) { s->first[part] = (uint16_t)total; s->count[part] = (uint16_t)kept; }
+    return (int)(total + kept);
 }
 /* One pass checks (apply 0), the next fills the song. */
 SONG_SMALL static int parse(struct song *s, const uint8_t *data, uint32_t bytes, unsigned apply,

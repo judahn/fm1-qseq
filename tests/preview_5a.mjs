@@ -25,11 +25,15 @@ export async function phase5a(browser, root) {
     const bootPads = pads();
     o.boot = { kits: store(2), kit: store(3), songs: store(0), padsUsed: bootPads.filter(p => p).length };
 
-    // 1. SAVE in the song view: the test song goes to slot 1.
+    // 1. SAVE in the song view opens the song list, and SAVE there saves:
+    // the test song goes to slot 1.
     const before = dump();
+    r.tap(B.SAVE);
+    o.saveOpens = r.page();
     r.tap(B.SAVE);
     const crc = store(16);                         /* as saved, now with its name and programs */
     o.saved = { songs: store(0), id: store(1) };
+    r.tap(B.HOME);
     // 2. Change it (delete bars 3 to 6), save that as a second song from the list.
     r.held(B.FX, () => r.key(11));
     o.changed = dump() !== before;
@@ -107,7 +111,8 @@ export async function phase5a(browser, root) {
   t.eq('at boot: one kit, the stock bank', q.boot.kits, 1);
   t.eq('at boot: that kit in use', q.boot.kit, 1);
   t.over('at boot: pads bound', q.boot.padsUsed, 0);
-  t.eq('SAVE: one song', q.saved.songs, 1);
+  t.eq('SAVE in the song view opens the song list', q.saveOpens, 25);
+  t.eq('SAVE there: one song', q.saved.songs, 1);
   t.eq('SAVE: it is song 1', q.saved.id, 1);
   t.yes('deleting bars changed the song', q.changed);
   t.eq('SHIFT+SAVE opens the song list', q.listPage, 25);

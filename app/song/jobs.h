@@ -43,8 +43,8 @@ int song_job_extract(struct song *s, const struct song_range *r, unsigned type, 
 int song_job_ramp(struct song *s, const struct song_range *r, unsigned lane, int start, int end, unsigned spacing,
                   int curve);
 int song_job_thin(struct song *s, const struct song_range *r, unsigned lane); /* every other change goes */
-/* Whole tracks: copy (replacing), merge (`from` ends up empty), clear. The
- * FX lane stays on track 1. */
+/* Whole tracks: copy (replacing), merge (`from` ends up empty), clear. Copy
+ * leaves the clip blocks where they are. */
 int song_job_copy_track(struct song *s, unsigned from, unsigned to);
 int song_job_merge(struct song *s, unsigned from, unsigned into);
 int song_job_clear(struct song *s, unsigned tracks);

@@ -139,8 +139,9 @@ export async function phase7(browser, root) {
     turn(5, -1);
     o.launchQ = info(42) >> 8;
     o.namedPng = png();
-    // 7. SAVE keeps the grid: delete row 1's clip, load the song back.
-    tap(B.SAVE);
+    // 7. SAVE keeps the grid: saved on the list SAVE opens, then row 1's clip
+    // deleted in the grid, and the song loaded back.
+    tap(B.SAVE); tap(B.SAVE); tap(B.HOME); tap(B.SEQ);
     held(B.FX, () => key(0));                        // copy, then delete it
     held(B.FX, () => key(11));
     o.beforeLoad = info(39, 0, cell(0, 0));
@@ -199,7 +200,7 @@ export async function phase7(browser, root) {
   t.eq('naming again and NO: the old name stays', q.cancelled, q.rowName);
   t.eq('K4 sets the launch quantize to a beat', q.launchQ, 1);
   t.eq('the clip deleted before loading', q.beforeLoad, 0);
-  t.eq('SHIFT+SAVE opens the song list', q.listPage, 25);
+  t.eq('SHIFT+SAVE opens the song list too', q.listPage, 25);
   t.eq('YES with unsaved changes asks before loading', q.askedFirst, 0);
   t.eq('loaded back: both clips, the row name and the launch quantize', q.loaded, [1920, 4, 3840, q.rowName, 1]);
   return { phase: '7', checks: t.list, out };

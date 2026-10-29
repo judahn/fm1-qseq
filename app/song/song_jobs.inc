@@ -5,7 +5,7 @@
  * (OCT+) asks, then YES again runs it (the QY's ENTER). The range is the 6a
  * selection: the loop region on the picked tracks (hold LFO and tap F3 to
  * G4), or the whole song, and it is always on screen. PLAY plays, NO, HOME
- * or EDIT goes back, SAVE saves the song, HOME+SAVE undoes. The jobs
+ * or EDIT goes back, SAVE opens the song list, HOME+SAVE undoes. The jobs
  * themselves are in jobs_*.c. */
 #include "jobs.h"
 

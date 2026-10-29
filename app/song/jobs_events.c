@@ -121,7 +121,7 @@ SONG_SMALL int song_job_thin(struct song *s, const struct song_range *r, unsigne
     return removed;
 }
 
-/* Whole tracks. The FX lane is the song's, not track 1's. */
+/* Whole tracks. A track's clip blocks stay with it (blocks.h). */
 SONG_SMALL static unsigned owned(const struct song *s, unsigned t)
 {
     unsigned count, n = 0;

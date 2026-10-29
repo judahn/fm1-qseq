@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception
 // YES and NO in the preview check (OCT+ and OCT-). The edit jobs: YES asks
 // with the events the job takes on, NO and a setting change cancel, SAVE
-// saves the song instead of running the job, YES twice runs it. The song
+// opens the song list instead of running the job (SAVE there saves), YES
+// twice runs it. The song
 // list: K2 picks the action and YES does it, the questions (a box over the
 // page) and what cancels them, SAVE ignored while one is open, renaming kept
 // with YES and dropped with NO, LOAD and NEW asking only over unsaved
@@ -42,15 +43,18 @@ export async function phaseYesNo(browser, root) {
     o.settingCancels = asking();
     r.turn(5, 1);
     const saves = written();
-    r.tap(B.SAVE);                                 // SAVE saves the song, the job doesn't run
-    o.jobSave = { songs: store(0), written: written() !== saves, offGrid: offGrid(), asking: asking(), page: r.page() };
+    r.tap(B.SAVE);                                 // SAVE opens the song list, the job doesn't run
+    o.jobSave = { offGrid: offGrid(), asking: asking(), page: r.page() };
+    r.tap(B.SAVE);                                 // SAVE there saves the song
+    o.listSave = { songs: store(0), written: written() !== saves };
+    r.tap(B.HOME); r.held(B.FX, () => r.tap(B.EDIT)); // back to the job, as it was
     r.tap(B.YES); r.tap(B.YES);
     o.jobRan = { offGrid: offGrid(), asking: asking() };
     r.tap(B.NO);                                   // nothing open: back to the song view
     o.jobNoBack = r.page();
 
     // 2. The song list, with the song saved as it is now.
-    r.tap(B.SAVE);
+    r.tap(B.SAVE);                                 // SAVE opens the list, SHIFT+SAVE there saves too
     r.held(B.FX, () => r.tap(B.SAVE));
     o.listPage = r.page();
     o.actions = [knob(1)];
@@ -138,14 +142,15 @@ export async function phaseYesNo(browser, root) {
   t.eq('jobs: NO runs nothing', q.jobNo.offGrid, q.jobAsks.before);
   t.eq('jobs: NO with a question open stays on the page', q.jobNo.page, 26);
   t.no('jobs: turning a setting cancels the question', q.settingCancels);
-  t.eq('jobs: SAVE saves the song', q.jobSave.songs, 1);
-  t.yes('jobs: SAVE writes flash', q.jobSave.written);
+  t.eq('jobs: SAVE opens the song list', q.jobSave.page, 25);
   t.eq('jobs: SAVE doesn\'t run the job', q.jobSave.offGrid, q.jobAsks.before);
   t.no('jobs: SAVE doesn\'t ask', q.jobSave.asking);
+  t.eq('list: SAVE there saves the song', q.listSave.songs, 1);
+  t.yes('list: SAVE writes flash', q.listSave.written);
   t.eq('jobs: YES, YES runs it', q.jobRan.offGrid, 0);
   t.no('jobs: no question after it ran', q.jobRan.asking);
   t.eq('jobs: NO with nothing open goes back to the song view', q.jobNoBack, 19);
-  t.eq('list: SHIFT+SAVE opens it', q.listPage, 25);
+  t.eq('list: SAVE opens it', q.listPage, 25);
   t.eq('list: K2 picks the action, LOAD first, DELETE last', q.actions, ['ACTION LOAD', 'ACTION SAVE', 'ACTION SAVE AS', 'ACTION NEW',
     'ACTION RENAME', 'ACTION DUPLICATE', 'ACTION DELETE', 'ACTION DELETE']);
   t.eq('list: K4 is NEW FROM', q.newFrom, 'NEW FROM BLANK');

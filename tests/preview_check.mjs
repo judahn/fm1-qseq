@@ -8,12 +8,14 @@
 //   panel  every button light on, the wake, a page change at the LCD's device pace (preview_panel.mjs)
 //   3  the selection, clipboard, undo and real-time takes (preview_3.mjs)
 //   4  automation, chase, the conductor lane, program changes (preview_4.mjs)
-//   4b glitch: repeats, the stutter, the FX lane, mangle (preview_4b.mjs)
+//   4b glitch: repeats, ARP as the arpeggiator, mangle (preview_4b.mjs)
 //   5a storage: save, load, kits, the recovery copy (preview_5a.mjs)
 //   5b the workbench's Songs and Kits sections (preview_5b.mjs)
 //   6  edit jobs (preview_6.mjs)
 //   7  the clip grid and launching (preview_7.mjs)
 //   7b clips in the song: takes, blocks, Expand, the open clip (preview_7b.mjs)
+//   grid rec  REC into a cell: a fixed length, FREE, overdub, the count-in, undo (preview_grid_rec.mjs)
+//   buttons  SAVE and the undo combos, FX's tap to the effects page, the engine's tempo (preview_buttons.mjs)
 //   8  chord mode: keys, strums, smooth voicing, recording, step entry (preview_8.mjs)
 //   yes/no  OCT+ and OCT- on the edit jobs and the song list: asking, cancelling, renaming (preview_yesno.mjs)
 // Each records named checks with actual and expected values, and every
@@ -39,6 +41,8 @@ import { phase5b } from './preview_5b.mjs';
 import { phase6 } from './preview_6.mjs';
 import { phase7 } from './preview_7.mjs';
 import { phase7b } from './preview_7b.mjs';
+import { phaseGridRec } from './preview_grid_rec.mjs';
+import { phaseButtons } from './preview_buttons.mjs';
 import { phase8 } from './preview_8.mjs';
 import { phaseYesNo } from './preview_yesno.mjs';
 
@@ -46,7 +50,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const phases = [['1', phase1], ['2', phase2], ['keys', phaseKeys], ['diagnostics', phaseDiag], ['panel', phasePanel], ['3', phase3],
-  ['4', phase4], ['4b', phase4b], ['5a', phase5a], ['5b', phase5b], ['6', phase6], ['7', phase7], ['7b', phase7b], ['8', phase8],
+  ['4', phase4], ['4b', phase4b], ['5a', phase5a], ['5b', phase5b], ['6', phase6], ['7', phase7], ['7b', phase7b], ['grid rec', phaseGridRec], ['buttons', phaseButtons], ['8', phase8],
   ['yes/no', phaseYesNo]];
 const only = process.env.PREVIEW_PHASES ? process.env.PREVIEW_PHASES.split(',') : null;
 const browser = await chromium.launch();

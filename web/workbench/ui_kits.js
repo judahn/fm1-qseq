@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* The Kits part of the "Songs and kits" section (phase 5b): a kit built
  * from up to 8 WAVs with prep per pad, kit files, the device's kit library,
- * and FM1 Open's built-in sounds sent as a kit. Encoding to SEA5 runs in a
- * private copy of the simulator. */
+ * FM1 Open's built-in sounds sent as a kit, and the factory DX7 voices sent
+ * to the DX7 library (voices.js). Encoding to SEA5 runs in a private copy
+ * of the simulator. */
 (function (root) {
   'use strict';
   /* The page declares the simulator's bytes with const, so not on globalThis. */
@@ -14,7 +15,8 @@
   const html = `<h3>Kits</h3>
 <label>On the device <select id="sw-kits" size="5"></select></label>
 <div><button id="sw-kit-use">Use on the device</button><button id="sw-kit-download">Download kit file</button>
-<button id="sw-kit-delete">Delete</button><button id="sw-kit-builtin">Send the built-in kit</button></div>
+<button id="sw-kit-delete">Delete</button><button id="sw-kit-builtin">Send the built-in kit</button>
+<button id="sw-voices-factory">Send the factory DX7 voices</button></div>
 <h4>Build a kit</h4>
 <div class="field-row"><label>Kit name <input id="sw-kit-name" type="text" maxlength="15" value="NEW KIT"></label>
 <label>Open a kit file <input id="sw-kit-file" type="file" accept=".fm1kit"></label></div>
@@ -154,6 +156,13 @@
           : 'Kit ' + at + ' written: BUILT-IN, the 8 built-in sounds, ' + r.fresh + ' new samples. Its samples take ' +
             kit.pads.reduce((n, p) => n + KF.sectors(p.data.length), 0) * 4 + ' KB on the device.');
       });
+      $('sw-voices-factory').onclick = ui.act(async () => {
+        const V = ns.voices, banks = await V.factory(simulator());
+        const ask = n => confirm('Replace ' + n + (n > 1 ? ' DX7 banks that hold' : ' DX7 bank that holds') +
+          ' saved voices with the factory voices?');
+        const r = await ui.run(link => V.sendFactory(link, banks, ask, ui.progress));
+        ui.status(r.cancelled ? 'Nothing sent.' : 'The 128 factory DX7 voices are in the DX7 library, all 4 banks read back and checked.');
+      });
       $('sw-kit-use').onclick = ui.act(async () => {
         const k = selectedKit();
         await ui.run(async link => { await link.useKit(k.id); await ui.refresh(link); });
@@ -180,7 +189,7 @@
       if (kits.some(k => String(k.id) === keep)) $('sw-kits').value = keep;
     },
     enable(busy) {
-      for (const id of ['sw-kit-use', 'sw-kit-download', 'sw-kit-delete', 'sw-kit-write', 'sw-kit-builtin']) $(id).disabled = busy;
+      for (const id of ['sw-kit-use', 'sw-kit-download', 'sw-kit-delete', 'sw-kit-write', 'sw-kit-builtin', 'sw-voices-factory']) $(id).disabled = busy;
     },
     state: () => ({ pads, built })
   };

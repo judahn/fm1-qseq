@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* Glitch attribute words, the song's glitch table and the FX lane. See
- * glitch.h. The player plays them (player_glitch.inc). */
+/* Glitch attribute words and the song's glitch table. See glitch.h. The
+ * player plays them (player_glitch.inc). */
 #include "glitch.h"
 #include "song_config.h"
 #include <string.h>
@@ -76,17 +76,5 @@ SONG_SMALL int song_glitch_apply(struct song *s, unsigned track, unsigned index,
     struct song_event e = t[index];
     e.at = (e.at & ~SONG_GLITCH_BITS) | (uint32_t)at << SONG_GLITCH_SHIFT;
     return e.at == t[index].at ? 0 : song_set_event(s, track, index, &e);
-}
-
-SONG_SMALL uint32_t song_slice_clocks(unsigned slice)
-{
-    uint32_t clocks = (uint32_t)SONG_PPQ >> (slice & 7U);
-    return slice & SONG_SLICE_TRIPLET ? clocks * 2U / 3U : clocks;
-}
-SONG_SMALL int song_fx_add(struct song *s, uint32_t clock, uint32_t length, unsigned slice, int drift)
-{
-    const struct song_event e = {clock | (uint32_t)SONG_FX << 24, (uint8_t)slice, (uint8_t)(drift + 64),
-                                 (uint16_t)(length < 1 ? 1 : length > 0xffff ? 0xffff : length)};
-    return clock > SONG_MAX_CLOCK ? -1 : song_add_event(s, 0, &e);
 }
 #endif

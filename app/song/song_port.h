@@ -41,14 +41,19 @@ void song_deliver_render(uint32_t block);            /* browser preview only */
  * control loop (method B). */
 extern volatile uint8_t song_isr_mode;
 #if SONG_UI
-/* Editing: the undo journal, the clipboard and real-time recording. */
+/* Editing: the undo journal, the clipboard and real-time recording
+ * (song_takes.c). A take ends with PLAY or REC and playing goes on, but in
+ * its count-in it is called off and playing stops. */
 struct song_undo *song_port_undo(void);
 struct song_clip *song_port_clip(void);
 struct song_recorder *song_port_recorder(void);
-int song_port_record(unsigned mode, unsigned track); /* with count-in and metronome */
-void song_port_record_stop(void);
+int song_port_record(unsigned mode, unsigned track); /* from a stop, with count-in and metronome */
+void song_port_record_stop(void);                    /* ends a take and stops */
 void song_port_key(const uint8_t *message, size_t bytes); /* a live key on its way to the engine */
 int64_t song_port_live_clock(void);                   /* where a key or knob lands now, -1 in a count-in */
+unsigned song_port_recording(void);  /* a take into the song or a clip, running or armed */
+unsigned song_port_take_full(void);  /* 1 once after a take ended because the song filled up */
+void song_takes_poll(void);
 void song_deliver_message(const uint8_t *message, size_t bytes); /* automation, as notes go */
 /* Clips (design 8f, song_port.c): launches, and a clip opened in the editor
  * and closed again, playing on in step with the bar (player.h). */
@@ -56,11 +61,37 @@ void song_port_launch(unsigned track, unsigned to);
 int song_port_clip_open(unsigned cell);
 void song_port_clip_close(void);
 /* REC while playing in an open clip: loop recording into it from its next
- * pass, the rest playing on. Armed until then. Ending it with keep_playing
- * leaves playback going. */
-int song_port_record_clip(void);
+ * pass (or at once with `now`), the rest playing on. Armed until then.
+ * Ending it with keep_playing leaves playback going. */
+int song_port_record_clip(unsigned now);
 unsigned song_port_clip_armed(void);
+unsigned song_port_clip_live(void);   /* taking into the open clip while playing */
+void song_port_clip_disarm(void);
 void song_port_record_end(unsigned keep_playing);
+void song_port_record_end_at(uint32_t clock); /* an open clip's take, ending at its end, playing on */
+/* Recording into a cell from the grid (song_grid_take.c, 0.3.0): REC on a
+ * cell, `bars` long when empty (0 for FREE). REC again ends it, or sets a
+ * FREE take's end at the next bar line. The take ending calls ended(), with
+ * whether it began and its clip clock. State: 0 none, 1 armed, 2 recording,
+ * plus 4 while FREE has no end and 8 for a new clip. */
+int song_grid_rec(unsigned cell, unsigned bars);
+void song_grid_rec_key(void);
+unsigned song_grid_rec_state(void);
+unsigned song_grid_rec_cell(void);
+void song_grid_take_poll(void);
+void song_grid_take_ended(unsigned began, uint32_t clock);
+/* The engine's tempo follows the song's where the playhead is, whole BPM
+ * (song_tempo.c, 0.3.0): follow() each poll, and with force after the song
+ * changed, and adopt() takes a change made on a stock page or by tap tempo
+ * into the song, at the tempo in force there. */
+void song_tempo_follow(unsigned force);
+void song_tempo_adopt(void);
+/* The battery's ADC reading (fm1_controls), each poll, and the smoothed
+ * value shown, at most once a second (0.3.0). The two readings for empty
+ * and full are guesses until a device is measured: replace them then. */
+enum { SONG_BATTERY_EMPTY = 700, SONG_BATTERY_FULL = 950 }; /* uncalibrated guesses */
+void song_port_battery(unsigned raw, uint32_t now);
+unsigned song_port_battery_shown(void);
 /* Recording a performance in the grid (song_perf.c): REC arms it, and the
  * take starts with the next launch or PLAY. Each launch writes its track a
  * block from its launch point to the track's next launch, stop or return
@@ -92,12 +123,6 @@ void song_knob_turn(unsigned knob, int delta, uint32_t now);
 void song_knobs_poll(uint32_t now);      /* lets go of knobs that stopped moving */
 void song_knobs_release(uint32_t clock); /* lets go of every knob: the take ends */
 void song_knobs_wrap(uint32_t loop_end); /* a loop pass ends */
-/* GLITCH held in the song view (song_knobs.c): the stutter, slice 0..4 for
- * 1/4 to 1/64, plus 8 for a triplet. A take records it on the FX lane. */
-void song_stutter_hold(unsigned slice, int drift);   /* starts, or a new slice */
-void song_stutter_drift(int drift);
-void song_stutter_release(void);
-unsigned song_stuttering(void);
 /* Storage (song_store.c, phase 5a): songs, kits and the recovery copy in
  * the flash pool. Writes happen only while stopped. 0, or an error. */
 enum { SONG_STORE_FULL = -20, SONG_STORE_PLAYING = -21, SONG_STORE_BUSY = -22 };

@@ -47,7 +47,9 @@ uploading the file gives the device the same bytes back, so device to file to de
 | per track | Event count (2), then each event: `at` (4), a (1), b (1), length (2). 4,096 events at most in all |
 
 An event's `at` holds its clock in bits 0 to 23, its kind in bits 24 and 25 (0 note, 1 controller, 2 program
-change, 3 FX lane stutter), and a note's glitch table index in bits 26 to 30. Bit 31 is always 0 in a file.
+change, 3 a clip block, below), and a note's glitch table index in bits 26 to 30. Bit 31 is always 0 in a file.
+Before 0.3.0, kind 3 with a below `0x80` on track 1 was a stutter on the FX lane. Such a file still loads, and
+the device drops those events (the workbench reads and keeps them).
 A note keeps pitch in a, velocity in b and its length in clocks (1 to 65535). A controller keeps its number in
 a and value in b, a program change its program in a, both with length 0. The clock is 480 per quarter note.
 Events on each track are in clock order. A note's pitch and velocity, a controller's number and value, and a
@@ -70,8 +72,8 @@ tracks by 16 rows. Cell c is track * 16 + row, both from 0, and a cell holds a c
 | 1 + per clip | Clips, 0 to 128, in rising cell order: cell (1, 0 to 127), length in clocks (2, 1 or more), event count (2), then the events as on a track |
 
 A clip's events are a track's: notes, controllers and program changes in clock order, at clocks from the clip's
-start. A clip keeps any events past its length, which stay quiet until the length grows again. The FX lane stays
-with the song and never sits in a clip. The 4,096-event limit counts the tracks and the clips together.
+start. A clip keeps any events past its length, which stay quiet until the length grows again. Clip blocks never
+sit in a clip. The 4,096-event limit counts the tracks and the clips together.
 
 A version 1 song loads with an empty grid and the launch quantize at a bar.
 
@@ -90,7 +92,7 @@ layout doesn't change. A block is an event of kind 3 with bit 7 of a set:
 | b | Bits 16 to 23 of the block's length |
 | length | Bits 0 to 15 of the block's length, which is 1 clock or more |
 
-The FX lane's stutters keep a below `0x80`. A block ends at its length or where the track's next block starts.
+Before 0.3.0 the FX lane's stutters had a below `0x80`. A block ends at its length or where the track's next block starts.
 Inside it, the track plays the clip from the block's start, pass after pass, or nothing for a stop, and its
 own events stay quiet. Blocks sit only on the tracks, never in a clip, and a version 1 or 2 payload with one
 is refused.
@@ -195,8 +197,8 @@ Tracks 2 to 9 are the FM-1 tracks 1 to 8 on MIDI channels 1 to 8, named after th
 controllers and program changes, and a program change at the start when the track's saved program is known
 and nothing else sits there. Every track ends at the end of the last bar. Clip blocks are expanded into what
 they play, as the device's Expand job does: the clip pass after pass from the block's start, cut off at its
-end, the track's own events inside it gone, and the controllers set at its edges. Glitch attributes, the FX
-lane, humanize and the clip grid itself are left out (the workbench says how many), and stay in the song file.
+end, the track's own events inside it gone, and the controllers set at its edges. Glitch attributes, an older
+file's FX lane, humanize and the clip grid itself are left out (the workbench says how many), and stay in the song file.
 
 The workbench also lists the open song's clips, and copies one into a cell of a song on the device. Its glitch
 attributes move to that song's glitch table, and a note whose attributes don't fit there plays plain.

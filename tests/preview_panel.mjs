@@ -7,7 +7,9 @@
 // band per control poll: the footer comes out as it does at full speed.
 // This fork's release (the probe, and CHANGELOG.md's latest) is on the boot
 // screen between the bars and M-VAVE, the same line heads the song list, and
-// the page's version badge carries it. Saves docs/panel-boot.png.
+// the page's version badge carries it. Under it on the list, the battery:
+// the simulator's 900 as BAT 900, and its bar. Saves docs/panel-boot.png and
+// docs/panel-song-list.png.
 import fs from 'node:fs';
 import path from 'node:path';
 import { simPage, savePng, checker } from './preview_lib.mjs';
@@ -53,7 +55,16 @@ export async function phasePanel(browser, root) {
     o.wakeStopped = r.info(51);
     r.tap(B.REC); look('recording chooser'); r.tap(B.HOME); r.render(8);
     r.held(B.FX, () => r.tap(B.SAVE)); look('song list');
-    o.sameLine = mask(r.pixels(), 76, 10) === mask(boot, left, 194);
+    const list = r.pixels();
+    o.sameLine = mask(list, 76, 5) === mask(boot, left, 194);
+    o.battery = r.info(55);
+    const box = { left: 240, right: -1, top: 240, bottom: -1 };   /* what is drawn left of the bar, under the release */
+    for (let y = 13; y < 25; y++)
+      for (let x = 70; x < 122; x++)
+        if (list[y * 240 + x]) { box.left = Math.min(box.left, x); box.right = Math.max(box.right, x); box.top = Math.min(box.top, y); box.bottom = Math.max(box.bottom, y); }
+    o.batteryBox = box;
+    o.batteryBar = [124, 125, 141, 142, 147].map(x => list[18 * 240 + x] !== 0);
+    o.listPng = r.png();
     r.tap(B.HOME); r.render(8);
     // The same steps at full speed and at the device's pace.
     const run = paced => {
@@ -74,6 +85,7 @@ export async function phasePanel(browser, root) {
   });
   out.badge = await page.textContent('#release-version');
   savePng(root, 'panel-boot', out, 'bootPng');
+  savePng(root, 'panel-song-list', out, 'listPng');
   await page.close();
   const latest = (fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8').match(/^## (\S+)/m) || [])[1];
   const t = checker('panel'), q = out;
@@ -87,6 +99,9 @@ export async function phasePanel(browser, root) {
   t.eq('the firmware\'s release is CHANGELOG.md\'s latest', q.version, latest);
   t.eq('the boot screen shows QY and the release, centered between the bars and M-VAVE', q.bootBox, q.bootWant);
   t.yes('the song list\'s header shows the same line', q.sameLine);
+  t.eq('the battery: the simulator\'s reading, smoothed', q.battery, 900);
+  t.eq('BAT 900 under the release, 7 letters wide', q.batteryBox, { left: 76, right: 76 + 6 * 7 - 2, top: 15, bottom: 21 });
+  t.eq('its bar: the frame, 17 of 22 lit from 700 to 950, the rest dark', q.batteryBar, [true, true, true, false, true]);
   t.eq('the page\'s version badge: FM1 Open\'s release, then this one', q.badge, 'V14 · QY ' + latest);
   return { phase: 'panel', checks: t.list, out };
 }

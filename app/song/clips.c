@@ -84,7 +84,7 @@ SONG_SMALL int song_clip_copy(const struct song *s, struct song_clip *board, uns
     return 0;
 }
 /* A cell's length, journaled. */
-SONG_SMALL static void set_length(struct song *s, unsigned cell, unsigned length)
+SONG_SMALL void song_clip_resize(struct song *s, unsigned cell, unsigned length)
 {
     if (s->undo) {
         const struct song_event e = {s->clip_length[cell], 0, 0, (uint16_t)length};
@@ -102,7 +102,7 @@ SONG_SMALL int song_clip_delete(struct song *s, unsigned cell)
 {
     if (cell >= SONG_CELLS || !s->clip_length[cell]) return -1;
     empty(s, cell);
-    set_length(s, cell, 0);
+    song_clip_resize(s, cell, 0);
     return 0;
 }
 SONG_SMALL int song_clip_cut(struct song *s, struct song_clip *board, unsigned cell)
@@ -112,21 +112,21 @@ SONG_SMALL int song_clip_cut(struct song *s, struct song_clip *board, unsigned c
 SONG_SMALL int song_clip_paste(struct song *s, const struct song_clip *board, unsigned cell)
 {
     unsigned row = cell % SONG_GRID_ROWS, single = board->tracks && !(board->tracks & (board->tracks - 1U));
-    unsigned targets = single ? 1U << cell / SONG_GRID_ROWS : board->tracks, freed = 0, fx = 0;
+    unsigned targets = single ? 1U << cell / SONG_GRID_ROWS : board->tracks, freed = 0, blocks = 0;
     if (cell >= SONG_CELLS || !board->length || board->length > song_clip_max(s)) return -1;
     for (unsigned t = 0; t < SONG_TRACKS; ++t)
         if (targets >> t & 1U) freed += s->count[song_owner(s, song_cell_part(song_cell(t, row)))];
-    for (unsigned i = 0; i < board->count; ++i) fx += song_event_kind(&board->event[i]) == SONG_FX;
-    if (s->events - freed + board->count - fx > SONG_EVENTS) return -1;
+    for (unsigned i = 0; i < board->count; ++i) blocks += song_is_block(&board->event[i]);
+    if (s->events - freed + board->count - blocks > SONG_EVENTS) return -1;
     for (unsigned t = 0; t < SONG_TRACKS; ++t)
         if (targets >> t & 1U) {
             empty(s, song_cell(t, row));
-            set_length(s, song_cell(t, row), board->length);
+            song_clip_resize(s, song_cell(t, row), board->length);
         }
     for (unsigned i = 0; i < board->count; ++i) {
         struct song_event e = song_board_event(s, board, i, 0);
         unsigned t = single ? cell / SONG_GRID_ROWS : board->track[i];
-        if (song_event_kind(&e) != SONG_FX) /* the FX lane and the blocks stay with the song */
+        if (!song_is_block(&e)) /* blocks stay with the song */
             (void)song_add_event(s, song_owner(s, song_cell_part(song_cell(t, row))), &e);
     }
     return 0;

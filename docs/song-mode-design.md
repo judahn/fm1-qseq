@@ -220,7 +220,7 @@ merge, clear and normalize work on whole tracks. An event belongs to the range b
 | Time stretch | 50 to 200%, gates included. Later events, markers and tempo changes move, as inserting or deleting time does. Shrinking needs the tracks left out to be empty where time closes |
 | Copy track | Events, sound or both, replacing the target |
 | Merge tracks | One track into another |
-| Clear track | Every event of the tracks. The FX lane stays |
+| Clear track | Every event of the tracks. Their clip blocks stay |
 | Normalize | Swing, humanize and the glitch attributes become plain notes, as the next play from the top would roll them, so they edit and export to MIDI. The tracks' swing and humanize go off |
 
 ## 7. Automation
@@ -277,7 +277,10 @@ device settings (MIDI, clock, Bluetooth), which is the stock firmware's global p
 and MIDI pages join it there (10/28), since SEQ now opens the clip grid.
 
 **Song settings:**
-- Tempo and time signature (the starting values, since changes can happen anywhere in the song)
+- Tempo and time signature (the starting values, since changes can happen anywhere in the song). Since 0.3.0
+  the stock instrument's own tempo (whole BPM, 30 to 300, for the arpeggiator, the synced delay, the stock
+  pages and MIDI clock out) follows the song's tempo at the playhead, rounded, and a tempo set on a stock page
+  or by tap tempo sets the song's tempo in force there, so the two never disagree
 - Swing: amount and grid (8th or 16th), plus an on/off per track so drums can swing while the bass stays
   straight. Swing is applied at playback and never changes the recorded notes, like the QY70's groove
   quantize. Turn it off and everything is straight again.
@@ -324,8 +327,9 @@ is a few seconds for a large song.
 
 ## 8c. Saving, sound editing, mixer and other defaults (agreed 10/27)
 
-- **Saving.** SAVE writes the song to flash. A recovery copy is also written automatically whenever playback
-  stops, since it's a battery device and power-off would lose unsaved work. Flash writes briefly mute audio,
+- **Saving.** SAVE writes the song to flash. Since 0.3.0 SAVE opens the song list as it comes up, and SAVE
+  there writes the song, so a save is SAVE, SAVE and HOME+SAVE (undo) never shows the list. A recovery copy is
+  also written automatically whenever playback stops, since it's a battery device and power-off would lose unsaved work. Flash writes briefly mute audio,
   so nothing is ever written during playback.
 - **Several songs on the device.** The user flash is about 524 KB: 68 KB of stock project slots, about 436 KB
   of sample memory, and 20 KB for the DX7 voice banks and settings. Our song mode doesn't use the stock
@@ -371,6 +375,10 @@ is a few seconds for a large song.
   the hardware diagnostics page is out of the full build. The default test build keeps it.
 
 ## 8e. Glitch (agreed 10/27)
+
+**0.3.0:** the live stutter and the FX lane are gone, and ARP on the song pages is the stock arpeggiator again
+(a tap on or off, a hold for its settings). Per-note glitch in step entry and the mangle jobs stay. Song files
+with FX lane events still load, and the events are dropped. What follows is the plan as agreed in 10/27.
 
 **Per note, on any track (synths as well as drums):** rolls and ratchets (repeat a note 2, 3, 4, 6 or 8 times
 inside its length, with optional pitch drift and velocity fade across the repeats), probability, random octave
@@ -454,7 +462,8 @@ from bar 9 to bar 17", drawn as shaded, numbered blocks on the track's row in th
 clip loops from the block's start and the track's own notes are silent. Outside, the track plays its own notes.
 A block can also be a stop, so a stop recorded in a performance stays silent on playback. Editing a clip
 changes it everywhere it's used.
-- **Recording a performance.** REC in the grid arms it, and the take starts with the next launch or PLAY.
+- **Recording a performance.** REC in the grid arms it (SHIFT+REC since 0.3.0), and the take starts with the
+  next launch or PLAY.
   Every launch writes a block for its track, from the launch point to that track's next launch, stop or return
   to the song. Tracks left on the song are untouched, and the song's loop is ignored while recording. The take
   is one undo step.
@@ -473,8 +482,9 @@ Clip events come out of the song's shared event pool, and a block costs a few by
   starting inside it and ends one reaching in where it starts. That one's tail isn't kept, since it would
   start its clip over.
 - Inside a block the track's notes, controllers and program changes are silent. The clip's controllers are
-  chased at the block's start and the track's own again at its end. The FX lane plays on.
-- A take ignores jumps too, and the song grows to hold it. REC again or stopping ends it.
+  chased at the block's start and the track's own again at its end.
+- A take ignores jumps too, and the song grows to hold it. REC again or stopping ends it, and since 0.3.0 PLAY
+  ends it with playing going on.
 - The grid's copy pastes as a block only into the song it came from, while that cell still holds the clip.
   Pasting selects the block, so Duplicate extends it, and blocks of one clip back to back join into one when
   the first is a whole number of passes.
@@ -482,9 +492,26 @@ Clip events come out of the song's shared event pool, and a block costs a few by
   rolled where the notes now sit, the same as before when a block starts on a bar line.
 - An open clip plays on its track like a launched one, in step with the song's bar when opened while playing.
   The editor works in the clip's time, a jump while playing moves the clip's pass at the next bar line, and
-  closing gives the track back to what it played. REC again ends a recording into it and playing goes on,
-  while PLAY stops both.
+  closing gives the track back to what it played. REC again ends a recording into it and playing goes on.
+  PLAY stopped both until 0.3.0, and now ends the recording too, playing on.
 - MIDI export expands every block in the workbench, the only place export happens.
+
+**Recording into a cell, as built in 0.3.0** (Judah, 10/28):
+- REC in the grid records into the cell at the cursor, and the performance moves to SHIFT+REC. K2 is the REC
+  length: 1, 2, 4, 8 or 16 bars (4 to start), or FREE. It lives in RAM, not the song.
+- An empty cell becomes a clip of that length. Playing, the cell launches on its track at the launch quantize,
+  or at the next beat with it off, and the take starts exactly there. From a stop, playing starts with the REC
+  chooser's count-in. A set length ends the take at the clip's end, and the clip plays on, launched. FREE runs
+  to 16 bars until REC, which ends it at the next bar line, its length.
+- A cell with a clip is overdubbed as loop recording from its next pass, the open clip's path.
+- While the take runs, the clip is open in the editor behind the grid, in the pass it was launched in. So the
+  take is an open clip's take: the keys play its track, live, and land at the clip's clocks, and record
+  quantize and the metronome's while-recording setting apply. Opening and closing don't break the pass: a clip
+  playing as launched goes on unbroken through both. The take is one undo step, with a new clip's length.
+- PLAY or REC ends any live take with playing going on, and a second PLAY stops. In a count-in, before
+  anything is recorded, either calls the take off and stops. A take that fills the song's event memory ends
+  there with a notice.
+- SEQ, SHIFT+SEQ, the song list, undo and the grid's cell edits wait while a cell's take is armed or running.
 
 **Later:** Live's follow actions, such as "after 4 bars, play a random clip from this column", next to the
 glitch tools.
@@ -565,6 +592,7 @@ costs little memory. HOME plus SAVE stays undo, as in the stock firmware.
 4. **Automation:** knob recording and playback, the conductor lane (tempo and time signature) and program
    changes.
 4b. **Glitch, sequencer side:** rolls and ratchets on any track, probability, stutter, mangle jobs, the FX lane.
+   (The stutter and the FX lane went in 0.3.0.)
    The master-bus effects follow once free memory is measured on the device.
 5. **Saving and transfer:** songs saved to and loaded from flash, the song list, and export and import through
    the browser workbench (song files and MIDI files).

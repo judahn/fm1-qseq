@@ -9,7 +9,8 @@
  *   here, captured by the port), name, kit, base programs, bars, the tempo,
  *   time signature and marker lists, the loop, the settings, the knobs,
  *   the glitch entries in use, humanize and seed, then per track its
- *   event count and events at 8 bytes each (the FX lane among track 1's).
+ *   event count and events at 8 bytes each. Track 1's events can hold the
+ *   FX lane's stutters from before 0.3.0: they still load, and are dropped.
  *   Version 2 (phase 7) adds the launch quantize, the row names in use and
  *   the clips: cell, length, event count and events. Version 3 lets the
  *   tracks hold clip blocks (blocks.h), the layout unchanged. Version 4

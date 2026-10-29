@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception
 // Node unit tests for the song workbench (web/workbench, phase 5b): the MIDI
 // writer and reader, the song and kit file codecs (with phase 7's clips),
-// songs to MIDI and back, sample prep, and the built-in kit against a fake
-// device. No dependencies:
+// songs to MIDI and back, sample prep, and the built-in kit and the factory
+// DX7 voices against a fake device. No dependencies:
 //   node tests/workbench_test.mjs
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -10,8 +10,8 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../web/workbench');
-for (const name of ['bytes', 'song_file', 'song_clips', 'kit_file', 'midi_file', 'song_midi', 'wav', 'link']) require(path.join(dir, name + '.js'));
-const { bytes: B, songFile: S, songClips: SC, kitFile: K, midiFile: M, songMidi: SM, wav: W, link: L } = globalThis.FM1SongWorkbench;
+for (const name of ['bytes', 'song_file', 'song_clips', 'kit_file', 'midi_file', 'song_midi', 'wav', 'link', 'voices']) require(path.join(dir, name + '.js'));
+const { bytes: B, songFile: S, songClips: SC, kitFile: K, midiFile: M, songMidi: SM, wav: W, link: L, voices: V } = globalThis.FM1SongWorkbench;
 
 let checks = 0, failed = 0;
 const check = (ok, what) => { checks++; if (!ok) { failed++; console.log('FAIL', what); } };
@@ -267,6 +267,45 @@ function fakeDevice(samples, kits) {
   const per = builtinPads.reduce((n, p) => n + K.sectors(p.data.length), 0);
   const cost = await empty.link.kitCost(builtin.pads, 0), again = await both.link.kitCost(builtin.pads, 2);
   check(cost.sectors === 2 + per && cost.fresh === 8 && again.sectors === 1 && again.fresh === 0, 'kit cost: two table copies for the first kit, one after');
+}
+
+// The factory DX7 voices: kind 4 transfers (commands 1 to 6) as app/transfer.c
+// runs them, over 4 banks: blank (never saved), voices of its own, and the
+// factory's already. One question for the one bank of its own, every bank
+// written, each transfer ended. Declined, nothing is written.
+function dx7Device(banks) {
+  const sent = [];
+  let open = null, at = 0, writing = false, index = 0;
+  const ok = (data = []) => ({ status: 0, data: Uint8Array.from(data) });
+  const reply = (command, p) => {
+    sent.push(command);
+    if (command === 1) { open = banks[p[1]].slice(); writing = false; return ok([0, 16]); }
+    if (command === 2) return ok(open.subarray(p[0] | p[1] << 8, (p[0] | p[1] << 8) + p[2]));
+    if (command === 3) { open = new Uint8Array(4096); at = 0; writing = true; index = p[1]; return ok(); }
+    if (command === 4) { open.set(p.slice(2), p[0] | p[1] << 8); at += p.length - 2; return ok(); }
+    if (command === 5) {
+      const crc = (p[0] | p[1] << 8 | p[2] << 16 | p[3] << 24) >>> 0;
+      if (!writing || at !== 4096 || crc !== B.crc32(open)) return { status: 71, data: new Uint8Array(0) };
+      banks[index] = open; open = null; return ok();
+    }
+    if (command === 6) { open = null; return ok(); }
+    return { status: 71, data: new Uint8Array(0) };
+  };
+  return { sent, banks, link: new L.Link(async requests => requests.map(([command, payload]) => reply(command, payload))) };
+}
+{
+  const factory = [0, 1, 2, 3].map(b => Uint8Array.from({ length: 4096 }, (_, i) => (i * 3 + b * 17) % 100));
+  const own = factory[2].map(v => (v + 1) % 100), asked = [];
+  const device = dx7Device([new Uint8Array(4096), factory[1].slice(), own.slice(), factory[3].slice()]);
+  const r = await V.sendFactory(device.link, factory, n => (asked.push(n), true));
+  check(same(asked, [1]), 'factory voices: one question, for the bank of its own');
+  check(device.banks.every((b, i) => same(Array.from(b), Array.from(factory[i]))), 'factory voices: every bank holds them');
+  check(r.saved === 1 && r.fresh === 1, 'factory voices: one bank of its own, one blank');
+  check(device.sent.filter(c => c === 3).length === 4 && device.sent.filter(c => c === 5).length === 4, 'factory voices: 4 banks written');
+  check(device.sent.filter(c => c === 1).length === device.sent.filter(c => c === 6).length - 4, 'factory voices: every transfer ended');
+  const declined = dx7Device([own.slice(), own.slice(), factory[2].slice(), new Uint8Array(4096)]), counts = [];
+  const no = await V.sendFactory(declined.link, factory, n => (counts.push(n), false));
+  check(no.cancelled && same(counts, [2]) && !declined.sent.includes(3), 'factory voices: declined, nothing written');
 }
 
 // Sample prep: WAV in and out, resampling, and each step of the chain.

@@ -153,7 +153,7 @@ $replacements['/*FM1_NOTICES*/'] = [Net.WebUtility]::HtmlEncode(($notices -join 
 foreach ($key in $replacements.Keys) { $web = $web.Replace($key,$replacements[$key]) }
 if ($web -match '/\*FM1_[A-Z_]+\*/') { throw 'Unexpanded HTML placeholder.' }
 # song-mode: the songs and kits workbench (web/workbench), one script before the page ends.
-$songScripts = @('bytes','song_file','song_clips','kit_file','midi_file','song_midi','wav','link','templates','ui_common','ui_songs','ui_kits') |
+$songScripts = @('bytes','song_file','song_clips','kit_file','midi_file','song_midi','wav','link','voices','templates','ui_common','ui_songs','ui_kits') |
     ForEach-Object { [IO.File]::ReadAllText((Join-Path $root "web/workbench/$_.js")) }
 $songScript = "<script>`nglobalThis.FM1_QY_VERSION = '$($qyMatch.Groups[1].Value)';`n" + ($songScripts -join "`n") + "</script>`n"
 if ($songScript -match '</script>[\s\S]*</script>') { throw 'A workbench script closes its own tag.' }

@@ -55,7 +55,7 @@ export async function phase4(browser, root) {
     s.png = r.png();
     r.render(120);                                 // 350 ms: the knob lets go
     s.heldAfter = info(31, 1, 0) >> 16 & 1;
-    r.tap(B.PLAY);
+    r.tap(B.PLAY); r.tap(B.PLAY);                  // PLAY ends the take, PLAY again stops
     const grid = new Map();
     for (const t of turns) grid.set(t.clock - t.clock % 60, t.value);
     const expected = [...grid].map(([clock, value]) => ({ clock, value })).filter((e, i, a) => !i || e.value !== a[i - 1].value);

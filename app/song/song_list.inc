@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* song-mode: the song list (SHIFT+SAVE, phase 5a). Songs in flash with the
+/* song-mode: the song list (SAVE, phase 5a, 0.3.0). Songs in flash with the
  * memory gauge on top. K1 or SELECT picks a song, K2 the action, K3 the kit
  * (the pads rebind at once) and K4 the sounds a new song starts from. YES
  * (OCT+) does the action, and the hint says what it will do and to what.
@@ -22,6 +22,26 @@ static const char *song_store_message(int r, const char *done)
 #include "song_list_act.inc"
 
 static void song_kb(char out[12], uint32_t bytes) { decimal(out, (int)((bytes + 1023U) / 1024U), 1); strcat(out, "K"); }
+/* The battery under the release: the sensor's ADC reading, smoothed, and a
+ * bar from SONG_BATTERY_EMPTY to SONG_BATTERY_FULL (uncalibrated guesses,
+ * song_port.h). It changes at most once a second, and repaints only itself. */
+static void song_battery_draw(void)
+{
+    if (paint_rendering && paint_top >= 26) return;
+    unsigned raw = song_port_battery_shown(), span = SONG_BATTERY_FULL - SONG_BATTERY_EMPTY;
+    unsigned level = raw <= SONG_BATTERY_EMPTY ? 0 : raw >= SONG_BATTERY_FULL ? 22 : (raw - SONG_BATTERY_EMPTY) * 22U / span;
+    uint32_t sig = 0xba770000U | raw;
+    if (sig == cache->header_cache) return;
+    cache->header_cache = sig;
+    paint_fill(76, 15, 78, 8, BACK);
+    if (!paint_rendering) return;
+    char line[12] = "BAT ", part[12];
+    decimal(part, (int)raw, 1);
+    strcat(line, part);
+    text(76, 15, line, 1, DIM, BACK);
+    frame(124, 15, 24, 7, DIM);
+    paint_fill(125, 16, level, 5, level < 5 ? AMBER : GREEN);
+}
 /* Flash use as a bar: songs, then samples and kits, then free. */
 static void song_gauge_bar(unsigned x, unsigned y, unsigned w, unsigned h, const struct song_gauge *g)
 {
@@ -43,7 +63,7 @@ static void song_list_draw(void)
         paint_fill(0, 0, 240, 196, BACK);
         if (paint_rendering) {
             text(8, 6, "SONGS", 2, ACCENT, BACK);
-            text(76, 10, "QY " FM1_QY_VERSION, 1, DIM, BACK); /* this fork's release */
+            text(76, 5, "QY " FM1_QY_VERSION, 1, DIM, BACK); /* this fork's release, the battery under it */
             strcpy(line, "FREE "); song_kb(part, g.free); strcat(line, part);
             text(232 - 6 * (unsigned)strlen(line), 10, line, 1, DIM, BACK);
             song_gauge_bar(8, 26, 224, 4, &g);
@@ -74,6 +94,7 @@ static void song_list_draw(void)
             song_ask_draw();
         }
     }
+    song_battery_draw();
     if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
     char kit[17] = "-", from[17];
     if (song_store_kit()) song_store_kit_name(song_store_kit(), kit);
@@ -94,7 +115,8 @@ static void song_list_open(void)
     song_ask_close();
     cache->shown_page = ~0U;
 }
-/* SAVE in the song view, and on the stock pages too: the song is the project. */
+/* SAVE on the song list saves the song being worked on: the song is the
+ * project. Elsewhere SAVE opens the list (song_buttons.inc). */
 static void song_save_key(uint32_t now)
 {
     notice = song_store_message(song_store_save(0), "SONG SAVED");

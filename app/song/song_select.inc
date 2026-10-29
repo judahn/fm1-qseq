@@ -87,7 +87,7 @@ static void song_undo_key(uint32_t buttons, uint32_t now)
     unsigned redo = (buttons & BUTTON(FX)) != 0;
     struct song_place place;
     song_player_hold(song_port_player(), &place);
-    int r = song_port_recorder()->active ? 1 : redo ? song_redo(song_port_undo(), song_port_song())
+    int r = song_port_recording() ? 1 : redo ? song_redo(song_port_undo(), song_port_song())
                                                     : song_undo(song_port_undo(), song_port_song());
     song_player_resume(song_port_player(), &place);
     song_ask_close(); /* what a question was about may have changed */

@@ -82,7 +82,7 @@ export async function phase8(browser, root) {
     o.recording = info(29, 0, 0);
     render(230);
     press(7); render(120); lift(7); render(40);
-    tap(B.PLAY);
+    tap(B.PLAY); tap(B.PLAY);                       // PLAY ends the take, PLAY again stops
     const all = notes(0), had = new Map();
     for (const n of before) had.set(noteKey(n), (had.get(noteKey(n)) || 0) + 1);
     const added = all.filter(n => { const k = noteKey(n); if (had.get(k)) { had.set(k, had.get(k) - 1); return false; } return true; });

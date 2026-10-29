@@ -47,15 +47,10 @@ struct song_player {
      * program: the last program change sent per track, 0xff for none. */
     uint8_t touch_track, touch_lane[4], program[SONG_TRACKS];
     /* Glitch: repeats due per track, the pass count that seeds the random
-     * choices, each drum track's pads (set by the port), and the stutter:
-     * repeats of [anchor - len, anchor) from stut_at to stut_to, NEVER
-     * when off or while held. */
+     * choices, and each drum track's pads (set by the port). */
     struct song_hit hit[SONG_TRACKS][SONG_HITS];
     uint8_t hits[SONG_TRACKS], pad_count[SONG_TRACKS], pads[SONG_TRACKS][16];
-    uint32_t pass, stut_at, stut_to, stut_anchor, stut_len;
-    uint16_t stut_k[SONG_TRACKS], stut_i[SONG_TRACKS];
-    int8_t stut_drift;
-    uint8_t stut_running;
+    uint32_t pass;
     /* Clips (design 8f, player_clips.inc): what each track plays, a row of
      * the grid, SONG_FROM_SONG or SONG_FROM_STOP, a launch waiting for its
      * clock, and where the clip's pass began. Those are transport clocks:
@@ -112,13 +107,6 @@ void song_player_chase(struct song_player *p, uint32_t clock);
  * goes on from the same clock and time. */
 struct song_place { uint64_t inside; uint32_t at, rate; };
 #if SONG_UI
-/* Stutter (design 8e): from the next grid line of `slice` clocks, every
- * track repeats the slice before it, each repeat `drift` semitones on,
- * until stopped. Song time runs on, so playing rejoins in time. Stop
- * returns where it began, or 0xffffffff when it never did. */
-void song_player_stutter(struct song_player *p, uint32_t slice, int drift);
-void song_player_stutter_drift(struct song_player *p, int drift);
-uint32_t song_player_stutter_stop(struct song_player *p);
 /* Normalize's capture (player_bake.inc): the notes the tracks in the mask
  * would send from the top, rolled as the next start of `live` would roll
  * them, as plain notes with their tracks. How many, or -1 past `room`. */
@@ -130,12 +118,17 @@ int song_player_bake(const struct song_player *live, struct song *s, unsigned tr
  * playing a clip or stopped stays that way through loops and jumps, until
  * it is launched again or playing stops, which hands every track back. */
 void song_player_launch(struct song_player *p, unsigned track, unsigned to);
+/* A launch for recording into the cell (0.3.0): the same, but with the
+ * launch quantize off it waits for the next beat. */
+void song_player_launch_rec(struct song_player *p, unsigned track, unsigned row);
 /* The transport clock playing now. */
 uint32_t song_player_transport(const struct song_player *p);
 /* After a clip opens in the editor (opening) or closes, with its track:
  * playing, the clip comes in at once in step with the song's bar, and on
- * closing the track goes back to what it played. Stopped, the playhead
- * moves between the clip's time and the song's. */
+ * closing the track goes back to what it played. A clip the track plays as
+ * launched keeps its pass going as it opens, and a track left on the open
+ * clip's pass (from and base set to it) plays on through the close.
+ * Stopped, the playhead moves between the clip's time and the song's. */
 void song_player_edit(struct song_player *p, unsigned track, unsigned opening);
 /* A track's notes, repeats and waiting swung notes end now. */
 void song_player_cut(struct song_player *p, unsigned track);

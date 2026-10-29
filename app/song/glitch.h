@@ -28,10 +28,4 @@ uint32_t song_glitch_word(const struct song *s, const struct song_event *e);
 int song_glitch_intern(struct song *s, uint32_t word);
 /* Gives the note at a track index the word. Journaled. 0, or -1 when full. */
 int song_glitch_apply(struct song *s, unsigned track, unsigned index, uint32_t word);
-
-/* The FX lane: a stutter is an event on track 1 (glitch.c), its slice
- * 1/4 to 1/64 as 0..4 plus 8 for a triplet, drift 64 based. */
-enum { SONG_SLICES = 5, SONG_SLICE_TRIPLET = 8 };
-uint32_t song_slice_clocks(unsigned slice);
-int song_fx_add(struct song *s, uint32_t clock, uint32_t length, unsigned slice, int drift);
 #endif

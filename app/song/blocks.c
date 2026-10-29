@@ -96,7 +96,7 @@ SONG_SMALL static int expand(struct song *s, unsigned t, unsigned i, unsigned ap
     song_chase(s, t, to, keep, &out);
     int n = (int)(in.count + out.count) - 1; /* the block itself goes */
     for (unsigned j = song_find(s, t, to); j-- > first;) {
-        if (song_event_kind(&e[j]) == SONG_FX) continue; /* the FX lane plays on, and the block goes last */
+        if (song_is_block(&e[j])) continue; /* the block goes last */
         --n;
         if (apply) (void)song_remove(s, t, j);
     }

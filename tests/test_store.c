@@ -25,7 +25,8 @@ static void build(struct song *s, unsigned seed)
         for (unsigned i = 0; i < 40 + t * 5; ++i) song_add_note(s, t, i * 120U + t, 40 + (i * 7 + seed) % 60, 90, 100);
     const struct song_event cc = song_lane_event(480, 74, 33), program = song_lane_event(960, SONG_LANE_PROGRAM, 5);
     song_add_event(s, 2, &cc); song_add_event(s, 2, &program);
-    song_fx_add(s, 1920, 240, 1, 2);
+    const struct song_event stop = {1920U | (uint32_t)SONG_FX << 24, SONG_BLOCK_STOP, 0, 240}; /* a clip block */
+    song_add_event(s, 0, &stop);
     song_set_tempo(s, 3840, 9000);
     song_set_meter(s, 4, 3, 4);
     song_add_marker(s, 1920, "VERSE");

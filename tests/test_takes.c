@@ -3,8 +3,10 @@
  * that play back what was played, note for note, in exact blocks, with the
  * song's loop ignored and the take one undo step), the song loop's wrap as
  * a launch point, a clip open in the editor while the song plays on, and
- * loop recording into it while the other tracks play. Blocks themselves
- * are in test_blocks.c. */
+ * loop recording into it while the other tracks play. And 0.3.0's grid
+ * recording, the player's side: a launched clip opening and closing in its
+ * pass, unbroken, and a recording's launch waiting for the next beat with
+ * the launch quantize off. Blocks themselves are in test_blocks.c. */
 #include "harness.h"
 #include "blocks.h"
 #include "clips.h"
@@ -317,11 +319,85 @@ static void test_record_clip(void)
     CHECK_EQ(song.count[song_cell_part(cell)], 3);           /* in the clip */
 }
 
+/* A 2-bar clip launched on track 3, opened in the editor halfway through
+ * its pass: the pass goes on (no note cut, its notes on their blocks), the
+ * editor's clock is the clip's there, and closed with the track left on
+ * that pass (as the grid's takes leave it), it plays on unbroken, launched. */
+static void test_launched_pass(void)
+{
+    song_clear(&song, 8, 12000);
+    unsigned cell = song_cell(2, 3), wrong = 0, offs = 0;
+    song.clip_length[cell] = 3840;
+    for (unsigned k = 0; k < 8; ++k) clip_note(cell, k * 480U, 60 + k, 400);
+    song_player_init(&player, &song, &listener);
+    reset_capture();
+    song_player_start(&player, 0);
+    uint32_t block = run_to(0, 100);
+    song_player_launch(&player, 2, 3);
+    block = run_to(block, 1920 + 1000);                      /* launched at bar 2, halfway through its first pass */
+    CHECK_EQ(player.from[2], 3);
+    uint32_t base = player.base[2];
+    CHECK_EQ(base - player.shift, 1920);
+    for (unsigned i = 0; i < heard_count; ++i) offs += !heard[i].velocity && heard[i].track == 2;
+    CHECK_EQ(song_clip_open(&song, cell), 0);
+    song_player_edit(&player, 2, 1);
+    unsigned cut = 0;
+    for (unsigned i = 0; i < heard_count; ++i) cut += !heard[i].velocity && heard[i].track == 2;
+    CHECK_EQ(cut, offs);                                     /* nothing cut as it opened */
+    CHECK_EQ(player.edit_base, base);
+    CHECK_EQ(song_player_clock(&player), song_player_transport(&player) - base);
+    block = run_to(block, 1920 + 3840 + 1000);               /* on into its second pass, open */
+    player.from[2] = 3;                                      /* closed on its pass, as a grid take leaves it */
+    player.base[2] = player.edit_base;
+    offs = 0;
+    for (unsigned i = 0; i < heard_count; ++i) offs += !heard[i].velocity && heard[i].track == 2;
+    song_clip_close(&song);
+    song_player_edit(&player, 2, 0);
+    cut = 0;
+    for (unsigned i = 0; i < heard_count; ++i) cut += !heard[i].velocity && heard[i].track == 2;
+    CHECK_EQ(cut, offs);                                     /* nothing cut as it closed */
+    run_to(block, 1920 + 3 * 3840);
+    unsigned k = 0;
+    for (unsigned i = 0; i < heard_count; ++i)               /* every note of every pass on its block */
+        if (heard[i].velocity && heard[i].track == 2) {
+            uint32_t pass = 1920 + (k / 8U) * 3840U, at = pass + (k % 8U) * 480U;
+            wrong += heard[i].block != block_at(at) || heard[i].pitch != 60 + k % 8U;
+            ++k;
+        }
+    CHECK(k >= 20);
+    CHECK_EQ(wrong, 0);
+    song_player_stop(&player);
+    CHECK(balanced());
+}
+
+/* With the launch quantize off a launch takes over at once, but a
+ * recording's launch waits for the next beat, or the beat it is on. */
+static void test_launch_rec(void)
+{
+    song_clear(&song, 8, 12000);
+    unsigned cell = song_cell(4, 0);
+    song.clip_length[cell] = 1920;
+    song.launch_q = 0;
+    song_player_init(&player, &song, &listener);
+    song_player_start(&player, 0);
+    run_to(0, 700);
+    song_player_launch(&player, 4, 0);
+    CHECK_EQ(player.launch_at[4] - player.shift, player.next);
+    song_player_launch_rec(&player, 4, 0);
+    CHECK_EQ(player.launch_at[4] - player.shift, 960);       /* the next beat after 700 */
+    song.launch_q = 2;
+    song_player_launch_rec(&player, 4, 0);
+    CHECK_EQ(player.launch_at[4] - player.shift, 1920);      /* with a quantize, the quantize */
+    song_player_stop(&player);
+}
+
 int main(void)
 {
     test_performance();
     test_loop_wrap();
     test_open_running();
     test_record_clip();
+    test_launched_pass();
+    test_launch_rec();
     return report("test_takes");
 }

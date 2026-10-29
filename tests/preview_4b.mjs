@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception
 // Phase 4b of the preview check: glitch. Repeats entered in step entry on a
-// synth track and played on exact blocks, a held stutter that repeats the
-// slice with its drift and rejoins in time, the same stutter recorded on the
-// FX lane and played back the same, and mangle with undo. Saves
-// docs/phase4b-*.png.
+// synth track and played on exact blocks, ARP in the song view as the
+// arpeggiator again (0.3.0, the stutter and the FX lane gone), and mangle
+// with undo. Saves docs/phase4b-*.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
 
 export async function phase4b(browser, root) {
@@ -13,7 +12,7 @@ export async function phase4b(browser, root) {
     const heard = () => r.heard().filter(h => !h.kind);
     const notes = t => Array.from({ length: info(0, t) }, (_, i) => i).filter(i => info(30, t, i) === 0)
       .map(i => ({ clock: info(1, t, i), pitch: info(2, t, i), length: info(3, t, i), glitch: info(35, t, i) }));
-    const o = { step: {}, stutter: {}, lane: {} };
+    const o = { step: {}, arp: {} };
     r.render(32);
     r.tap(B.SEQ);
 
@@ -45,80 +44,28 @@ export async function phase4b(browser, root) {
     st.entered.forEach((n, i) => { const k = st.repeats[i]; for (let j = 0; j < k; j++) st.want.push(block(start, at, n.clock + Math.floor((j * n.length + Math.floor(k / 2)) / k)) + ':' + n.pitch); });
     st.got = ons.map(h => h.block + ':' + h.pitch);
 
-    // 2. A held stutter from bar 3 (marker 2): GLITCH down about 0.8 s in,
-    // K1 drifts each repeat up 2 semitones, released 1.1 s later.
-    const su = o.stutter;
-    r.held(B.FX, () => r.key(14));                 // SHIFT+G4: marker 2
-    const origin = info(8);
-    c.sim_song_capture(1);
-    r.tap(B.PLAY);
-    r.render(300);
+    // 2. ARP in the song view is the arpeggiator's (0.3.0): a tap turns it on
+    // for the track and another off, the song playing on as it was. A hold
+    // opens its settings, and HOME there comes back to the song view.
+    const ar = o.arp, track = 1;
+    r.turn(0, track);                              // track 2
+    ar.before = info(56, track);
+    r.tap(B.ARP);
+    ar.on = info(56, track);
+    ar.page = r.page();
+    r.tap(B.ARP);
+    ar.off = info(56, track);
     c.sim_control(0, B.ARP, 1);
-    r.turn(2, 2);
-    su.at = info(36, 0, 0);
-    r.render(400);
-    su.png = r.png();
+    r.render(250);                                 // past the 600 ms hold
+    ar.held = r.page();
     c.sim_control(0, B.ARP, 0);
-    su.to = info(36, 0, 1);
-    r.render(600);
-    const list = heard();
-    r.tap(B.PLAY);
-    const start2 = info(9), map = r.tempo().block, block2 = clock => map(start2, origin, clock), slice = 240, from = su.at - slice;
-    const engines = [0, 1, 2, 3, 4, 5, 6, 7].map(t => info(34, t));
-    const lo = block2(su.at), hi = block2(su.to), endBlock = start2 + 1290;
-    const wantRep = [], wantAfter = [];
-    for (let t = 0; t < 8; t++) {
-      const src = notes(t).filter(n => n.clock >= from && n.clock < su.at);
-      for (let k = 0; src.length; k++) {
-        const first = su.at + k * slice;
-        if (first >= su.to) break;
-        for (const n of src) {
-          const when = first + n.clock - from;
-          if (when < su.to) wantRep.push(block2(when) + ':' + t + ':' + (engines[t] === 2 || engines[t] === 5 ? n.pitch : n.pitch + 2 * k));
-        }
-      }
-      for (const n of notes(t)) if (n.clock >= su.to && block2(n.clock) < endBlock) wantAfter.push(block2(n.clock) + ':' + t + ':' + n.pitch);
-    }
-    const gotRep = list.filter(h => h.velocity && h.block >= lo && h.block < hi).map(h => h.block + ':' + h.track + ':' + h.pitch);
-    const gotAfter = list.filter(h => h.velocity && h.block >= hi && h.block < endBlock).map(h => h.block + ':' + h.track + ':' + h.pitch);
-    su.replays = { expected: wantRep.length, got: gotRep.length, ok: same([...wantRep].sort(), [...gotRep].sort()) };
-    su.rejoined = { expected: wantAfter.length, got: gotAfter.length, ok: same([...wantAfter].sort(), [...gotAfter].sort()) };
-    su.balanced = r.balanced(heard());
-
-    // 3. The same during an overdub take, no count-in: it lands on the FX
-    // lane, and playing the song back sounds the same as the take did.
-    const la = o.lane;
-    r.held(B.FX, () => r.key(14));
-    r.tap(B.REC); r.turn(2, 2); r.turn(3, -1);
-    c.sim_song_capture(1);
-    r.tap(B.REC);
-    r.render(300);
-    c.sim_control(0, B.ARP, 1);                    // the drift stays at +2
-    r.render(400);
-    c.sim_control(0, B.ARP, 0);
-    r.render(600);
-    const take = heard().filter(h => !(h.track === 7 && h.pitch === 37)).map(h => [h.block - info(9), h.track, h.pitch, h.velocity]);
-    r.tap(B.PLAY);
-    la.fx = Array.from({ length: info(0, 0) }, (_, i) => i).filter(i => info(30, 0, i) === 3)
-      .map(i => ({ clock: info(1, 0, i), slice: info(2, 0, i), drift: info(18, 0, i) - 64, length: info(3, 0, i) }));
-    r.held(B.FX, () => r.key(14));
-    c.sim_song_capture(1);
-    r.tap(B.PLAY);
-    r.render(1300);
-    const back = heard().map(h => [h.block - info(9), h.track, h.pitch, h.velocity]);
-    r.tap(B.PLAY);
-    const window = take.filter(h => h[0] < 1290), again = back.filter(h => h[0] < 1290);
-    la.compared = window.length;
-    la.same = same(window, again);
-    // The FX lane in the automation view: the conductor row, PRESETS to FX.
-    r.held(B.FX, () => r.tap(B.LFO));
-    r.turn(0, -1); r.turn(6, 2);
-    r.turn(5, 2);
     r.render(4);
-    o.lanePng = r.png();
-    r.turn(5, -2);
-    r.held(B.FX, () => r.tap(B.LFO));
-    // 4. Mangle from the song view: SHIFT+F#3 scrambles bars 3 to 6 of track
+    ar.png = r.png();
+    r.tap(B.HOME);
+    ar.back = r.page();
+    ar.unchanged = info(56, track);
+    r.turn(0, -track);
+    // 3. Mangle from the song view: SHIFT+F#3 scrambles bars 3 to 6 of track
     // 1, and undo puts them back.
     const before = notes(0).map(n => n.clock + ':' + n.pitch).join();
     r.held(B.FX, () => r.key(1));
@@ -129,26 +76,18 @@ export async function phase4b(browser, root) {
     return o;
   });
   savePng(root, 'phase4b-step-glitch', out.step, 'png');
-  savePng(root, 'phase4b-stutter', out.stutter, 'png');
-  savePng(root, 'phase4b-fx-lane', out, 'lanePng');
+  savePng(root, 'phase4b-arp', out.arp, 'png');
   await page.close();
-  const t = checker('4b'), { step: st, stutter: su, lane: la } = out;
+  const t = checker('4b'), { step: st, arp: ar } = out;
   t.eq('two notes entered with glitch', st.entered.length, 2);
   t.eq('their repeats: 4 and 3', st.repeats, [4, 3]);
   t.eq('the repeats play on their exact blocks', st.got, st.want);
-  t.eq('the stutter starts on a slice grid line', su.at % 240, 0);
-  t.over('the stutter ends after it starts', su.to, su.at);
-  t.yes('every track repeats the slice, drifting', su.replays.ok, su.replays);
-  t.over('repeats checked', su.replays.expected, 20);
-  t.yes('playing rejoins the song in time', su.rejoined.ok, su.rejoined);
-  t.over('notes checked after the rejoin', su.rejoined.expected, 20);
-  t.yes('balanced through the stutter', su.balanced);
-  t.eq('one stutter recorded on the FX lane', la.fx.length, 1);
-  t.eq('its slice is a 1/8', la.fx[0]?.slice, 1);
-  t.eq('its drift is +2', la.fx[0]?.drift, 2);
-  t.eq('it starts where the held one did', la.fx[0]?.clock, su.at);
-  t.yes('the song plays back as the take sounded', la.same);
-  t.over('events compared', la.compared, 100);
+  t.eq('ARP tapped in the song view: the track\'s arpeggiator on', [ar.before, ar.on], [0, 1]);
+  t.eq('and the song view stays', ar.page, 19);
+  t.eq('tapped again: off', ar.off, 0);
+  t.eq('ARP held: the arpeggiator\'s settings', ar.held, 17);
+  t.eq('HOME there: back to the song view', ar.back, 19);
+  t.eq('the hold left the arpeggiator as it was', ar.unchanged, 0);
   t.yes('SHIFT+F#3 scrambles the selection', out.mangle.changed);
   t.yes('undo puts it back', out.mangle.undone);
   return { phase: '4b', checks: t.list, out };

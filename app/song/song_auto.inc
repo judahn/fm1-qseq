@@ -3,7 +3,7 @@
  * The conductor row on top holds tempo and time signature changes, and
  * each track row shows one lane's curve. SELECT picks a row, past track 1
  * up to the conductor, and PRESETS the lane shown, or on the conductor
- * tempo, time signature or the FX lane's stutters. While stopped, ALGO sets the change at the
+ * tempo or time signature. While stopped, ALGO sets the change at the
  * playhead: tempo there, the time signature from that bar, or a program
  * change. SCL deletes the change at the playhead and SHIFT+SCL clears the
  * shown lanes in the selection. Everything else works as in the song view,
@@ -11,7 +11,7 @@
 
 enum { AUTO_C = SONG_ROWS, AUTO_CH = 13, AUTO_Y = SONG_ROWS + 15, AUTO_ROW = 16 };
 static uint8_t song_auto_lanes[SONG_TRACKS]; /* lane shown per track, 0 for the first knob's */
-static uint8_t song_auto_conductor, song_auto_mode; /* mode: tempo, time signature, FX lane */
+static uint8_t song_auto_conductor, song_auto_mode; /* mode: tempo or time signature */
 static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now);
 
 static unsigned song_auto_lane(unsigned t) { return song_auto_lanes[t] ? song_auto_lanes[t] : song_knob_lane(t, 0); }
@@ -68,8 +68,8 @@ static void song_auto_row(const struct song *s, unsigned t)
     if (!s->open || t == song_editing(s)) /* a clip in the editor: only its row */
         song_auto_curve(s, t, lane, y + 1, AUTO_ROW - 3, frame_views[t].audible ? colors[t] : DIM);
 }
-/* Tempo as a step line between the song's slowest and fastest, the time
- * signature changes as flags, and the FX lane's stutters as bars. */
+/* Tempo as a step line between the song's slowest and fastest, and the
+ * time signature changes as flags. */
 static void song_auto_conductor_row(const struct song *s)
 {
     if (paint_rendering && (AUTO_C >= paint_top + PAINT_ROWS || AUTO_C + AUTO_CH <= paint_top)) return;
@@ -103,15 +103,7 @@ static void song_auto_conductor_row(const struct song *s)
         char sig_text[12], unit[12];
         decimal(sig_text, s->meter[m].beats, 1); strcat(sig_text, "/"); decimal(unit, s->meter[m].unit, 1); strcat(sig_text, unit);
         paint_fill(song_x(at), AUTO_C, 1, AUTO_CH, AMBER);
-        text(song_x(at) + 2, AUTO_C + 3, sig_text, 1, song_auto_mode == 1 ? AMBER : DIM, BACK);
-    }
-    unsigned count;
-    const struct song_event *e = song_track(s, 0, &count);
-    for (unsigned i = 0; i < count && song_event_start(&e[i]) < end; ++i) {
-        uint32_t at = song_event_start(&e[i]);
-        if (!song_is_stutter(&e[i]) || at + e[i].length <= song_window) continue;
-        unsigned x1 = at > song_window ? song_x(at) : SONG_X, x2 = song_x(at + e[i].length < end ? at + e[i].length : end);
-        paint_fill(x1, AUTO_C + AUTO_CH - 3, x2 > x1 + 1 ? x2 - x1 : 2, 3, song_auto_mode == 2 ? 0xf81fU : DIM);
+        text(song_x(at) + 2, AUTO_C + 3, sig_text, 1, song_auto_mode ? AMBER : DIM, BACK);
     }
 }
 static void song_auto_draw(void)
@@ -127,9 +119,7 @@ static void song_auto_draw(void)
     char hint[40], part[24];
     song_footer(s, "CHANGE");
     song_notice_expire();
-    if (song_now.glitching) song_stutter_hint(hint);
-    else if (song_auto_conductor && song_auto_mode == 2) strcpy(hint, "FX STUTTERS  SEL DEL  SHIFT+SEL CLEAR");
-    else if (song_auto_conductor && !song_auto_mode) {
+    if (song_auto_conductor && !song_auto_mode) {
         unsigned bpm = s->tempo[song_tempo_at(s, song_now.clock)].bpm100;
         strcpy(hint, "TEMPO "); decimal(part, (int)(bpm / 100), 1); strcat(hint, part);
         strcat(hint, "."); decimal(part, (int)(bpm % 100), 2); strcat(hint, part);
@@ -168,7 +158,7 @@ static int song_auto_input(const struct fm1_controls *c, uint32_t *pressed, uint
     else if (k.encoders[0] > 0 && song_auto_conductor) { song_auto_conductor = 0; k.encoders[0] = 0; }
     else if (song_auto_conductor) k.encoders[0] = 0;
     if (c->encoders[6]) {
-        if (song_auto_conductor) song_auto_mode = (uint8_t)clamp(song_auto_mode + c->encoders[6], 0, 2);
+        if (song_auto_conductor) song_auto_mode = (uint8_t)clamp(song_auto_mode + c->encoders[6], 0, 1);
         else { /* the engine's parameters, then programs where it has them */
             const uint8_t *index;
             unsigned n = song_params(song_port_engine(track), &index), lane = song_auto_lane(track), at = 0;

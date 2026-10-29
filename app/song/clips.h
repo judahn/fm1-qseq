@@ -28,5 +28,8 @@ int song_clip_copy(const struct song *s, struct song_clip *board, unsigned cell)
 int song_clip_cut(struct song *s, struct song_clip *board, unsigned cell);
 int song_clip_paste(struct song *s, const struct song_clip *board, unsigned cell);
 int song_clip_delete(struct song *s, unsigned cell);
+/* A cell's length set, journaled (0 empties it of its length, not its
+ * events). */
+void song_clip_resize(struct song *s, unsigned cell, unsigned length);
 #endif
 #endif

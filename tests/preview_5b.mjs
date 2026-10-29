@@ -19,8 +19,8 @@ export async function phase5b(browser, root) {
     require(path.join(root, 'web/workbench', name + '.js'));
   const { bytes: B, songFile: S, kitFile: K, midiFile: M, wav: W } = globalThis.FM1SongWorkbench;
   const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1180, height: 1000 } });
-  const page = await context.newPage();
-  page.on('dialog', dialog => dialog.accept());
+  const page = await context.newPage(), dialogs = [];
+  page.on('dialog', dialog => { dialogs.push(dialog.message()); dialog.accept(); });
   await page.goto(pathToFileURL(path.join(root, 'build/preview/index.html')).href);
   await page.waitForFunction(() => globalThis.FM1SimProtocol && document.getElementById('sw-section'));
   await page.click('#mode-library');
@@ -253,6 +253,41 @@ export async function phase5b(browser, root) {
     again: afterAgain.kits.length, sectors: afterSent.info.sampleSectors - before8.info.sampleSectors,
     againSectors: afterAgain.info.sampleSectors - afterSent.info.sampleSectors };
 
+  // 9. The factory DX7 voices (0.3.0): the third bank holds voices of its
+  // own, so the button asks before it replaces that one bank. Then the 4
+  // banks read back as the factory bank (its VMEM hash, app/fm_factory.inc),
+  // and they are saved in the simulator's flash, each in its own sector of
+  // the DX7 library. A second press asks nothing.
+  const vmem = (fs.readFileSync(path.join(root, 'app/fm_factory.inc'), 'utf8').match(/VMEM SHA-256: ([0-9a-f]{64})/) || [])[1];
+  out.ownBank = await page.evaluate(async () => {
+    const ns = FM1SongWorkbench, link = ns.link.simulator(FM1SimProtocol), raw = await ns.voices.readBank(link, 2);
+    await ns.voices.writeBank(link, 2, raw.map((v, i) => (i % 128 < 100 ? (v + 1) % 100 : v)));
+    return (await ns.voices.readBank(link, 2)).some((v, i) => v !== raw[i]);
+  });
+  dialogs.length = 0;
+  out.voicesSent = await act('#sw-voices-factory');
+  out.voicesAsked = dialogs.slice();
+  out.voices = await page.evaluate(async () => {
+    const ns = FM1SongWorkbench, link = ns.link.simulator(FM1SimProtocol), all = new Uint8Array(4 * 4096);
+    for (let i = 0; i < 4; i++) all.set(await ns.voices.readBank(link, i), i * 4096);
+    const hex = b => Array.from(new Uint8Array(b), v => v.toString(16).padStart(2, '0')).join('');
+    const read = async () => { const s = localStorage.getItem('fm1.simulator.flash.v4'); return s ? Uint8Array.from(atob(s), c => c.charCodeAt(0)) : null; };
+    const unpack = p => Array.from({ length: 128 }, (_, i) => { const bit = i * 7, at = bit >> 3, s = bit & 7; return ((p[at] >> s) | (s > 1 ? p[at + 1] << (8 - s) : 0)) & 127; });
+    let stored = [];
+    for (let tries = 0; tries < 40; tries++) { /* the page saves the simulator's flash after it changes */
+      const flash = await read(), sector = i => flash.subarray(516096 + i * 4096, 516096 + (i + 1) * 4096);
+      const word = (b, at) => (b[at] | b[at + 1] << 8 | b[at + 2] << 16 | b[at + 3] << 24) >>> 0;
+      stored = flash ? [0, 1, 2, 3].map(i => word(sector(i), 0) === 0x31424d46 && word(sector(i), 8) === i && word(sector(i), 16) === 0 &&
+        Array.from({ length: 32 }, (_, v) => unpack(sector(i).subarray(20 + v * 112))).flat().every((x, j) => x === all[i * 4096 + j])) : [];
+      if (stored.length && stored.every(Boolean)) break;
+      await new Promise(done => setTimeout(done, 100));
+    }
+    return { hash: hex(await crypto.subtle.digest('SHA-256', all)), stored };
+  });
+  dialogs.length = 0;
+  out.voicesAgain = await act('#sw-voices-factory');
+  out.voicesAskedAgain = dialogs.slice();
+
   // 7. Errors: playing, a full pool and bad data are refused with their codes,
   // and the stock commands still answer.
   out.errors = await page.evaluate(async () => {
@@ -351,6 +386,14 @@ export async function phase5b(browser, root) {
   t.match('built-in kit sent again: found, nothing sent', q.builtinAgain, /already on the device as kit \d+, BUILT-IN\. Nothing sent/);
   t.eq('built-in kit sent again: no kit added', bc.again, bc.sent);
   t.eq('built-in kit sent again: nothing written', bc.againSectors, 0);
+  t.yes('a DX7 bank of voices of its own, written', q.ownBank);
+  t.eq('the factory voices: asks before replacing that one bank', q.voicesAsked,
+    ['Replace 1 DX7 bank that holds saved voices with the factory voices?']);
+  t.match('the factory voices: sent and read back', q.voicesSent, /128 factory DX7 voices are in the DX7 library, all 4 banks read back/);
+  t.eq('the 4 banks hold the factory bank (app/fm_factory.inc\'s VMEM SHA-256)', q.voices.hash, vmem);
+  t.eq('each saved in its own sector of the simulator\'s DX7 library', q.voices.stored, [true, true, true, true]);
+  t.eq('sent again: nothing to ask', q.voicesAskedAgain, []);
+  t.match('sent again: read back', q.voicesAgain, /all 4 banks read back/);
   t.eq('stock command 11 still answers', e.stock11, 2);
   t.eq('stock command 0 still answers', e.stock0, 14);
   t.eq('a song write while playing: refused (85)', e.playing, 85);

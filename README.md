@@ -23,7 +23,7 @@ There are two device builds, and the browser preview:
 | Build | What's in it | App size |
 |---|---|---|
 | Default (`./build.sh`) | The hardware test build: FM1 Open V14 plus a diagnostics page that plays a built-in test song and measures its timing. To fit, it leaves out the 16 factory preset projects and the workbench's project, sample and voice transfers. Firmware updates still work | 453,480 bytes of 453,921 |
-| Full (`FM1_SONG_DEVICE_FULL=1`) | The whole song mode, without the diagnostics page. It leaves out the stock step and pattern pages (their sync and MIDI pages move to the device settings), the stock project pages, the demo projects, the factory sound sets and the built-in FM factory voices | 520,680 bytes of 548,129 |
+| Full (`FM1_SONG_DEVICE_FULL=1`) | The whole song mode, without the diagnostics page. It leaves out the stock step and pattern pages (their sync and MIDI pages move to the device settings), the stock project pages, the demo projects, the factory sound sets and the built-in FM factory voices (the workbench can send those to the DX7 library) | 520,296 bytes of 548,129 |
 | Browser preview | The whole song mode on FM1 Open's simulator, in one HTML file | |
 
 ### What installing the full build costs
@@ -34,7 +34,7 @@ slots and the first 8 sectors of the stock sample area. On the device that means
 - The settings sector moves, so the MIDI, clock and Bluetooth settings start from their defaults.
 - The stock projects are overwritten and the stock sample bank is lost. Kits come from the workbench, which
   can send FM1 Open's 8 built-in sounds as a kit.
-- The SDK's settings area (VM) takes the space between the code and the Bluetooth sector, 60 KB at the
+- The SDK's settings area (VM) takes the space between the code and the Bluetooth sector, 56 KB at the
   current size, and the Bluetooth sector moves. Neither has been tried on hardware.
 - The DX7 voice banks and the tuning sector keep their places. Songs and kits share the remaining 101 sectors
   (404 KB).
@@ -74,7 +74,6 @@ The full build and the preview have all of these. The [user guide](docs/user-gui
 **Glitch**
 - Per-note repeats, pitch drift, fade, chance, octave jumps, accent, flam and pad swap.
 - Humanize per track.
-- A live stutter (1/4 to 1/64, triplets, drift) that records onto an FX lane.
 - Mangle: scramble 16ths, reverse, shuffle notes between tracks.
 
 **Saving and kits**
@@ -92,6 +91,8 @@ The full build and the preview have all of these. The [user guide](docs/user-gui
 **Clips**
 - A grid of 8 tracks by 16 rows, launched per track or by row at a launch quantize.
 - Clips are edited in the song view, even while the song plays, and can be recorded into on their next pass.
+- REC in the grid records into a cell: a new clip of 1 to 16 bars, or FREE to the next bar line after REC, or an
+  overdub of the clip there. The keys play its track meanwhile.
 - Clips go into the song as blocks: record a performance from the grid, or paste a clip by hand.
 - The Expand job turns blocks into plain notes.
 
@@ -152,7 +153,7 @@ FM1_SONG_DEVICE_FULL=1 FM1_SOURCE_URL=https://github.com/judahn/fm1-qy/archive/C
 ```
 
 A firmware build prints its size and checks it fits. A package build also prints the flash layout, for example
-`Offline package fits 1 MiB: image 536576, VM 61440, user 442368 bytes`.
+`Offline package fits 1 MiB: image 540672, VM 57344, user 442368 bytes`.
 
 Every firmware build of a kind (default or full) first clears that kind's update image and replaces its
 workbench page with a "Build incomplete" stub. So after a plain `./build.sh`, run `--package` again before
@@ -195,11 +196,12 @@ With the full build or the preview:
 - **REC** (stopped) opens the recording chooser. Pick STEP there for step entry.
 - **SEQ** again opens the clip grid.
 - A tap of **GLO** opens the song settings, with chord mode on the fifth page.
-- **SHIFT+SAVE** opens the song list: K2 picks the action, **OCT+** (YES) does it, **OCT-** (NO) cancels.
-  **SAVE** saves. **HOME+SAVE** undoes.
+- **SAVE** opens the song list, and **SAVE** there saves. On the list K2 picks the action, **OCT+** (YES) does it,
+  **OCT-** (NO) cancels. **HOME+SAVE** undoes.
+- **PLAY** or **REC** during a take ends the recording, and playing goes on.
 
-FX is SHIFT on the song pages, and ARP is GLITCH. The [user guide](docs/user-guide.md) covers every page and
-control, checked against the code.
+Held, FX is SHIFT on the song pages. A tap of FX opens the effects page, and ARP is the arpeggiator, as on the
+stock pages. The [user guide](docs/user-guide.md) covers every page and control, checked against the code.
 
 ## The workbench
 
@@ -231,9 +233,14 @@ pads and set its start, end, fades, gain, bit depth, sample rate, normalize and 
 encodes them, **Save kit file** keeps the kit on the computer, and **Write kit to the device** sends it.
 Samples already on the device aren't sent twice.
 
+**Send the factory DX7 voices** writes M-VAVE's 128 factory DX7 voices into the device's DX7 library (4 banks of
+32), which the full build needs: it leaves the factory voices out, so its DX7 presets are blank until the library
+holds voices. It asks before replacing a bank that holds voices of its own, and reads every bank back.
+
 The page's other tools are FM1 Open's. With the full build, the DX7 voice library works. The stock sample
 bank page works through the kits: a bank written there becomes a new kit, and reading the bank gives the
-current kit. The stock project library doesn't work, because its slots are gone.
+current kit. The stock project library connects, but its slots are gone: they show as empty, and saving to one is
+refused.
 
 ## Development
 

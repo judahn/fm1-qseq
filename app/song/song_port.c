@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* Song glue: owns the song, the player and step entry, and hands notes to
- * the engine as MIDI on each track's input channel (song_deliver.c says how). */
+ * the engine as MIDI on each track's input channel (song_deliver.c says how).
+ * Live recording is in song_takes.c. */
 #include "song_port.h"
 #include "instrument.h"
 #if SONG_HW_TEST
@@ -9,18 +10,11 @@
 #include <string.h>
 #if SONG_UI
 #include "undo.h"
-#include "arrange.h"
 #include "record.h"
-#include "lanes.h"
 #include "glitch.h"
 #include "clips.h"
 static struct song_undo undo;
 static struct song_clip clip;
-static struct song_recorder recorder;
-static uint8_t loop_before, clip_armed, clip_live; /* REC in an open clip: waiting for its next pass, taking while playing */
-static uint32_t clip_last;
-SONG_SMALL static void clip_take(void);
-static uint64_t first_frame; /* the take's first beat, after any count-in */
 #endif
 
 _Static_assert(SONG_FRAME_RATE == FM1_SAMPLE_RATE, "song frame rate");
@@ -32,19 +26,11 @@ static struct song_player player;
 static struct song_step step;
 #endif
 static uint8_t ready;
-#if SONG_UI
-/* The clock for a key played now, or -1 in the count-in. A key up to 50 ms
- * early still lands on the first beat. */
-SONG_SMALL static int64_t live_clock(void)
-{
-    uint64_t frame = (uint64_t)song_port_blocks() * FM1_BLOCK_FRAMES;
-    if (frame >= first_frame) return song_player_clock_at(&player, frame);
-    return frame + FM1_SAMPLE_RATE / 20U >= first_frame ? (int64_t)recorder.from : -1;
-}
-#endif
 #ifdef FM1_OPEN_WEB
 static void capture(unsigned track, unsigned pitch, unsigned velocity, unsigned kind);
 static uint32_t start_block, start_clock;
+/* Where a take began playing, for the headless check (song_takes.c). */
+void song_port_mark_start(void) { start_block = song_port_blocks(); start_clock = player.playhead; }
 #endif
 
 SONG_SMALL static void deliver(void *context, unsigned track, unsigned pitch, unsigned velocity)
@@ -74,7 +60,6 @@ SONG_SMALL static void deliver_control(void *context, unsigned track, unsigned s
     capture(track, a, b, status);
 #endif
 }
-int64_t song_port_live_clock(void) { return live_clock(); }
 /* Each drum track's pads, for glitch's pad swap, as playing starts. */
 SONG_SMALL static void pads(void)
 {
@@ -130,14 +115,9 @@ SONG_SMALL void song_port_poll(void)
 #endif
     song_deliver_poll();
 #if SONG_UI
-    clip_take();
+    song_takes_poll();
     song_perf_poll();
-    if (recorder.active && !player.playing) song_port_record_stop(); /* the song ended */
-    else if (recorder.active && live_clock() >= 0) {
-        uint32_t clock = (uint32_t)live_clock();
-        if (recorder.mode == SONG_REC_LOOP && clock < recorder.last) song_knobs_wrap(song.loop_end);
-        song_rec_follow(&recorder, clock);
-    }
+    song_tempo_follow(0);
     song_knobs_poll(fm1_millis());
     song_store_poll(fm1_millis());
 #endif
@@ -164,11 +144,10 @@ SONG_SMALL int song_port_start(void)
 #if SONG_UI
 struct song_undo *song_port_undo(void) { ensure(); return &undo; }
 struct song_clip *song_port_clip(void) { return &clip; }
-struct song_recorder *song_port_recorder(void) { ensure(); return &recorder; }
 
 /* Clips. Opening one while playing: it plays at once on its track, in step
- * with the bar the song is in, and the song plays on. Closing gives the
- * track back to what it played. */
+ * with the bar the song is in (or on in its pass, launched there already),
+ * and the song plays on. Closing gives the track back to what it played. */
 SONG_SMALL void song_port_launch(unsigned track, unsigned to)
 {
     song_player_launch(&player, track, to);
@@ -186,92 +165,21 @@ SONG_SMALL void song_port_clip_close(void)
 {
     if (!song.open) return;
     unsigned t = song_editing(&song);
-    clip_armed = 0;
+    song_port_clip_disarm();
+    song_port_recorder()->taken = 0; /* a take into the clip can't be requantized from the track */
     song_clip_close(&song);
     song_player_edit(&player, t, 0);
 }
-/* REC while playing with a clip open: loop recording into it from its next
- * pass, while everything else plays on. Armed until the clip goes round. */
-SONG_SMALL int song_port_record_clip(void)
+/* The battery (0.3.0): the panel's reading each poll, smoothed, and what
+ * the song list shows, taken from it at most once a second. */
+static uint16_t battery_smooth, battery_shown;
+static uint32_t battery_at;
+SONG_SMALL void song_port_battery(unsigned raw, uint32_t now)
 {
-    if (!song.open || !player.playing || recorder.active) return -1;
-    clip_armed = 1;
-    clip_last = song_player_clock(&player);
-    return 0;
+    battery_smooth = (uint16_t)(battery_smooth ? battery_smooth + raw - (battery_smooth >> 4) : raw << 4);
+    if (!battery_shown || now - battery_at >= 1000U) { battery_shown = (uint16_t)((battery_smooth + 8U) >> 4); battery_at = now; }
 }
-SONG_SMALL static void clip_take(void)
-{
-    if (!clip_armed) return;
-    uint32_t now = song_player_clock(&player);
-    if (!song.open || !player.playing) { clip_armed = 0; return; }
-    if (now >= clip_last) { clip_last = now; return; }
-    clip_armed = 0;
-    song_undo_begin(&undo, &song);
-    loop_before = song.loop_on;
-    song_rec_start(&recorder, &song, song_editing(&song), SONG_REC_LOOP, 0);
-    first_frame = 0; /* keys count from here */
-    clip_live = 1;
-}
-unsigned song_port_clip_armed(void) { return clip_armed; }
-/* Chord mode's notes into the take, each with its lead after the chord's
- * first, so input quantize moves the chord as a whole. */
-SONG_SMALL void song_port_chord_take(unsigned track, const uint8_t *pitch, const uint8_t *offset, unsigned count)
-{
-    clip_take();
-    int64_t clock = live_clock();
-    for (unsigned i = 0; recorder.active && clock >= 0 && track == recorder.track && i < count; ++i)
-        song_rec_lead(&recorder, pitch[i], 100, (uint32_t)clock + offset[i], offset[i]);
-}
-void song_port_chord_drop(unsigned track, unsigned pitch) { if (track == recorder.track) song_rec_drop(&recorder, pitch); }
-
-/* Live keys on the take track, at the clock playing now. */
-SONG_SMALL void song_port_key(const uint8_t *m, size_t bytes)
-{
-    clip_take(); /* a key at the top of the clip's next pass starts its take */
-    int64_t clock = live_clock();
-    if (!recorder.active || bytes != 3 || (m[0] & 0xe0U) != 0x80U || clock < 0 ||
-        (m[0] & 15U) != groove_midi_input_channel(recorder.track)) return;
-    song_rec_note(&recorder, m[1], (m[0] & 0xf0U) == 0x90U ? m[2] : 0, (uint32_t)clock);
-}
-/* A take is one undo step. Loop recording starts at the loop and repeats it. */
-SONG_SMALL int song_port_record(unsigned mode, unsigned track)
-{
-    ensure();
-    if (player.playing || mode == SONG_REC_STEP || mode >= SONG_REC_MODES) return -1;
-    song_undo_begin(&undo, &song);
-    loop_before = song.loop_on;
-    if (mode == SONG_REC_LOOP) { song.loop_on = 1; player.playhead = song.loop_start; }
-    song_rec_start(&recorder, &song, track, mode, player.playhead);
-    uint32_t from, to;
-    if (song_rec_quiet(&recorder, &from, &to)) { player.mute_track = (uint8_t)track; player.mute_from = from; player.mute_to = to; }
-    player.click = song.metronome != 0;
-#ifdef FM1_OPEN_WEB
-    start_block = song_port_blocks();
-    start_clock = player.playhead;
-#endif
-    uint64_t now = (uint64_t)song_port_blocks() * FM1_BLOCK_FRAMES;
-    pads();
-    song_deliver_start(song.count_in);
-    first_frame = song.count_in ? player.frame : now; /* in the count-in the player waits at the first beat */
-    return 0;
-}
-SONG_SMALL void song_port_record_stop(void) { song_port_record_end(0); }
-SONG_SMALL void song_port_record_end(unsigned keep_playing)
-{
-    clip_armed = 0;
-    if (!recorder.active) { if (!keep_playing) song_port_stop(); return; }
-    song_stutter_release(); /* a stutter still held goes on the FX lane */
-    int64_t now = live_clock();
-    uint32_t clock = player.playing && now >= 0 ? (uint32_t)now : recorder.last;
-    song_knobs_release(clock); /* before the chase on stop */
-    if (!keep_playing || !clip_live) song_port_stop();
-    clip_live = 0;
-    song_rec_stop(&recorder, clock);
-    player.mute_track = 0xff;
-    player.click = song.metronome == 1;
-    if (recorder.mode == SONG_REC_LOOP) song.loop_on = loop_before;
-    song_undo_end(&undo, &song);
-}
+unsigned song_port_battery_shown(void) { return battery_shown; }
 #endif
 
 #ifdef FM1_OPEN_WEB
