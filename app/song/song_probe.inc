@@ -84,6 +84,7 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     case 47: return song_perf_state() | (uint32_t)song_port_clip_armed() << 8 | (uint32_t)clip_live << 16; /* phase 7b */
     case 49: return song.chord[track & 7U] | (uint32_t)song.chord_type[track & 7U] << 8; /* phase 8 */
     case 50: return song_port_blocks();
+    case 52: { char n[17]; uint32_t v; song_store_name(song_store_id(index), n); memcpy(&v, n, 4); return v; } /* a stored name */
 #endif
     case 18: return index < count ? e[index].b : 0;
     case 19: return song.swing | (uint32_t)song.swing_grid << 8 | (uint32_t)song.swing_tracks << 16;

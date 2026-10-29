@@ -176,7 +176,7 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
         cache->shown_page = ~0U;
 #if SONG_UI
         static uint8_t offered; /* a recovery copy from before: the list offers it, once */
-        if (page == SONG && song_store_recovery() && !offered) { offered = 1; song_list_at = 0; song_list_open(); }
+        if (page == SONG && song_store_recovery() && !offered) { offered = 1; song_list_at = 0; song_list_act = LIST_LOAD; song_list_open(); }
 #endif
         return 1;
     }
@@ -249,6 +249,7 @@ static int song_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t 
     else if ((*pressed & (BUTTON(HOME) | BUTTON(SAVE))) && page >= SONG) song_combo_from = page;
     song_undo_begin(song_port_undo(), song_port_song());
     int result = song_input_pages(c, pressed, key_down, now);
+    if (page != song_open_page) song_ask_close(); /* leaving a page drops its question or naming */
     song_clip_follow(song_port_song()); /* an open clip's length is its loop end */
     song_undo_end(song_port_undo(), song_port_song());
     return result;

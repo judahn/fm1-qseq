@@ -6,7 +6,8 @@
  * The header, playhead and recording knobs are in song_header.inc, step
  * entry in song_step.inc, settings in song_setup.inc, REC's chooser in
  * song_rec.inc, arranging in song_select.inc, the automation view in
- * song_auto.inc, the clip grid in song_grid.inc and input in song_panel.inc.
+ * song_auto.inc, the clip grid in song_grid.inc, YES and NO in song_ask.inc
+ * and input in song_panel.inc.
  * A clip open in the editor (design 8f) is its track's row here, looped,
  * with the other tracks and the markers out of the way. */
 #include "song_port.h"
@@ -44,6 +45,7 @@ static void song_notice_expire(void)
 {
     if (notice && (int32_t)(frame_time - notice_until) >= 0) notice = NULL;
 }
+#include "song_ask.inc"
 #include "song_select.inc"
 #include "song_glitch.inc"
 #include "lanes.h"

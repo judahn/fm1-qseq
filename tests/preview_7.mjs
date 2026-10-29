@@ -5,7 +5,8 @@
 // (starting playback), a scene key launches row 1 on every track at the next
 // bar line, checked against exact block arithmetic, then the SONG row and
 // SHIFT+SEQ hand the tracks back. Copy, paste, delete and undo on a cell, a
-// row name, the launch quantize, and the clips surviving a save and a load.
+// row name (YES keeps it, NO leaves the old one), the launch quantize, and
+// the clips surviving a save and a load.
 // Saves docs/phase7-*.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
 
@@ -125,8 +126,16 @@ export async function phase7(browser, root) {
     o.undone = [info(39, 0, cell(0, 1)), info(40, 0, cell(0, 1))];
     o.afterUndoPage = pageNow();
     turn(2, -1);
-    tap(B.ENV); turn(3, 1); turn(2, 1); turn(3, 2); tap(B.ENV);
+    tap(B.ENV); turn(3, 1); turn(2, 1); turn(3, 2);
+    o.whileNaming = info(46, 0, 0);                 // the row keeps its name until YES
+    render(2);
+    o.namingKnobs = r.knobs().slice(0, 2);
+    tap(B.ENV); tap(B.SAVE); render(2);             // neither ends the naming now
+    o.stillNaming = r.knobs()[0];
+    tap(B.YES);
     o.rowName = info(46, 0, 0);
+    tap(B.ENV); turn(3, 3); turn(2, 1); turn(3, 1); tap(B.NO);
+    o.cancelled = info(46, 0, 0);
     turn(5, -1);
     o.launchQ = info(42) >> 8;
     o.namedPng = png();
@@ -137,7 +146,9 @@ export async function phase7(browser, root) {
     o.beforeLoad = info(39, 0, cell(0, 0));
     held(B.FX, () => tap(B.SAVE));
     o.listPage = pageNow();
-    key(0); key(0);
+    tap(B.YES);                                      // the clip deleted is unsaved: YES asks first
+    o.askedFirst = info(39, 0, cell(0, 0));
+    tap(B.YES);
     tap(B.HOME);
     o.loaded = [info(39, 0, cell(0, 0)), info(40, 0, cell(0, 0)), info(39, 0, cell(1, 0)), info(46, 0, 0), info(42) >> 8];
     return o;
@@ -181,10 +192,15 @@ export async function phase7(browser, root) {
   t.eq('SHIFT+E4 deletes it', q.deleted, 0);
   t.eq('undo brings it back', q.undone, [1920, 4]);
   t.eq('undo stays on the grid', q.afterUndoPage, 27);
-  t.eq('ENV names row 1 "AB"', q.rowName & 0xffff, 0x4241);
+  t.eq('naming: the row keeps its old name until YES', q.whileNaming, 0);
+  t.eq('naming: K1 the letter, K2 the name', q.namingKnobs, ['LETTER 2', 'NAME AB']);
+  t.eq('naming: ENV and SAVE don\'t end it', q.stillNaming, 'LETTER 2');
+  t.eq('ENV names row 1 "AB", YES keeps it', q.rowName & 0xffff, 0x4241);
+  t.eq('naming again and NO: the old name stays', q.cancelled, q.rowName);
   t.eq('K4 sets the launch quantize to a beat', q.launchQ, 1);
   t.eq('the clip deleted before loading', q.beforeLoad, 0);
   t.eq('SHIFT+SAVE opens the song list', q.listPage, 25);
+  t.eq('YES with unsaved changes asks before loading', q.askedFirst, 0);
   t.eq('loaded back: both clips, the row name and the launch quantize', q.loaded, [1920, 4, 3840, q.rowName, 1]);
   return { phase: '7', checks: t.list, out };
 }

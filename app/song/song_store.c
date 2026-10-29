@@ -234,8 +234,11 @@ SONG_SMALL int song_store_rename(unsigned id, const char name[12])
 {
     struct song *s = song_port_song();
     if (song_port_player()->playing) return SONG_STORE_PLAYING;
+    unsigned clean = id == s->id && !song_store_unsaved(); /* a saved song stays saved under its new name */
     if (id == s->id) memcpy(s->name, name, 12);
-    return id ? copy_song(id, id, name) : 0;
+    int r = id ? copy_song(id, id, name) : 0;
+    if (clean && !r) recovery.saved_crc = song_file_crc(s, sounds, SOUNDS);
+    return r;
 }
 SONG_SMALL int song_store_duplicate(unsigned id)
 {
@@ -249,9 +252,10 @@ SONG_SMALL int song_store_duplicate(unsigned id)
 SONG_SMALL int song_store_delete(unsigned id)
 {
     if (song_port_player()->playing) return SONG_STORE_PLAYING;
-    if (id == song_port_song()->id) song_port_song()->id = 0;
+    if (id == song_port_song()->id) { song_port_song()->id = 0; recovery.saved_crc = 0; } /* saved nowhere now */
     return pool_delete(&pool, POOL_SONG, id);
 }
 #include "song_store_list.inc"
+#include "song_store_recovery.inc"
 #include "song_store_io.inc"
 #endif

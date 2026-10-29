@@ -10,8 +10,8 @@ static void song_job_open(void)
         song_job_value[JOB_COPY][0] = (int16_t)track;
         song_job_ready = 1;
     }
-    song_job_armed = 0;
     page = music_page = SONG_JOB;
+    song_ask_close();
     cache->shown_page = ~0U;
 }
 
@@ -21,7 +21,7 @@ static void song_job_draw(void)
     char where[40], value[16];
     song_job_where(where);
     uint32_t sig = signature(song_job | song_job_page << 8 | (uint32_t)track << 12, song_job_value[song_job], 12);
-    sig = signature(sig, where, (unsigned)strlen(where)) ^ (uint32_t)song_port_engine(track) << 20;
+    sig = signature(sig, where, (unsigned)strlen(where)) ^ (uint32_t)song_port_engine(track) << 20 ^ song_ask_signature();
     if ((!paint_rendering || paint_top < 192) && sig != cache->middle_cache) {
         cache->middle_cache = sig;
         paint_fill(0, 0, 240, 192, BACK);
@@ -41,6 +41,7 @@ static void song_job_draw(void)
             }
             if (!d->count) text(24, 55, "NOTHING TO SET", 1, DIM, BACK);
             text(8, 182, d->about, 1, DIM, BACK);
+            song_ask_draw();
         }
     }
     if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
@@ -52,7 +53,7 @@ static void song_job_draw(void)
     }
     song_notice_expire();
     const char *hint = notice ? notice : (previous_buttons & BUTTON(LFO)) ? "LFO + F3-F4 TRACKS  G4 ALL"
-        : d->count > 3 ? "ALGO MORE  SAVE RUNS  HOME BACK" : "SAVE RUNS  HOME BACK  LFO TRACKS";
+        : song_asking() ? "OCT+ RUN IT   OCT- CANCEL" : d->count > 3 ? "OCT+ RUN  ALGO MORE  HOME BACK" : "OCT+ RUN  HOME BACK  LFO TRACKS";
     song_hint(hint);
 }
 
@@ -103,23 +104,21 @@ static int song_job_go(void)
     default: song_port_ready_pads(); return song_job_normalize(s, r.tracks, song_port_player());
     }
 }
-/* SAVE once asks, with what the job takes on and whether undo can hold
- * it. Again within 3 s, it runs: one undo step, playing goes on in time. */
-static void song_job_save(uint32_t now)
+/* YES asks first, with what the job takes on and whether undo can hold it.
+ * YES again runs it: one undo step, and playing goes on in time. */
+static void song_job_yes(uint32_t now)
 {
-    static char asked[40];
-    if (!song_job_armed || now - song_job_armed > 3000U) {
+    if (!song_asking()) {
         const struct song *s = song_port_song();
         const struct song_range r = song_job_range();
         unsigned n = 0;
-        char part[12];
+        char asked[SONG_ASK_CHARS + 1], part[12];
         for (unsigned t = 0; t < SONG_TRACKS; ++t)
             if (r.tracks >> t & 1U) n += song_find(s, t, r.to) - song_find(s, t, r.from);
-        song_job_armed = now ? now : 1U;
-        strcpy(asked, "SAVE AGAIN TO RUN, ");
-        decimal(part, (int)n, 1); strcat(asked, part); strcat(asked, " EVENTS");
-        if (n * 24U + 512U > SONG_UNDO_BYTES) strcpy(asked, "SAVE AGAIN: TOO BIG TO UNDO");
-        notice = asked; notice_until = now + 3000U;
+        strcpy(asked, song_jobs[song_job].name); strcat(asked, " ");
+        decimal(part, (int)n, 1); strcat(asked, part); strcat(asked, n == 1 ? " EVENT?" : " EVENTS?");
+        unsigned big = n * 24U + 512U > SONG_UNDO_BYTES;
+        song_ask(asked, big ? "TOO BIG TO UNDO" : NULL, big);
         return;
     }
     static char done[40];
@@ -128,7 +127,7 @@ static void song_job_save(uint32_t now)
     song_undo_step(song_port_undo());
     int r = song_job_go();
     song_player_resume(song_port_player(), &place);
-    song_job_armed = 0;
+    song_ask_close();
     if (r > 0) {
         char part[12];
         strcpy(done, song_jobs[song_job].name); strcat(done, ": ");
@@ -145,16 +144,22 @@ static void song_job_save(uint32_t now)
 static int song_job_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
 {
     unsigned shift = (c->buttons & BUTTON(FX)) != 0;
-    if (*pressed & (BUTTON(HOME) | BUTTON(EDIT))) { /* back to the song */
+    int answer = song_yes_no(pressed);
+    if ((*pressed & (BUTTON(HOME) | BUTTON(EDIT))) || (answer < 0 && !song_asking())) { /* back to the song */
         *pressed &= ~(BUTTON(HOME) | BUTTON(EDIT));
         page = music_page = SONG;
         cache->shown_page = ~0U;
         return 1;
     }
     if (*pressed & BUTTON(PLAY)) { if (song_port_player()->playing) song_port_stop(); else song_start(now); }
-    if (*pressed & BUTTON(SAVE)) song_job_save(now);
+    if ((*pressed & BUTTON(SAVE)) && !song_asking()) { /* the song, as on the other song pages */
+        *pressed &= ~BUTTON(SAVE);
+        if (shift) { song_list_open(); return 1; }
+        song_save_key(now);
+    }
     *pressed &= ~(BUTTON(PLAY) | BUTTON(SAVE) | BUTTON(FX) | BUTTON(REC) | BUTTON(ARP) | BUTTON(ENV) | BUTTON(SCL) | BUTTON(LFO));
     if (*pressed & BUTTON(GLO)) return 0;
+    if (answer < 0) song_ask_close();
     select_track(c->encoders[0]);
     unsigned before = song_job;
     song_job = (unsigned)clamp((int)song_job + c->encoders[2], 0, SONG_JOBS - 1);
@@ -171,7 +176,10 @@ static int song_job_input(const struct fm1_controls *c, uint32_t *pressed, uint3
         song_job_value[song_job][p] = (int16_t)clamp(song_job_value[song_job][p] + c->encoders[3 + k] * (shift ? 10 : 1),
                                                      q->low, high);
     }
-    if (song_job != before || c->encoders[1] || c->encoders[3] || c->encoders[4] || c->encoders[5]) song_job_armed = 0;
+    unsigned picked = (c->buttons & BUTTON(LFO)) && (key_down & ~blocked_keys);
+    if (song_job != before || picked || c->encoders[0] || c->encoders[1] || c->encoders[3] || c->encoders[4] || c->encoders[5])
+        song_ask_close(); /* the job, a setting or the range changed */
     if (c->buttons & BUTTON(LFO)) { song_pick_tracks(key_down & ~blocked_keys); blocked_keys |= key_down; }
+    if (answer > 0) song_job_yes(now);
     return 1;
 }

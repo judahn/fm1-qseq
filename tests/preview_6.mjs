@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception
 // Phase 6 of the preview check, run from preview_check.mjs: edit
 // jobs through the panel (SHIFT+EDIT, K1 the job, K2 to K4 its settings,
-// SAVE twice), then playback checked against exact block arithmetic.
+// YES asks and YES runs), then playback checked against exact block arithmetic.
 // Quantize (with undo and redo), strum, crescendo, fit to scale and a
 // cutoff ramp on one simulator. Normalize on a second, against a third
 // that plays the same song unbaked: every note on the same block. Saves
@@ -18,14 +18,14 @@ export async function phase6(browser, root) {
       r.events = t => Array.from({ length: r.info(0, t) }, (_, i) => ({ clock: r.info(1, t, i), a: r.info(2, t, i),
         length: r.info(3, t, i), b: r.info(18, t, i), kind: r.info(30, t, i), glitch: r.info(35, t, i) }));
       r.notes = t => r.events(t).filter(e => !e.kind);
-      /* Jobs: open the page, K1 to the job, settings, SAVE twice. */
+      /* Jobs: open the page, K1 to the job, settings, YES twice (it asks, then runs). */
       r.job = (index, settings = () => {}) => {
         r.held(B.FX, () => r.tap(B.EDIT));
         r.turn(2, -30); r.turn(2, index);
         settings();
         r.render(2);
         const shown = r.knobs();
-        r.tap(B.SAVE); r.tap(B.SAVE);
+        r.tap(B.YES); r.tap(B.YES);
         r.render(2);
         return shown;
       };

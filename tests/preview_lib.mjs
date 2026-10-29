@@ -14,7 +14,8 @@ import path from 'node:path';
  * a PNG at 2x. */
 function installRig() {
   const wasm = Uint8Array.from(atob(FM1_SIMULATOR.data), ch => ch.charCodeAt(0));
-  globalThis.previewButtons = { FX: 2, SCL: 3, ENV: 4, LFO: 5, EDIT: 6, GLO: 7, HOME: 8, SAVE: 9, ARP: 10, SEQ: 11, PLAY: 12, REC: 13 };
+  globalThis.previewButtons = { OCT_DOWN: 0, OCT_UP: 1, NO: 0, YES: 1, /* OCT- is NO and OCT+ is YES on the song list, jobs and naming */
+    FX: 2, SCL: 3, ENV: 4, LFO: 5, EDIT: 6, GLO: 7, HOME: 8, SAVE: 9, ARP: 10, SEQ: 11, PLAY: 12, REC: 13 };
   globalThis.previewRig = () => {
     const r = { B: previewButtons, wasm, meter: false, rms: 0, blocks: 0 };
     r.boot = () => { r.core = new FM1SimulatorCore(wasm, null, null); r.c = r.core.c; return r; };

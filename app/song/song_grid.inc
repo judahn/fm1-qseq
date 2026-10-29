@@ -5,12 +5,14 @@
  * quantize. The keys launch here: F3 to F4 the track's cell in the cursor
  * row (an empty cell stops the track, the SONG row hands it back to the
  * song), G4 to G5 rows 1 to 8 of the page. SCL opens the clip at the cursor,
- * ENV names the row, and SHIFT plus F3, G3, A3 or B3, and E4 copy, cut,
- * paste and delete the cell. REC records a performance (song_perf.c). */
+ * ENV names the row (YES keeps the name, NO leaves the old one), and SHIFT
+ * plus F3, G3, A3 or B3, and E4 copy, cut, paste and delete the cell. REC
+ * records a performance (song_perf.c). */
 #include "clips.h"
 
 enum { GRID_X = 46, GRID_W = 24, GRID_SONG = 34, GRID_Y = 52, GRID_H = 16, GRID_EMPTY = 0x2104 };
-static uint8_t grid_row = 1, grid_page, grid_naming, grid_letter; /* row 0 is SONG */
+static uint8_t grid_row = 1, grid_page, grid_letter; /* row 0 is SONG */
+static char grid_name[SONG_MARKER_NAME]; /* the row's name while naming, kept on YES */
 
 /* A cell: 0 empty, 1 a clip, 2 playing, 3 waiting to (blinks). The SONG
  * row's cells are the song for each track. */
@@ -41,12 +43,13 @@ static void song_grid_draw(void)
         unsigned y = r ? GRID_Y + (r - 1U) * GRID_H : GRID_SONG, row = r ? grid_page * 8U + r - 1U : SONG_FROM_SONG;
         unsigned here = r ? grid_row == row + 1U : !grid_row;
         if (paint_rendering && (y + GRID_H <= paint_top || y >= paint_top + PAINT_ROWS)) continue;
-        uint32_t sig = signature(row << 1 | here, r ? s->row_name[row] : "SONG", r ? SONG_MARKER_NAME : 4);
+        const char *named = r && here && song_naming() ? grid_name : r ? s->row_name[row] : "SONG";
+        uint32_t sig = signature(row << 1 | here, named, r ? SONG_MARKER_NAME : 4);
         if (sig != cache->tile_cache[r]) { /* the row's number and name */
             cache->tile_cache[r] = sig;
             paint_fill(0, y - 1, GRID_X - 1, GRID_H, BACK);
             char name[SONG_MARKER_NAME + 1] = "SONG";
-            if (r) { memcpy(name, s->row_name[row], 4); name[4] = 0; number(4, y + 3, (int)row + 1, 2, 1, here ? AMBER : DIM, BACK); }
+            if (r) { memcpy(name, named, 4); name[4] = 0; number(4, y + 3, (int)row + 1, 2, 1, here ? AMBER : DIM, BACK); }
             text(r ? 20 : 4, y + 3, name, 1, here ? AMBER : TEXT, BACK);
         }
         for (unsigned t = 0; t < SONG_TRACKS; ++t) {
@@ -76,9 +79,9 @@ static void song_grid_draw(void)
     if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
     char line[12], value[12] = "SONG";
     unsigned row = grid_row ? grid_row - 1U : 0;
-    if (grid_naming) { /* the name in the footer, the letter being set shown even when blank */
+    if (song_naming()) { /* the name in the footer, the letter being set shown even when blank */
         char name[SONG_MARKER_NAME + 1] = {0};
-        memcpy(name, s->row_name[row], SONG_MARKER_NAME);
+        memcpy(name, grid_name, SONG_MARKER_NAME);
         for (unsigned i = 0; i < grid_letter; ++i) if (!name[i]) name[i] = ' ';
         if (!name[grid_letter] || name[grid_letter] == ' ') name[grid_letter] = '_';
         decimal(value, grid_letter + 1, 1);
@@ -93,7 +96,7 @@ static void song_grid_draw(void)
     knob(2, "-", "", colors[2]);
     knob(3, "LAUNCH Q", song_launch_names[s->launch_q % 5U], colors[3]);
     song_notice_expire();
-    const char *hint = notice ? notice : grid_naming ? "ENV OR SAVE DONE" : song_perf_state() == 2 ? "REC: LAUNCHES BECOME BLOCKS"
+    const char *hint = notice ? notice : song_naming() ? SONG_NAMING_HINT : song_perf_state() == 2 ? "REC: LAUNCHES BECOME BLOCKS"
         : song_perf_state() ? "REC ARMED: LAUNCH OR PLAY" : (previous_buttons & BUTTON(FX))
         ? "F3 COPY G3 CUT A3 PASTE E4 DELETE" : grid_page ? "F3-F4 LAUNCH  G4-G5 ROWS 9-16" : "F3-F4 LAUNCH  G4-G5 ROWS 1-8";
     song_hint(hint);
@@ -112,11 +115,13 @@ static void grid_action(unsigned which, uint32_t now)
         : which < 4 ? done[which] : "CLIP DELETED";
     notice_until = now + 1500U;
 }
+/* YES: the name goes to the row, without trailing blanks. */
 static void grid_name_done(void)
 {
     char *name = song_port_song()->row_name[grid_row - 1U];
+    memcpy(name, grid_name, SONG_MARKER_NAME);
     for (unsigned i = SONG_MARKER_NAME; i-- > 0 && (name[i] == ' ' || !name[i]);) name[i] = 0;
-    grid_naming = 0;
+    song_ask_close();
 }
 /* Launch a track to a row, or stop it when the cell is empty. */
 static void grid_launch(unsigned t, unsigned row)
@@ -127,14 +132,14 @@ static void grid_launch(unsigned t, unsigned row)
 static int song_grid_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
 {
     struct song *s = song_port_song();
-    unsigned shift = (c->buttons & BUTTON(FX)) != 0, launched = 0;
+    unsigned shift = (c->buttons & BUTTON(FX)) != 0, launched = 0, naming = song_naming();
+    int answer = song_yes_no(pressed); /* only naming takes YES or NO here */
     uint32_t down = key_down & ~blocked_keys;
     blocked_keys |= key_down; /* the keys launch here, never play */
-    if (*pressed & BUTTON(SAVE)) {
+    if (*pressed & BUTTON(SAVE)) { /* nothing while naming */
         *pressed &= ~BUTTON(SAVE);
-        if (grid_naming) grid_name_done();
-        else if (shift) { song_list_open(); return 1; }
-        else song_save_key(now);
+        if (shift && !naming) { song_list_open(); return 1; }
+        if (!naming) song_save_key(now);
     }
     if (*pressed & BUTTON(PLAY)) { if (song_port_player()->playing) song_port_stop(); else song_start(now); }
     if (*pressed & BUTTON(REC)) { /* a performance: armed, then every launch is a block in the song */
@@ -142,11 +147,13 @@ static int song_grid_input(const struct fm1_controls *c, uint32_t *pressed, uint
         else notice = song_perf_arm() ? "NOT NOW" : "REC: LAUNCH OR PLAY TO START";
         notice_until = now + 1500U;
     }
-    if ((*pressed & BUTTON(ENV)) && grid_row) {
-        if (grid_naming) grid_name_done();
-        else { grid_naming = 1; grid_letter = 0; }
+    if ((*pressed & BUTTON(ENV)) && grid_row && !naming) { /* name the row: YES keeps it, NO leaves the old one */
+        memcpy(grid_name, s->row_name[grid_row - 1U], SONG_MARKER_NAME);
+        grid_letter = 0;
+        song_name_open();
+        naming = 1;
     }
-    if ((*pressed & BUTTON(SCL)) && grid_row && !grid_naming) {
+    if ((*pressed & BUTTON(SCL)) && grid_row && !naming) {
         if (song_port_clip_open(song_cell(track, grid_row - 1U))) return 1;
         page = music_page = SONG;
         cache->shown_page = ~0U;
@@ -154,13 +161,14 @@ static int song_grid_input(const struct fm1_controls *c, uint32_t *pressed, uint
     }
     *pressed &= ~(BUTTON(PLAY) | BUTTON(REC) | BUTTON(FX) | BUTTON(SCL) | BUTTON(ENV) | BUTTON(LFO) | BUTTON(ARP));
     if (*pressed & (BUTTON(HOME) | BUTTON(EDIT) | BUTTON(GLO))) return 0;
-    if (grid_naming) { /* K1 the letter's place, K2 the letter */
-        char *name = s->row_name[grid_row - 1U];
+    if (naming) { /* K1 the letter's place, K2 the letter */
         grid_letter = (uint8_t)clamp(grid_letter + c->encoders[2], 0, SONG_MARKER_NAME - 1);
         if (c->encoders[3]) {
-            for (unsigned i = 0; i < grid_letter; ++i) if (!name[i]) name[i] = ' ';
-            name[grid_letter] = edit_character(name[grid_letter] ? name[grid_letter] : ' ', c->encoders[3]);
+            for (unsigned i = 0; i < grid_letter; ++i) if (!grid_name[i]) grid_name[i] = ' ';
+            grid_name[grid_letter] = edit_character(grid_name[grid_letter] ? grid_name[grid_letter] : ' ', c->encoders[3]);
         }
+        if (answer > 0) grid_name_done();
+        else if (answer < 0) song_ask_close();
         return 1;
     }
     select_track(c->encoders[0]);

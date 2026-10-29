@@ -14,12 +14,13 @@
 //   7  the clip grid and launching (preview_7.mjs)
 //   7b clips in the song: takes, blocks, Expand, the open clip (preview_7b.mjs)
 //   8  chord mode: keys, strums, smooth voicing, recording, step entry (preview_8.mjs)
+//   yes/no  OCT+ and OCT- on the edit jobs and the song list: asking, cancelling, renaming (preview_yesno.mjs)
 // Each records named checks with actual and expected values, and every
 // failure is printed with its phase and name. Screenshots go to docs/.
 // The diagnostics phase needs ./build.sh --test-preview, the rest ./build.sh --preview.
 //   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright node tests/preview_check.mjs
 // PREVIEW_DUMP=1 prints every phase's full record too. PREVIEW_PHASES=3,7 runs
-// only those phases.
+// only those phases (yes/no by that name).
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -37,12 +38,13 @@ import { phase6 } from './preview_6.mjs';
 import { phase7 } from './preview_7.mjs';
 import { phase7b } from './preview_7b.mjs';
 import { phase8 } from './preview_8.mjs';
+import { phaseYesNo } from './preview_yesno.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const phases = [['1', phase1], ['2', phase2], ['diagnostics', phaseDiag], ['panel', phasePanel], ['3', phase3], ['4', phase4], ['4b', phase4b],
-  ['5a', phase5a], ['5b', phase5b], ['6', phase6], ['7', phase7], ['7b', phase7b], ['8', phase8]];
+  ['5a', phase5a], ['5b', phase5b], ['6', phase6], ['7', phase7], ['7b', phase7b], ['8', phase8], ['yes/no', phaseYesNo]];
 const only = process.env.PREVIEW_PHASES ? process.env.PREVIEW_PHASES.split(',') : null;
 const browser = await chromium.launch();
 const runs = [];

@@ -23,7 +23,7 @@ show which page or mode is active. The key lights work as described below.
 | | ARP | GLITCH: the stutter, and the glitch layer in step entry |
 | | SEQ | The song view, and from there the clip grid |
 | | PLAY, REC | Transport and recording |
-| | OCT- / OCT+ | Move the keys an octave, two at most each way |
+| | OCT- / OCT+ | Move the keys an octave, two at most each way. On the song list, the edit jobs and while naming they are NO and YES |
 | Encoders | SELECT | The track |
 | | ALGO (ALGORITHM) | Turns pages on pages that have them |
 | | K1 to K4 | The four knobs above the screen. Their labels sit at the bottom of the screen |
@@ -37,6 +37,12 @@ F4, often stand for tracks 1 to 8.
 
 The FM-1 starts on the stock overview. SEQ goes to the song view.
 
+**YES and NO.** On the song list, the edit jobs and while naming a grid row, OCT+ is YES and OCT- is NO, as
+on the QY70's +1/YES and -1/NO keys. A question shows as a box over the page with `OCT+ YES   OCT- NO` under
+it. It stays until YES, NO, or a change that cancels it (another song, action or setting, or leaving the
+page). It never times out. With nothing open, NO goes back to the song view. In the song view and step entry
+OCT- and OCT+ still move the keyboard's octave.
+
 | Page | How to get there | How to leave |
 |---|---|---|
 | Song view | SEQ from any stock page, or from the grid | SEQ to the grid, HOME to the stock overview |
@@ -47,22 +53,22 @@ The FM-1 starts on the stock overview. SEQ goes to the song view.
 | Song settings | Tap GLO on a song page | Tap GLO again |
 | Device settings | SHIFT+GLO on a song page (or HOME+GLO anywhere) | HOME, or SEQ |
 | Automation view | SHIFT+LFO in the song view | SHIFT+LFO again |
-| Edit jobs | SHIFT+EDIT in the song view | HOME or EDIT |
-| Song list | SHIFT+SAVE on any page | HOME |
+| Edit jobs | SHIFT+EDIT in the song view | HOME, EDIT or NO (OCT-) |
+| Song list | SHIFT+SAVE on any page | HOME or NO (OCT-) |
 | Sound editing | EDIT | EDIT again returns to the song page |
 
 These work on every song page:
 
 | Buttons | Action |
 |---|---|
-| SAVE | Save the song to flash, in the song view, the automation view and the grid |
+| SAVE | Save the song to flash, in the song view, the automation view, the grid, the song list and the edit jobs. Not while a question or a naming is open |
 | SHIFT+SAVE | The song list |
 | HOME+SAVE | Undo, up to 64 steps (fewer when steps are large) |
 | SHIFT+HOME+SAVE | Redo |
 | HOME+PLAY | Stop everything and go to the stock overview |
 | SHIFT+SEQ | Every track back to the song (clips, see below) |
 | SELECT | The track |
-| OCT- / OCT+ | The keyboard's octave |
+| OCT- / OCT+ | The keyboard's octave. NO and YES on the song list, the edit jobs and while naming |
 
 Each poll's edits are one undo step, so a knob turned over many moves undoes as one. A recording take is one
 step. Flash writes happen only while stopped. A recovery copy of an unsaved song is written after playback
@@ -233,9 +239,11 @@ back. Per-note glitch is in step entry. Humanize per track is on settings page 4
 ## Edit jobs
 
 SHIFT+EDIT in the song view. K1 picks the job. K2 to K4 set its settings, ALGO turns to the next three, and
-SHIFT moves a setting by ten. SAVE asks first, with how many events the job takes on, and SAVE again within
-3 seconds runs it as one undo step. PLAY plays. Hold LFO and tap keys to pick tracks, as in the song view.
-RANGE is the selection or the whole song.
+SHIFT moves a setting by ten. YES (OCT+) asks first, with how many events the job takes on
+(`QUANTIZE 120 EVENTS?`), and says when it is too big to undo. YES again runs it as one undo step. NO cancels
+the question, and so does changing the job, a setting, the track or the picked tracks. With no question open
+NO goes back to the song view, as HOME and EDIT do. SAVE saves the song. PLAY plays. Hold LFO and tap keys to
+pick tracks, as in the song view. RANGE is the selection or the whole song.
 
 Jobs: QUANTIZE, VELOCITY, CRESCENDO, GATE TIME, TRANSPOSE, FIT TO SCALE, SHIFT CLOCK, CHORD SORT, STRUM,
 PASTE N TIMES, ERASE, EXTRACT, RAMP, THIN OUT, TIME STRETCH, COPY TRACK, MERGE TRACKS, CLEAR TRACK, NORMALIZE
@@ -243,21 +251,36 @@ and EXPAND CLIPS. With a clip open, the jobs that reach other tracks or the song
 
 ## Song list
 
-SHIFT+SAVE. A memory gauge shows songs, kits and free space.
+SHIFT+SAVE. A memory gauge shows songs, kits and free space. K2 picks an action and YES does it. The line at
+the bottom always says what YES will do and to what, for example `OCT+ LOAD VERSE   OCT- BACK`.
 
 | Control | Action |
 |---|---|
 | K1 or SELECT | Pick a song |
-| K2 | What a new song starts from |
+| K2 | The action: LOAD, SAVE, SAVE AS (a new song), NEW, RENAME, DUPLICATE or DELETE. It starts on LOAD and keeps the last pick while the FM-1 is on |
 | K3 | The kit. The pads switch at once and nothing is written |
-| F3 | Load (press again to confirm, unsaved changes go) |
-| G3 | Save (SAVE does the same) |
-| A3 | Save as a new song |
-| B3 | New song, not saved yet |
-| C4 | Rename: K1 or SELECT picks the letter, K2 changes it, SAVE or C4 finishes |
-| D4 | Duplicate |
-| E4 | Delete (press again to confirm) |
+| K4 | NEW FROM: what a new song starts from |
+| YES (OCT+) | Do the action |
+| NO (OCT-) | Cancel a question or a naming. With nothing open, back to the song view |
+| SAVE | Save the song being worked on. Not while a question or a naming is open |
 | HOME | Back to the song view |
+
+What YES does:
+
+| Action | YES |
+|---|---|
+| LOAD | Loads the picked song. With unsaved changes it asks first (`LOAD VERSE? UNSAVED CHANGES GO`) |
+| SAVE | Saves the song being worked on |
+| SAVE AS | Saves it as a new song |
+| NEW | Starts a new song from K4's pick, not saved yet. With unsaved changes it asks first |
+| RENAME | Names the picked song: K1 or SELECT picks the letter, K2 changes it, YES keeps the name, NO leaves the old one |
+| DUPLICATE | Copies the picked song |
+| DELETE | Asks (`DELETE VERSE?`), then deletes |
+
+A question goes when another song is picked or K2 or K4 turns. The note keys do nothing on the list. Nothing
+is written while the song plays: stop first. On the recovery row (RESTORE THE UNSAVED SONG) LOAD restores
+the copy and DELETE drops it, asking first. RENAME and DUPLICATE don't work there. SAVE, SAVE AS and NEW
+work as anywhere, since they act on the song being worked on.
 
 In the full build the stock factory sound sets are left out, so a new song starts blank. The workbench can
 build a song from a factory sound set and upload it.
@@ -276,7 +299,7 @@ track's loop, a beat to 16 bars long. A track plays either the song or a clip, n
 | G4 to G5 | Launch rows 1 to 8 of the page on every track (a scene). Tracks with nothing in the row stop |
 | SHIFT+SEQ | Every track back to the song |
 | SEL | Open the clip at the cursor. An empty cell gets a new one-bar clip |
-| ENV | Name the row: K1 picks the letter, K2 changes it, ENV or SAVE finishes |
+| ENV | Name the row: K1 picks the letter, K2 changes it, YES (OCT+) keeps the name, NO (OCT-) leaves the old one. SAVE does nothing while naming |
 | SHIFT + F3, G3, A3 or B3, E4 | Copy, cut, paste, paste, delete the cell |
 | PLAY | Play and stop. Launching while stopped starts playback. Stopping gives every track back to the song |
 | REC | Record a performance (below) |

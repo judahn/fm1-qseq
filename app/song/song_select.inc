@@ -90,6 +90,7 @@ static void song_undo_key(uint32_t buttons, uint32_t now)
     int r = song_port_recorder()->active ? 1 : redo ? song_redo(song_port_undo(), song_port_song())
                                                     : song_undo(song_port_undo(), song_port_song());
     song_player_resume(song_port_player(), &place);
+    song_ask_close(); /* what a question was about may have changed */
     if (r > 0) notice = "STOP RECORDING FIRST";
     else if (r) notice = redo ? "NOTHING TO REDO" : "NOTHING TO UNDO";
     else { notice = redo ? "REDONE" : "UNDONE"; song_port_recorder()->taken = 0; } /* the take can't be requantized now */

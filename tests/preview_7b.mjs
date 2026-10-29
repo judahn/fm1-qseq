@@ -93,7 +93,7 @@ export async function phase7b(browser, root) {
     held(B.LFO, () => key(14));                     // all tracks
     turn(3, 1);                                     // the whole song
     o.jobKnobs = r.knobs();
-    tap(B.SAVE); render(2); tap(B.SAVE);
+    tap(B.YES); render(2); tap(B.YES);
     o.expanded = [blocks(0).length, blocks(1).length];
     o.expandUndo = undos();
     tap(B.HOME);

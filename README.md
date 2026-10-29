@@ -192,7 +192,8 @@ With the full build or the preview:
 - **REC** (stopped) opens the recording chooser. Pick STEP there for step entry.
 - **SEQ** again opens the clip grid.
 - A tap of **GLO** opens the song settings, with chord mode on the fifth page.
-- **SHIFT+SAVE** opens the song list. **SAVE** saves. **HOME+SAVE** undoes.
+- **SHIFT+SAVE** opens the song list: K2 picks the action, **OCT+** (YES) does it, **OCT-** (NO) cancels.
+  **SAVE** saves. **HOME+SAVE** undoes.
 
 FX is SHIFT on the song pages, and ARP is GLITCH. The [user guide](docs/user-guide.md) covers every page and
 control, checked against the code.

@@ -1,11 +1,12 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* song-mode: the edit job page (phase 6), after the QY70's song jobs. SHIFT+
  * EDIT in the song view opens it. K1 picks the job, K2 to K4 set what the
- * screen lists (ALGO turns to the next three, SHIFT moves by ten), and SAVE
- * runs it, asking once (the QY's ENTER). The range is the 6a selection:
- * the loop region on the picked tracks (hold LFO and tap F3 to G4), or the
- * whole song, and it is always on screen. PLAY plays, HOME or EDIT goes back,
- * HOME+SAVE undoes. The jobs themselves are in jobs_*.c. */
+ * screen lists (ALGO turns to the next three, SHIFT moves by ten), and YES
+ * (OCT+) asks, then YES again runs it (the QY's ENTER). The range is the 6a
+ * selection: the loop region on the picked tracks (hold LFO and tap F3 to
+ * G4), or the whole song, and it is always on screen. PLAY plays, NO, HOME
+ * or EDIT goes back, SAVE saves the song, HOME+SAVE undoes. The jobs
+ * themselves are in jobs_*.c. */
 #include "jobs.h"
 
 enum { JOB_QUANTIZE, JOB_VELOCITY, JOB_CRESCENDO, JOB_GATE, JOB_TRANSPOSE, JOB_FIT, JOB_SHIFT, JOB_SORT, JOB_STRUM,
@@ -54,7 +55,6 @@ static const struct song_job_def song_jobs[SONG_JOBS] = {
 };
 static const struct song_job_param *song_job_param(unsigned job, unsigned p) { return &song_job_params[song_jobs[job].p[p]]; }
 static unsigned song_job, song_job_page, song_job_ready;
-static uint32_t song_job_armed;
 static int16_t song_job_value[SONG_JOBS][6];
 static const char *const song_job_grids[14] = {"1/64", "1/64T", "1/32", "1/32T", "1/16", "1/16T", "1/8", "1/8T",
                                                "1/4", "1/4T", "1/2", "1/2T", "1/1", "1/1T"};

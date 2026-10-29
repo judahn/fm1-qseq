@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception
-// Phase 5a of the preview check: storage. Save, change, load and compare. A
-// kit made through the transfer calls, switched to and back. A recovery copy
-// after a stop, offered and restored after a reboot on the same flash. Saves
-// docs/phase5a-*.png.
+// Phase 5a of the preview check: storage. Save, change, load and compare,
+// through the song list (K2 the action, YES does it). A kit made through the
+// transfer calls, switched to and back. A recovery copy after a stop, offered
+// and restored after a reboot on the same flash. Saves docs/phase5a-*.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
 
 export async function phase5a(browser, root) {
@@ -34,12 +34,16 @@ export async function phase5a(browser, root) {
     o.changed = dump() !== before;
     r.held(B.FX, () => r.tap(B.SAVE));
     o.listPage = r.page();
-    r.key(4);                                      // A3: save as
+    r.turn(3, 2);                                  // K2: SAVE AS
+    r.render(2);
+    o.saveAsLabel = r.knobs()[1];
+    r.tap(B.YES);
     o.songsAfterSaveAs = store(0);
-    // 3. Load song 1 back: F3 asks, F3 again loads.
+    // 3. Load song 1 back: K2 to LOAD, K1 to song 1, YES. Nothing unsaved, so no question.
+    r.turn(3, -2);
     r.turn(2, -5);
-    r.key(0); r.key(0);
-    o.loaded = { id: store(1), sameEvents: dump() === before, sameBytes: store(16) === crc };
+    r.tap(B.YES);
+    o.loaded = { id: store(1), sameEvents: dump() === before, sameBytes: store(16) === crc, page: r.page() };
     r.render(4);
     o.listPng = r.png();
 
@@ -65,7 +69,7 @@ export async function phase5a(browser, root) {
     r.render(4);
     o.songPng = r.png();
 
-    // 6. Reboot on the same flash: SEQ offers the copy, F3 twice restores it.
+    // 6. Reboot on the same flash: SEQ offers the copy, YES restores it.
     const bytes = 536576, image = new Uint8Array(r.c.memory.buffer, r.c.sim_flash(), bytes).slice();
     r.boot();
     new Uint8Array(r.c.memory.buffer, r.c.sim_flash(), bytes).set(image);
@@ -75,7 +79,9 @@ export async function phase5a(browser, root) {
     o.reboot = { page: r.page(), waiting: store(4), songs: store(0) };
     r.render(4);
     o.restorePng = r.png();
-    r.key(0); r.key(0);
+    r.render(2);
+    o.restoreLabel = r.knobs()[1];
+    r.tap(B.YES);
     o.restored = { sameBytes: store(16) === changed, id: store(1), waiting: store(4) };
     return o;
   });
@@ -91,8 +97,10 @@ export async function phase5a(browser, root) {
   t.eq('SAVE: it is song 1', q.saved.id, 1);
   t.yes('deleting bars changed the song', q.changed);
   t.eq('SHIFT+SAVE opens the song list', q.listPage, 25);
-  t.eq('save as: two songs', q.songsAfterSaveAs, 2);
-  t.eq('F3 twice loads song 1', q.loaded.id, 1);
+  t.eq('K2 picks SAVE AS', q.saveAsLabel, 'ACTION SAVE AS');
+  t.eq('YES saves as a new song: two songs', q.songsAfterSaveAs, 2);
+  t.eq('YES loads song 1, nothing unsaved, so at once', q.loaded.id, 1);
+  t.eq('loading stays on the list', q.loaded.page, 25);
   t.yes('the loaded song has the same events', q.loaded.sameEvents);
   t.yes('the loaded song has the same bytes', q.loaded.sameBytes);
   t.eq('a kit through the transfer calls', q.kitImport, 0);
@@ -110,6 +118,7 @@ export async function phase5a(browser, root) {
   t.eq('after a reboot SEQ offers the copy in the song list', q.reboot.page, 25);
   t.eq('after a reboot the copy is waiting', q.reboot.waiting, 1);
   t.eq('after a reboot both songs are there', q.reboot.songs, 2);
+  t.eq('the offer comes with K2 on LOAD', q.restoreLabel, 'ACTION LOAD');
   t.yes('restored, the song is what was played', q.restored.sameBytes);
   t.eq('restored, nothing waits any more', q.restored.waiting, 0);
   return { phase: '5a', checks: t.list, out };

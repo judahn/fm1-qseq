@@ -195,9 +195,10 @@ by memory and gets measured with everything else. Every action can be undone.
 
 **Where they live.** SHIFT+EDIT in the song view opens the job page, since EDIT alone stays sound editing (8c)
 and jobs are edits. It works like the QY70's Job menu: K1 picks the job, K2 to K4 set what the screen lists
-(ALGO turns to the next three, SHIFT moves a setting by ten), and SAVE runs it after asking once, as the QY's
-ENTER. The question says how many events the job takes on, and warns when it is too big to undo. HOME or EDIT
-goes back, PLAY plays, and HOME+SAVE undoes as everywhere. Every job is one undo step.
+(ALGO turns to the next three, SHIFT moves a setting by ten), and YES (OCT+) runs it after asking once, as the
+QY's ENTER. The question says how many events the job takes on, and warns when it is too big to undo. NO
+(OCT-) cancels it, and so does changing the job, a setting or the range. NO with nothing asked, HOME or EDIT
+goes back, SAVE saves the song, PLAY plays, and HOME+SAVE undoes as everywhere. Every job is one undo step.
 
 **Range.** Most jobs start with RANGE: the selection (the loop region on the 6a tracks, picked here too by
 holding LFO and tapping F3 to G4) or the whole song. The screen always shows it as bars and tracks. Copy,
@@ -333,8 +334,10 @@ is a few seconds for a large song.
   of sample memory, and 20 KB for the DX7 voice banks and settings. Our song mode doesn't use the stock
   pattern projects, so songs and kits share one pool of about 504 KB, with the gauge showing how it's split.
   A song is roughly 2 KB of sounds and settings plus about 8 bytes per note, so a 1,000-note song is about
-  10 KB. Fewer sample seconds means room for more songs, and the reverse. The song list has new, save,
-  rename, duplicate and delete. The browser editor keeps an unlimited library on the computer.
+  10 KB. Fewer sample seconds means room for more songs, and the reverse. The song list has load, save,
+  save as, new, rename, duplicate and delete, picked on K2 and done with YES (OCT+), with a question first
+  when unsaved changes would go and always before a delete. The browser editor keeps an unlimited library on
+  the computer.
 - **New songs from factory sound sets.** The stock firmware's 16 factory projects (Acid Alley, Night Drive, Dub
   Harbour and so on) are 8-track sound setups. A new song can start from one of them, or from blank.
 - **Sound editing.** EDIT enters sound editing. While there, FX, SEL, ENV and LFO go back to their stock jobs
@@ -600,6 +603,10 @@ trims voices on its own when it runs out.
 - The song holds references to clips, and an Expand job turns them into notes (10/28).
 - Chords are a play setting per track, roots on the left and types on the right, with strum. The QY70's
   chord track is dropped (10/28).
+- OCT+ is YES and OCT- is NO on the song list, the edit jobs and while naming, after the QY70's +1/YES and
+  -1/NO keys. The song list's actions move from the note keys to K2, one at a time, with the hint saying what
+  YES will do. A question is a box over the page that stays until it is answered or cancelled. In the song
+  view and step entry the two keys still move the octave (10/28).
 - A song settings page with swing, key and scale. Out-of-scale notes snap up to the next scale note, and the
   pitch knob moves selected notes by scale step.
 
