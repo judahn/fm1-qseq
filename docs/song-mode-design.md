@@ -140,7 +140,7 @@ Long jumps use markers, or zoom out and move by bars. Step mode is separate: its
 length.
 | SELECT | Track |
 | FX | SHIFT |
-| SEL | Add a marker at the playhead |
+| SEL | Stopped: add a marker at the playhead, or remove the one there. Playing: add one at the nearest snap step, never remove |
 | ENV | Loop on or off. With SHIFT, metronome |
 | LFO | SELECT: hold and tap track keys to choose which tracks the selection covers (6a). With SHIFT, automation view on or off |
 | SHIFT + upper white keys F4 to G5 | Jump to markers 1 to 9 |

@@ -58,7 +58,7 @@ export async function phase5a(browser, root) {
 
     // 5. A change, play and stop: a recovery copy appears.
     const generation = store(6);
-    r.tap(B.SCL);                                  // a marker
+    r.tap(B.SCL);                                  // SEL removes INTRO, at bar 1
     r.tap(B.PLAY); r.render(200); r.tap(B.PLAY); r.render(8);
     o.recovery = { before: generation, after: store(6) };
     const changed = store(16);

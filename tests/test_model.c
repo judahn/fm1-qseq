@@ -47,6 +47,19 @@ static void test_model(void)
     CHECK_EQ(song_marker_step(&song, 3840, 1), 2);
     CHECK_EQ(song_marker_step(&song, 3840, -1), 0);
     CHECK_EQ(song_marker_step(&song, 7680, 1), -1);
+    /* Removing takes every marker at exactly that clock, and only there. */
+    CHECK_EQ(song_add_marker(&song, 3840, "B2"), 0);
+    unsigned revision = song.revision;
+    CHECK_EQ(song_remove_marker(&song, 3841), 0);
+    CHECK_EQ(song.revision, revision);
+    CHECK_EQ(song_remove_marker(&song, 3840), 2);
+    CHECK(song.revision != revision);
+    CHECK_EQ(song.markers, 2);
+    CHECK(song.marker[0].clock == 0 && song.marker[1].clock == 7680);
+    CHECK(!memcmp(song.marker[1].name, "LONGNAME", 8));
+    CHECK_EQ(song_remove_marker(&song, 0), 1);
+    CHECK_EQ(song_remove_marker(&song, 7680), 1);
+    CHECK_EQ(song.markers, 0);
     /* The pool fills, then refuses. */
     song_clear(&song, 999, 12000);
     unsigned added = 0;

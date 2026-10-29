@@ -57,7 +57,7 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
         cache->shown_page = ~0U;
         return 1;
     }
-    if ((*pressed & BUTTON(SCL)) && !clip) song_add_marker_here(now);
+    if ((*pressed & BUTTON(SCL)) && !clip) song_marker_key(now);
     if ((*pressed & BUTTON(EDIT)) && shift) { /* SHIFT+EDIT: the edit jobs (EDIT alone stays sound editing) */
         *pressed &= ~BUTTON(EDIT);
         song_job_open();

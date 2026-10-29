@@ -151,6 +151,7 @@ int song_add_note(struct song *s, unsigned track, uint32_t clock, unsigned pitch
 int song_set_tempo(struct song *s, uint32_t clock, unsigned bpm100);
 int song_set_meter(struct song *s, unsigned bar, unsigned beats, unsigned unit);
 int song_add_marker(struct song *s, uint32_t clock, const char *name);
+unsigned song_remove_marker(struct song *s, uint32_t clock); /* every marker at clock, how many went */
 int song_set_loop(struct song *s, uint32_t start, uint32_t end);
 const struct song_event *song_track(const struct song *s, unsigned track, unsigned *count);
 unsigned song_find(const struct song *s, unsigned track, uint32_t clock); /* first start >= clock */

@@ -134,6 +134,18 @@ SONG_SMALL int song_add_marker(struct song *s, uint32_t clock, const char *name)
     return 0;
 }
 
+#if SONG_UI
+SONG_SMALL unsigned song_remove_marker(struct song *s, uint32_t clock)
+{
+    unsigned kept = 0;
+    for (unsigned i = 0; i < s->markers; ++i)
+        if (s->marker[i].clock != clock) s->marker[kept++] = s->marker[i];
+    unsigned removed = s->markers - kept;
+    if (removed) { s->markers = (uint8_t)kept; ++s->revision; }
+    return removed;
+}
+#endif
+
 SONG_SMALL int song_set_loop(struct song *s, uint32_t start, uint32_t end)
 {
     if (start >= end || end > song_end(s)) return -1;

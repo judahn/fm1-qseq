@@ -85,11 +85,15 @@ Tracks are rows, bars run across. The loop region is shaded and is also the sele
 | K4 | Zoom: 16, 8, 4 or 2 bars across. The snap follows: a bar, half a bar, a beat or an 8th |
 | ENV | Loop on or off |
 | SHIFT+ENV | Metronome: off, on, or only while recording |
-| SEL | Add a marker at the playhead (M1, M2 and so on, 16 at most) |
+| SEL | Stopped: add a marker at the playhead, or remove the one already there. Playing: add one at the nearest snap step |
 | SHIFT+LFO | The automation view |
 | SHIFT+EDIT | The edit jobs |
 | Hold LFO, tap F3 to F4 | Add or remove tracks 1 to 8 from the selection |
 | Hold LFO, tap G4 | All tracks, or back to just the current one |
+
+New markers are named M1, M2 and so on, taking the first free number, 16 at most. To remove one, go to it
+with SHIFT+K1, which lands on it exactly, and press SEL. Removing only happens while stopped. HOME+SAVE brings
+a removed marker back.
 
 The selection starts as the current track and follows SELECT until tracks are picked by hand.
 

@@ -46,7 +46,11 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     case 10: return start_clock;
     case 11: return song_end(&song);
     case 12: return song.markers;
-    case 13: return index < song.markers ? song.marker[index].clock : 0;
+    case 13: { /* a marker's clock, or with track 1 its first 4 name bytes */
+        if (index >= song.markers) return 0;
+        const uint8_t *n = (const uint8_t *)song.marker[index].name;
+        return track ? n[0] | (uint32_t)n[1] << 8 | (uint32_t)n[2] << 16 | (uint32_t)n[3] << 24 : song.marker[index].clock;
+    }
     case 14: return song.loop_start;
     case 15: return song.loop_end;
     case 16: return song.loop_on | (uint32_t)player.jumping << 1;

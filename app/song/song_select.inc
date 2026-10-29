@@ -95,12 +95,35 @@ static void song_undo_key(uint32_t buttons, uint32_t now)
     else { notice = redo ? "REDONE" : "UNDONE"; song_port_recorder()->taken = 0; } /* the take can't be requantized now */
     notice_until = now + 1500U;
 }
-/* SCL drops a marker at the playhead. */
-static void song_add_marker_here(uint32_t now)
+/* SCL, stopped: removes the markers at the playhead (SHIFT+K1 lands on one
+ * exactly), or drops one there. Playing: drops one at the snap step nearest
+ * where the song is, and never removes. A new one takes the first free name
+ * of M1 to M16. */
+static void song_marker_key(uint32_t now)
 {
     struct song *s = song_port_song();
-    char name[4] = {'M', (char)('1' + s->markers % 9U), 0, 0};
-    if (s->markers >= 9) { name[1] = '1'; name[2] = (char)('0' + s->markers - 9U); }
-    notice = song_add_marker(s, song_port_player()->playhead, name) ? "MARKERS FULL" : "MARKER ADDED";
+    struct song_player *p = song_port_player();
+    uint32_t at = p->playhead;
+    if (p->playing) {
+        uint32_t clock = song_player_clock(p), down = song_snap_move(s, clock + 1U, song_zoom, -1);
+        uint32_t up = song_snap_move(s, down, song_zoom, 1);
+        at = up > clock && up - clock < clock - down ? up : down;
+    }
+    unsigned there = 0;
+    for (unsigned i = 0; i < s->markers; ++i) there |= s->marker[i].clock == at;
     notice_until = now + 1500U;
+    if (there) {
+        if (p->playing) notice = "MARKER ALREADY THERE";
+        else { (void)song_remove_marker(s, at); notice = "MARKER REMOVED"; }
+        return;
+    }
+    char name[4] = {'M', 0, 0, 0};
+    for (unsigned n = 1, i = 0; n <= SONG_MARKERS && i < s->markers; ++n) {
+        name[1] = (char)(n < 10 ? '0' + n : '1');
+        name[2] = (char)(n < 10 ? 0 : '0' + n - 10);
+        i = 0;
+        while (i < s->markers && strncmp(s->marker[i].name, name, SONG_MARKER_NAME)) ++i;
+    }
+    if (!name[1]) name[1] = '1';
+    notice = song_add_marker(s, at, name) ? "MARKERS FULL" : "MARKER ADDED";
 }
