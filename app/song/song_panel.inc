@@ -58,7 +58,7 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
         unsigned from = page;
         if (page == SONG_STEP) song_step_leave(0, now);
         if (song_port_song()->open) { song_port_clip_close(); page = SONG_GRID; }
-        else page = from == SONG ? SONG_GRID : SONG;
+        else if (from != SONG_STEP) page = from == SONG ? SONG_GRID : SONG; /* step entry went back where it came from */
         music_page = page;
         writing = 0;
 #else

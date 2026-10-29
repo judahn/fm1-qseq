@@ -531,7 +531,8 @@ Clip events come out of the song's shared event pool, and a block costs a few by
   settings (the REC chooser before), and HOME there goes back. A REC that ends or calls off something still
   acts as it goes down. SHIFT+REC is step entry: at the playhead, in an open clip, or in a grid cell's clip
   from its start, an empty cell first getting a clip of the REC length (4 bars for FREE). It starts only
-  while stopped, as before.
+  while stopped, as before. REC or PLAY in it goes back to the view it was opened from (0.4.1): from the
+  grid with the clip closed, PLAY launching the clip and playing.
 - The record settings list REPLACE, OVERDUB, PUNCH, LOOP and STEP. A live mode picked becomes the song's, and
   STEP never does. REC or PLAY there goes back and does what REC (a live mode) or SHIFT+REC (STEP) does
   there. New songs record in OVERDUB, and a file with STEP, the default before, loads as OVERDUB, so the song

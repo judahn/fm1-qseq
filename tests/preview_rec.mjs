@@ -7,7 +7,8 @@
 // switches REPLACE and OVERDUB (from PUNCH or LOOP, OVERDUB), the mode shows
 // at the right of the bottom line, and it survives a save and a load. In the
 // grid SHIFT+REC opens a cell's clip in step entry at its start, a new clip
-// REC LEN long (4 bars for FREE). Playback follows the view: the grid plays
+// REC LEN long (4 bars for FREE), and REC or PLAY there goes back to the
+// grid, PLAY launching the clip (0.4.1). Playback follows the view: the grid plays
 // only launched clips and the song view only the song. A clip block in the
 // song view is drawn in its track's full color with its clip's notes, and
 // the track's own notes are hidden under it. Saves docs/rec-settings.png and
@@ -97,6 +98,8 @@ export async function phaseRec(browser, root) {
     s.fromAuto = pageNow();
     tap(B.HOME);
     s.backToAuto = pageNow();
+    r.step();                                       // step entry from the automation view, and REC goes back there (0.4.1)
+    s.stepFromAuto = [pageNow(), (tap(B.REC), pageNow())];
     held(B.FX, () => tap(B.LFO));
 
     // 4. SHIFT+SEL: REPLACE, shown in the song view and the grid, and it
@@ -125,16 +128,18 @@ export async function phaseRec(browser, root) {
     turn(0, -7);                                    // track 1, row 1
     r.step();
     g.empty = { page: pageNow(), open: info(42) & 255, length: info(39, 0, 0), pointer: info(17) };
-    tap(B.REC); tap(B.SEQ);
+    tap(B.REC);                                     // back in the grid (0.4.1)
     g.closed = [pageNow(), info(42) & 255];
     r.step();
     g.again = { page: pageNow(), open: info(42) & 255, length: info(39, 0, 0) };
-    tap(B.REC); tap(B.SEQ);
+    tap(B.PLAY); render(20);                        // the grid again, the clip launched and playing
+    g.played = [pageNow(), info(42) & 255, info(7), from(0)];
+    tap(B.PLAY);
     turn(3, 3);                                     // REC LEN FREE
     turn(2, 1);                                     // row 2
     r.step();
     g.free = { page: pageNow(), open: info(42) & 255, length: info(39, 0, 1) };
-    tap(B.REC); tap(B.SEQ);
+    tap(B.REC);
     turn(3, -3);
     turn(2, -2);                                    // the SONG row
     r.step();
@@ -239,6 +244,7 @@ export async function phaseRec(browser, root) {
   t.eq('its bottom line has no REC mode', s.autoShown, -1);
   t.eq('REC held there: the record settings', s.fromAuto, 23);
   t.eq('HOME goes back to the automation view', s.backToAuto, 24);
+  t.eq('SHIFT+REC there: step entry, and REC goes back to the automation view', s.stepFromAuto, [20, 24]);
   t.eq('SHIFT+SEL: REPLACE, shown in red', m.replace, [1, { left: 234 - 6 * 7, right: 232 }]);
   t.eq('the grid\'s bottom line shows it too', m.grid, { left: 234 - 6 * 7, right: 232 });
   t.eq('SHIFT+SEL again after saving: OVERDUB', m.changed, 2);
@@ -246,8 +252,9 @@ export async function phaseRec(browser, root) {
   t.eq('and SHIFT+SEL: OVERDUB again', m.back, 2);
   t.eq('the grid\'s SHIFT+REC on an empty cell: step entry at the start of a new 4-bar clip', g.empty,
     { page: 20, open: 8, length: 7680, pointer: 0 });
-  t.eq('REC, SEQ: back in the grid, the clip closed', g.closed, [27, 0]);
+  t.eq('REC leaves step entry for the grid it came from, the clip closed', g.closed, [27, 0]);
   t.eq('on the clip now there: step entry in it, its length kept', g.again, { page: 20, open: 8, length: 7680 });
+  t.eq('PLAY leaves it for the grid too, the clip launched and playing', g.played, [27, 0, 1, 0]);
   t.eq('REC LEN FREE: a new clip 4 bars long', g.free, { page: 20, open: 9, length: 7680 });
   t.eq('on the SONG row: no step entry', g.songRow, [27, 0]);
   t.eq('playing: no step entry', g.playing, [27, 0]);

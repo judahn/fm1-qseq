@@ -7,6 +7,7 @@
  * the roots enter their chords, F4 to E5 pick the type, and F5 to G5 enter
  * the last chord again, an octave down and an octave up (song_chord_keys). */
 static uint32_t step_held; /* entry keys down for the chord being built */
+static uint8_t step_from; /* the page step entry was opened from (0.4.1) */
 static unsigned song_key_note(unsigned note);
 
 static void song_step_enter(void)
@@ -14,19 +15,30 @@ static void song_step_enter(void)
     struct song_step *st = song_port_step();
     step_begin(st, track, song_port_player()->playhead);
     step_held = 0;
+    step_from = (uint8_t)page;
     page = music_page = SONG_STEP;
     cache->shown_page = ~0U;
     step_land(st);
 }
-/* The playhead follows the pointer out. PLAY plays from the pointer's bar. */
+/* The playhead follows the pointer out. PLAY plays from the pointer's bar.
+ * It goes back to the view it was opened from (0.4.1). Opened from the
+ * grid, the clip closes, and PLAY launches the clip and plays. */
 static void song_step_leave(unsigned play, uint32_t now)
 {
     struct song_step *st = song_port_step();
+    unsigned cell = st->song->open - SONG_TRACKS;
     uint32_t start;
     step_preview_stop(st);
+    if (step_from == SONG_GRID && st->song->open) {
+        song_port_clip_close();
+        page = music_page = SONG_GRID;
+        cache->shown_page = ~0U;
+        if (play) { song_port_launch(cell / SONG_GRID_ROWS, cell % SONG_GRID_ROWS); song_start(now); }
+        return;
+    }
     song_bar_at(st->song, st->pointer, &start, NULL);
     song_port_jump(play ? start : st->pointer);
-    page = music_page = SONG;
+    page = music_page = step_from == SONG_AUTO ? SONG_AUTO : SONG;
     cache->shown_page = ~0U;
     if (play) song_start(now);
 }

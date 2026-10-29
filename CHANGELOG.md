@@ -2,6 +2,13 @@
 
 The version is `FM1_QY_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.4.1
+
+- Step entry opened from the grid goes back to the grid. REC there closes the clip and returns, and PLAY
+  returns, launches the clip and plays, so entering notes and listening to them stays in the grid. It went to the
+  clip editor before. Opened from the automation view it goes back there too, instead of to the song view.
+  Opened from the song view or the clip editor, it goes back there as before.
+
 ## 0.4.0
 
 - A tap of REC records. Stopped in the song view or the automation view it starts a take in the song's mode,

@@ -49,7 +49,7 @@ OCT- and OCT+ still move the keyboard's octave.
 | Clip grid | SEQ in the song view | SEQ back to the song view |
 | A clip in the editor | SEL on a grid cell | SEQ closes it and goes back to the grid |
 | Record settings | Hold REC in the song view, the automation view or the grid | HOME goes back. REC or PLAY goes back and records there |
-| Step entry | SHIFT+REC in the song view, or on a row of the grid | REC leaves, PLAY leaves and plays from the pointer's bar |
+| Step entry | SHIFT+REC in the song view, or on a row of the grid | REC leaves, PLAY leaves and plays from the pointer's bar. Both go back to the view it was opened from: from the grid, PLAY also launches the clip and plays |
 | Song settings | Tap GLO on a song page | Tap GLO again |
 | Device settings | SHIFT+GLO on a song page (or HOME+GLO anywhere) | HOME, or SEQ |
 | Automation view | SHIFT+LFO in the song view | SHIFT+LFO again |
@@ -405,7 +405,9 @@ take, and a new clip with it, is one undo step. SEQ waits until the take is over
 SEL on a cell opens the clip in the song view's editor, looped to its own length. K3, labelled CLIP END,
 sets that length. Step entry (SHIFT+REC), recording, automation, glitch and the jobs that stay inside the
 track all work on the clip. SELECT stays on the clip's track, and the markers are hidden. SEQ closes it and
-goes back to the grid. SHIFT+REC on a row of the grid opens the cell's clip straight into step entry.
+goes back to the grid. SHIFT+REC on a row of the grid opens the cell's clip straight into step entry, and REC
+or PLAY there go back to the grid, PLAY launching the clip and playing, so you can enter and listen without
+leaving the grid.
 
 The open clip plays with the grid's other launched clips while it is open, not with the song, so a part can
 be written against them. REC while playing records into the clip as loop recording from its next pass, and
