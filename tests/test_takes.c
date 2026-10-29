@@ -1,7 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* Phase 7b in the player: recording a performance (launches become blocks
  * that play back what was played, note for note, in exact blocks, with the
- * song's loop ignored and the take one undo step), the song loop's wrap as
+ * song's loop ignored and the take one undo step), a performance in the
+ * grid's view (0.4.0: silent tracks get stop blocks, so the song plays back
+ * what was heard, and a clip already playing is written from the take's
+ * start), the song loop's wrap as
  * a launch point, a clip open in the editor while the song plays on, and
  * loop recording into it while the other tracks play. And 0.3.0's grid
  * recording, the player's side: a launched clip opening and closing in its
@@ -391,9 +394,100 @@ static void test_launch_rec(void)
     song_player_stop(&player);
 }
 
+/* A performance in the grid's view (0.4.0), where every track plays a clip
+ * or is silent. Armed, PLAY starts it with track 1's clip launched, track 2
+ * is launched at bar 2 and stopped at bar 3, and the rest stay silent. The
+ * song gets what was heard: track 1's clip from the top, track 2 silent,
+ * its clip, then silent, and the rest stop blocks over the whole take.
+ * Played back in the song view's, every track sounds as it did in the take,
+ * the song's own notes under the blocks quiet. Then, armed while track 1's
+ * clip plays, the take starts with track 2's launch at bar 2, and track 1's
+ * clip is written from there. */
+static void test_grid_performance(void)
+{
+    static struct on live[4096], back[4096];
+    song_clear(&song, 4, 12000);
+    for (unsigned t = 0; t < SONG_TRACKS; ++t)
+        for (unsigned beat = 0; beat < 16; ++beat) song_add_note(&song, t, beat * 480U, 30 + t, 100, 100);
+    for (unsigned t = 0; t < 2; ++t) {
+        unsigned cell = song_cell(t, 0);
+        song.clip_length[cell] = 1920;
+        for (unsigned k = 0; k < 4; ++k) clip_note(cell, k * 480U + 120U, 60 + t * 12 + k, 120);
+    }
+    song_player_init(&player, &song, &listener);
+    song_player_view(&player, 1);
+    reset_capture();
+    song_take_begin(&take, &player);
+    song_player_launch(&player, 0, 0);                       /* as playing starts */
+    song_player_start(&player, 0);
+    CHECK_EQ(player.perf, 2);
+    uint32_t block = run_to(0, 1000);
+    song_player_launch(&player, 1, 0);                       /* at 1920 */
+    block = run_to(block, 2500);
+    song_player_launch(&player, 1, SONG_FROM_STOP);          /* at 3840 */
+    block = run_to(block, 4500);
+    song_take_end(&take, &player);
+    uint32_t ended = player.next, last = block_at(ended);
+    song_player_stop(&player);
+    CHECK(balanced());
+    const struct song_event *b = nth_block(0, 0);
+    CHECK(blocks_on(0) == 1 && b && song_event_start(b) == 0 && song_block_length(b) == ended && b->a == (SONG_BLOCK | 0));
+    CHECK_EQ(blocks_on(1), 3);
+    b = nth_block(1, 0);
+    CHECK(b && song_event_start(b) == 0 && song_block_length(b) == 1920 && b->a == SONG_BLOCK_STOP);
+    b = nth_block(1, 1);
+    CHECK(b && song_event_start(b) == 1920 && song_block_length(b) == 1920 && b->a == (SONG_BLOCK | 0));
+    b = nth_block(1, 2);
+    CHECK(b && song_event_start(b) == 3840 && song_block_length(b) == ended - 3840 && b->a == SONG_BLOCK_STOP);
+    unsigned stops = 0;
+    for (unsigned t = 2; t < SONG_TRACKS; ++t)
+        stops += blocks_on(t) == 1 && (b = nth_block(t, 0)) && song_event_start(b) == 0 && song_block_length(b) == ended &&
+                 b->a == SONG_BLOCK_STOP;
+    CHECK_EQ(stops, SONG_TRACKS - 2);
+    unsigned n = notes_of(0xff, live), m;
+    while (n && live[n - 1].block >= last) --n;
+    CHECK_EQ(n, 10 + 4);                                      /* track 1's clip two passes and a half, track 2's once */
+    /* Played back from the top in the song view's: the same, every track. */
+    song_player_init(&player, &song, &listener);
+    reset_capture();
+    song_player_start(&player, 0);
+    run_blocks(&player, 0, last);
+    song_player_stop(&player);
+    m = notes_of(0xff, back);
+    while (m && back[m - 1].block >= last) --m;
+    unsigned same = m == n;
+    for (unsigned i = 0; same && i < n; ++i) same = !memcmp(&live[i], &back[i], sizeof live[i]);
+    CHECK_EQ(m, n);
+    CHECK(same);
+    /* Armed while track 1's clip plays: the take starts at track 2's launch. */
+    song_clear(&song, 4, 12000);
+    for (unsigned t = 0; t < 2; ++t) {
+        song.clip_length[song_cell(t, 0)] = 1920;
+        clip_note(song_cell(t, 0), 0, 60 + t, 120);
+    }
+    song_player_init(&player, &song, &listener);
+    song_player_view(&player, 1);
+    song_player_launch(&player, 0, 0);
+    song_player_start(&player, 0);
+    block = run_to(0, 1000);
+    song_take_begin(&take, &player);
+    song_player_launch(&player, 1, 0);                       /* at 1920 */
+    block = run_to(block, 2500);
+    song_take_end(&take, &player);
+    ended = player.next;
+    song_player_stop(&player);
+    b = nth_block(0, 0);
+    CHECK(blocks_on(0) == 1 && b && song_event_start(b) == 1920 && song_block_length(b) == ended - 1920 && b->a == (SONG_BLOCK | 0));
+    b = nth_block(1, 0);
+    CHECK(blocks_on(1) == 1 && b && song_event_start(b) == 1920 && b->a == (SONG_BLOCK | 0));
+    b = nth_block(5, 0);
+    CHECK(blocks_on(5) == 1 && b && song_event_start(b) == 1920 && b->a == SONG_BLOCK_STOP);
+}
+
 int main(void)
 {
     test_performance();
+    test_grid_performance();
     test_loop_wrap();
     test_open_running();
     test_record_clip();

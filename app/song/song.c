@@ -6,6 +6,7 @@
 #include <string.h>
 #if SONG_UI /* edits are journaled for undo on the editing pages */
 #include "undo.h"
+#include "record.h"
 #define JOURNAL(s, op, track, e) do { if ((s)->undo) song_undo_record((s)->undo, op, song_owner(s, track), e, 0); } while (0)
 #else
 #define JOURNAL(s, op, track, e) ((void)0)
@@ -23,6 +24,7 @@ SONG_SMALL void song_clear(struct song *s, unsigned bars, unsigned bpm100)
     s->swing_tracks = 0xff;
 #if SONG_UI
     s->launch_q = 2; /* a bar */
+    s->rec_mode = SONG_REC_OVERDUB; /* 0.4.0: REC's live mode, never STEP */
 #endif
     song_tempo_refresh(s);
 }

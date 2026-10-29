@@ -2,6 +2,7 @@
 /* Songs as stored. See song_file.h. */
 #include "song_file.h"
 #include "chords.h"
+#include "record.h"
 #include "song_config.h"
 #include <string.h>
 #if SONG_UI
@@ -177,7 +178,8 @@ SONG_SMALL static int parse(struct song *s, const uint8_t *data, uint32_t bytes,
         s->meters = (uint8_t)meters; s->markers = (uint8_t)markers;
         s->loop_start = loop_start; s->loop_end = loop_end; s->loop_on = (uint8_t)loop_on;
         s->swing = settings[0]; s->swing_grid = settings[1]; s->swing_tracks = settings[2];
-        s->key_root = settings[3]; s->key_scale = settings[4]; s->rec_mode = settings[5]; s->count_in = settings[6];
+        s->key_root = settings[3]; s->key_scale = settings[4]; s->count_in = settings[6];
+        s->rec_mode = settings[5] ? settings[5] : SONG_REC_OVERDUB; /* STEP, the default before 0.4.0, is no live mode */
         s->metronome = settings[7]; s->quantize = settings[8]; s->strength = settings[9];
         memcpy(s->knob_cc, knobs, sizeof knobs);
     }

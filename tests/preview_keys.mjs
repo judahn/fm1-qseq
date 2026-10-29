@@ -17,7 +17,7 @@ export async function phaseKeys(browser, root) {
     r.render(32);
     r.tap(B.SEQ);
     r.turn(2, 12);                                 // K1: to the song end, bar 13, where track 1 is empty
-    r.tap(B.REC); r.tap(B.REC);                    // step entry on track 1
+    r.step();                                      // SHIFT+REC: step entry on track 1
     o.stepPage = r.page();
 
     // 1. Lengths by note name. K1 down to 1/64 first, so each F shows.
@@ -60,7 +60,7 @@ export async function phaseKeys(browser, root) {
     // 6. A minor on the settings page: in step entry all 27 key lights show it.
     r.tap(B.REC);
     r.tap(B.GLO); r.turn(1, 1); r.turn(2, 9); r.turn(3, 2); r.turn(1, -1); r.tap(B.GLO);
-    r.tap(B.REC); r.tap(B.REC);
+    r.step();
     r.render(4);
     const minor = [0, 2, 4, 5, 7, 9, 11], lit = Array.from(r.state().subarray(168 + 14, 168 + 41));
     o.scaleLeds = { lit: lit.map(v => (v ? 1 : 0)).join(''), want: lit.map((_, k) => (minor.includes((53 + k) % 12) ? 1 : 0)).join('') };
@@ -69,7 +69,7 @@ export async function phaseKeys(browser, root) {
   savePng(root, 'keys-step-shift', out, 'shiftPng');
   await page.close();
   const t = checker('keys'), q = out;
-  t.eq('REC, REC opens step entry', q.stepPage, 20);
+  t.eq('SHIFT+REC opens step entry', q.stepPage, 20);
   t.eq('SHIFT+F3, SHIFT+F4 and SHIFT+F5 each pick 1/1', q.octaves, ['1/1', '1/1', '1/1']);
   t.eq('SHIFT+F4 to E5: 1/1 down to 1/64', q.whites, ['1/1', '1/2', '1/4', '1/8', '1/16', '1/32', '1/64']);
   t.eq('SHIFT+C4 picks 1/16', q.c, '1/16');

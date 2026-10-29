@@ -147,7 +147,8 @@ struct song_clip *song_port_clip(void) { return &clip; }
 
 /* Clips. Opening one while playing: it plays at once on its track, in step
  * with the bar the song is in (or on in its pass, launched there already),
- * and the song plays on. Closing gives the track back to what it played. */
+ * and the rest plays on. Closing gives the track back to what it played,
+ * and in the grid a track still on the song comes back stopped (0.4.0). */
 SONG_SMALL void song_port_launch(unsigned track, unsigned to)
 {
     song_player_launch(&player, track, to);
@@ -155,9 +156,11 @@ SONG_SMALL void song_port_launch(unsigned track, unsigned to)
 SONG_SMALL int song_port_clip_open(unsigned cell)
 {
     int r = song_clip_open(&song, cell);
+    unsigned t = cell / SONG_GRID_ROWS;
     if (!r) {
-        player.waiting[cell / SONG_GRID_ROWS] = SONG_FROM_NONE;
-        song_player_edit(&player, cell / SONG_GRID_ROWS, 1);
+        player.waiting[t] = SONG_FROM_NONE;
+        if (player.from[t] == SONG_FROM_SONG) player.from[t] = player.home;
+        song_player_edit(&player, t, 1);
     }
     return r;
 }

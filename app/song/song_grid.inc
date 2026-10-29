@@ -2,15 +2,18 @@
 /* song-mode: the clip grid (design 8f), included by song_view.inc. SEQ flips
  * between it and the song view. 8 tracks across, 16 rows in two pages of 8,
  * and the SONG row on top. SELECT picks the track, K1 the row, K2 the REC
- * length, K4 the launch quantize. The keys launch here: F3 to F4 the
- * track's cell in the cursor row (an empty cell stops the track, the SONG
- * row hands it back to the song), G4 to G5 rows 1 to 8 of the page. SCL
- * opens the clip at the cursor, ENV names the row (YES keeps the name, NO
- * leaves the old one), and SHIFT plus F3, G3, A3 or B3, and E4 copy, cut,
- * paste and delete the cell. REC records into the cell at the cursor
- * (song_grid_take.c), and while it is armed or recording the keys play its
- * track instead of launching. SHIFT+REC records a performance
- * (song_perf.c). Drawing is in song_grid_draw.inc. */
+ * length, K4 the launch quantize. Only launched clips play here (0.4.0,
+ * song_player_view). The keys launch: F3 to F4 the track's cell in the
+ * cursor row (an empty cell stops the track, and on the SONG row they stop
+ * it), G4 to G5 rows 1 to 8 of the page. SCL opens the clip at the
+ * cursor, SHIFT+SCL switches REC between REPLACE and OVERDUB, ENV names
+ * the row (YES keeps the name, NO leaves the old one), and SHIFT plus F3,
+ * G3, A3 or B3, and E4 copy, cut, paste and delete the cell. REC records
+ * into the cell at the cursor (song_grid_take.c), and while it is armed or
+ * recording the keys play its track instead of launching. On the SONG row
+ * REC records a performance (song_perf.c). SHIFT+REC opens the cell's clip
+ * in step entry. A held REC opens the record settings (song_rec.inc).
+ * Drawing is in song_grid_draw.inc. */
 #include "clips.h"
 
 enum { GRID_X = 46, GRID_W = 24, GRID_SONG = 34, GRID_Y = 52, GRID_H = 16, GRID_EMPTY = 0x2104 };
@@ -40,23 +43,45 @@ static void grid_name_done(void)
     for (unsigned i = SONG_MARKER_NAME; i-- > 0 && (name[i] == ' ' || !name[i]);) name[i] = 0;
     song_ask_close();
 }
-/* Launch a track to a row, or stop it when the cell is empty. */
-static void grid_launch(unsigned t, unsigned row)
+/* Launch a track to a row, or stop it when the cell is empty or the row is
+ * the SONG row (SONG_FROM_SONG here), since the grid plays no song. 1 for
+ * a clip. */
+static unsigned grid_launch(unsigned t, unsigned row)
 {
-    unsigned to = row == SONG_FROM_SONG || song_port_song()->clip_length[song_cell(t, row)] ? row : SONG_FROM_STOP;
+    unsigned to = row < SONG_GRID_ROWS && song_port_song()->clip_length[song_cell(t, row)] ? row : SONG_FROM_STOP;
     song_port_launch(t, to);
+    return to != SONG_FROM_STOP;
 }
-/* REC: a performance running or armed ends, a cell's take goes on to its
- * next step (song_grid_rec_key), SHIFT+REC arms a performance, and REC
- * records into the cell at the cursor. */
+/* What a tap of REC (step 0) or SHIFT+REC (step 1) does here (0.4.0). On
+ * the SONG row REC arms a performance, and step entry needs a row. On a
+ * row REC records into the cell at the cursor, and SHIFT+REC opens its
+ * clip in step entry at its start, stopped, a new clip REC LEN long (4
+ * bars for FREE) when the cell is empty. */
+static void grid_rec_go(unsigned step, uint32_t now)
+{
+    struct song *s = song_port_song();
+    unsigned cell = song_cell(track, grid_row ? grid_row - 1U : 0);
+    notice_until = now + 1500U;
+    if (!grid_row) notice = step ? "STEP ENTRY NEEDS A ROW" : song_perf_arm() ? "NOT NOW" : "REC: LAUNCH OR PLAY TO START";
+    else if (!step) { if (song_grid_rec(cell, grid_bars())) notice = "NOT NOW"; }
+    else if (song_port_player()->playing) notice = "STOP FIRST FOR STEP ENTRY";
+    else {
+        if (!s->clip_length[cell]) s->clip_length[cell] = (uint16_t)song_bar_clock(s, grid_bars() ? grid_bars() : 4U);
+        if (song_port_clip_open(cell)) notice = "NOT NOW";
+        else song_step_enter();
+    }
+}
+/* REC that ends something acts at once: a performance running or armed
+ * ends, and a cell's take goes on to its next step (song_grid_rec_key).
+ * SHIFT+REC is step entry, and otherwise REC waits to tell a tap from a
+ * hold (song_rec_down). */
 static void grid_rec(unsigned shift, uint32_t now)
 {
     notice_until = now + 1500U;
     if (song_perf_state()) { song_perf_end(); notice = "TAKE ENDED"; }
     else if (song_grid_rec_state()) song_grid_rec_key();
-    else if (shift) notice = song_perf_arm() ? "NOT NOW" : "REC: LAUNCH OR PLAY TO START";
-    else if (!grid_row) notice = "PICK A ROW TO RECORD INTO";
-    else if (song_grid_rec(song_cell(track, grid_row - 1U), grid_bars())) notice = "NOT NOW";
+    else if (shift) grid_rec_go(1, now);
+    else song_rec_down(now);
 }
 static int song_grid_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
 {
@@ -71,13 +96,15 @@ static int song_grid_input(const struct fm1_controls *c, uint32_t *pressed, uint
     }
     if (*pressed & BUTTON(PLAY)) { if (song_port_player()->playing) song_port_stop(); else song_start(now); }
     if (*pressed & BUTTON(REC)) grid_rec(shift, now);
+    if (page != SONG_GRID) return 1; /* step entry */
     if ((*pressed & BUTTON(ENV)) && grid_row && !naming && !taking) { /* name the row: YES keeps it, NO leaves the old one */
         memcpy(grid_name, s->row_name[grid_row - 1U], SONG_MARKER_NAME);
         grid_letter = 0;
         song_name_open();
         naming = 1;
     }
-    if ((*pressed & BUTTON(SCL)) && grid_row && !naming && !taking) {
+    if ((*pressed & BUTTON(SCL)) && shift && !naming) song_rec_toggle(now); /* SHIFT+SEL: REPLACE or OVERDUB */
+    else if ((*pressed & BUTTON(SCL)) && grid_row && !naming && !taking) {
         if (song_port_clip_open(song_cell(track, grid_row - 1U))) return 1;
         page = music_page = SONG;
         cache->shown_page = ~0U;
@@ -112,12 +139,10 @@ static int song_grid_input(const struct fm1_controls *c, uint32_t *pressed, uint
         return 1;
     }
     for (unsigned t = 0; t < SONG_TRACKS; ++t)
-        if (down & (1U << white_keys[t])) { grid_launch(t, grid_row ? grid_row - 1U : SONG_FROM_SONG); launched = 1; }
+        if (down & (1U << white_keys[t])) launched |= grid_launch(t, grid_row ? grid_row - 1U : SONG_FROM_SONG);
     for (unsigned i = 0; i < 8; ++i) /* a scene: the row on every track */
-        if (down & (1U << white_keys[8 + i])) {
-            for (unsigned t = 0; t < SONG_TRACKS; ++t) grid_launch(t, grid_page * 8U + i);
-            launched = 1;
-        }
-    if (launched && !song_port_player()->playing) song_start(now);
+        if (down & (1U << white_keys[8 + i]))
+            for (unsigned t = 0; t < SONG_TRACKS; ++t) launched |= grid_launch(t, grid_page * 8U + i);
+    if (launched && !song_port_player()->playing) song_start(now); /* a clip launched while stopped starts playing */
     return 1;
 }

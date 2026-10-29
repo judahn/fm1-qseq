@@ -16,6 +16,7 @@
 //   7b clips in the song: takes, blocks, Expand, the open clip (preview_7b.mjs)
 //   grid rec  REC into a cell: a fixed length, FREE, overdub, the count-in, undo (preview_grid_rec.mjs)
 //   buttons  SAVE and the undo combos, FX's tap to the effects page, the engine's tempo (preview_buttons.mjs)
+//   rec  0.4.0: REC tapped, SHIFT+REC, the record settings, SHIFT+SEL, playback following the view, blocks (preview_rec.mjs)
 //   8  chord mode: keys, strums, smooth voicing, recording, step entry (preview_8.mjs)
 //   yes/no  OCT+ and OCT- on the edit jobs and the song list: asking, cancelling, renaming (preview_yesno.mjs)
 // Each records named checks with actual and expected values, and every
@@ -43,6 +44,7 @@ import { phase7 } from './preview_7.mjs';
 import { phase7b } from './preview_7b.mjs';
 import { phaseGridRec } from './preview_grid_rec.mjs';
 import { phaseButtons } from './preview_buttons.mjs';
+import { phaseRec } from './preview_rec.mjs';
 import { phase8 } from './preview_8.mjs';
 import { phaseYesNo } from './preview_yesno.mjs';
 
@@ -50,7 +52,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const phases = [['1', phase1], ['2', phase2], ['keys', phaseKeys], ['diagnostics', phaseDiag], ['panel', phasePanel], ['3', phase3],
-  ['4', phase4], ['4b', phase4b], ['5a', phase5a], ['5b', phase5b], ['6', phase6], ['7', phase7], ['7b', phase7b], ['grid rec', phaseGridRec], ['buttons', phaseButtons], ['8', phase8],
+  ['4', phase4], ['4b', phase4b], ['5a', phase5a], ['5b', phase5b], ['6', phase6], ['7', phase7], ['7b', phase7b], ['grid rec', phaseGridRec], ['buttons', phaseButtons], ['rec', phaseRec], ['8', phase8],
   ['yes/no', phaseYesNo]];
 const only = process.env.PREVIEW_PHASES ? process.env.PREVIEW_PHASES.split(',') : null;
 const browser = await chromium.launch();

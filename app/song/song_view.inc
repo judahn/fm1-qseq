@@ -4,8 +4,8 @@
  * the marking pass records damage and the band pass repaints from a frame
  * snapshot. Transport, snap and zoom, markers, the loop and the selection.
  * The header, playhead and recording knobs are in song_header.inc, step
- * entry in song_step.inc, settings in song_setup.inc, REC's chooser in
- * song_rec.inc, arranging in song_select.inc, the automation view in
+ * entry in song_step.inc, settings in song_setup.inc, REC and its record
+ * settings in song_rec.inc, arranging in song_select.inc, the automation view in
  * song_auto.inc, the clip grid in song_grid.inc, YES and NO in song_ask.inc,
  * and input in song_panel.inc (with song_view_input.inc for this view and
  * song_buttons.inc for SAVE, FX, ARP and PLAY across the pages).
@@ -52,6 +52,18 @@ static void song_notice_expire(void)
 #include "song_glitch.inc"
 #include "lanes.h"
 #include "chords.h"
+/* The bottom line with the song's REC mode at its right end, in REC's red
+ * (0.4.0): the song view and the grid show it while the line is idle. */
+static void song_hint_mode(const char *hint)
+{
+    const char *mode = song_rec_modes[song_port_song()->rec_mode % SONG_REC_MODES];
+    uint32_t sig = signature(signature(0, hint, (unsigned)strlen(hint)), mode, (unsigned)strlen(mode));
+    if (sig == cache->hint_cache) return;
+    cache->hint_cache = sig;
+    paint_fill(6, 231, 228, 7, BACK);
+    text(6, 231, hint, 1, DIM, BACK);
+    text(234 - 6 * (unsigned)strlen(mode), 231, mode, 1, 0xf800, BACK);
+}
 
 static uint32_t song_span(void) { return (16U >> song_zoom) * (uint32_t)SONG_WHOLE; }
 static unsigned song_x(uint32_t clock)
@@ -70,19 +82,31 @@ static void song_follow(const struct song *s, uint32_t clock)
     song_window = song_bar_clock(s, bar / bars * bars);
     if (!song_visible(clock)) song_window = start;
 }
-/* Each row maps its own pitch range onto its height. */
+/* Each row maps its own pitch range onto its height: its notes', and the
+ * notes of the clips its blocks play (0.4.0). */
+static void song_range(const struct song *s, unsigned part, uint32_t limit, unsigned *low, unsigned *high)
+{
+    unsigned count;
+    const struct song_event *e = song_track(s, part, &count);
+    for (unsigned i = 0; i < count && song_event_start(&e[i]) < limit; ++i) {
+        if (!song_is_note(&e[i])) continue;
+        if (e[i].a < *low) *low = e[i].a;
+        if (e[i].a > *high) *high = e[i].a;
+    }
+}
 static void song_ranges(const struct song *s)
 {
     if (song_ranged == s->revision) return;
     song_ranged = s->revision;
     for (unsigned t = 0; t < SONG_TRACKS; ++t) {
-        unsigned count, low = 127, high = 0;
+        unsigned count, low = 127, high = 0, rows = 0;
         const struct song_event *e = song_track(s, t, &count);
-        for (unsigned i = 0; i < count; ++i) {
-            if (!song_is_note(&e[i])) continue;
-            if (e[i].a < low) low = e[i].a;
-            if (e[i].a > high) high = e[i].a;
-        }
+        for (unsigned i = 0; i < count && !s->open; ++i)
+            if (song_is_block(&e[i]) && e[i].a != SONG_BLOCK_STOP) rows |= 1U << (e[i].a & (SONG_GRID_ROWS - 1U));
+        song_range(s, t, SONG_MAX_CLOCK + 1U, &low, &high);
+        for (unsigned row = 0; row < SONG_GRID_ROWS; ++row)
+            if (rows >> row & 1U) song_range(s, song_owner(s, SONG_TRACKS + t * SONG_GRID_ROWS + row),
+                                             s->clip_length[t * SONG_GRID_ROWS + row], &low, &high);
         song_low[t] = (uint8_t)(low <= high ? low : 60);
         song_high[t] = (uint8_t)(low <= high ? high : 60);
     }
@@ -119,6 +143,27 @@ static void song_ruler(const struct song *s)
         paint_fill(song_x(song_now.target) - 1, SONG_ROWS - 5, 3, 3, GREEN);
 }
 
+/* A block's clip on its row, pass after pass from the block's start up to
+ * `stop`, as marks in BACK over the track's color: what plays there. */
+static void song_row_clip(const struct song *s, unsigned t, unsigned row, uint32_t from, uint32_t stop, unsigned y)
+{
+    unsigned cell = t * SONG_GRID_ROWS + row, count, span = song_high[t] - song_low[t];
+    uint32_t length = s->clip_length[cell], end = song_window + song_span(), pass = from;
+    const struct song_event *e = song_track(s, song_owner(s, SONG_TRACKS + cell), &count);
+    if (!length) return;
+    if (stop > end) stop = end;
+    if (song_window > from + length) pass += ((song_window - from) / length - 1U) * length; /* one pass back, for notes still sounding */
+    for (; pass < stop; pass += length)
+        for (unsigned i = 0; i < count && song_event_start(&e[i]) < length; ++i) {
+            uint32_t at = pass + song_event_start(&e[i]), off = at + e[i].length;
+            if (at >= stop) break;
+            if (off > stop) off = stop;
+            if (!song_is_note(&e[i]) || off <= song_window) continue;
+            unsigned x = song_x(at), w = song_x(off) - x, pitch = e[i].a;
+            pitch = pitch < song_low[t] ? song_low[t] : pitch > song_high[t] ? song_high[t] : pitch;
+            paint_fill(x, y + 14 - (span ? (pitch - song_low[t]) * 13U / span : 6U), w > 2 ? w - 1 : 1, 2, BACK);
+        }
+}
 static void song_row(const struct song *s, unsigned t)
 {
     unsigned y = SONG_ROWS + t * SONG_ROW;
@@ -150,26 +195,39 @@ static void song_row(const struct song *s, unsigned t)
     /* Notes as marks, placed by pitch. Look back a little for notes that
      * started before the window and still sound inside it. */
     unsigned count, first = song_find(s, t, song_window), span = song_high[t] - song_low[t];
+    unsigned look = first > 32 ? first - 32 : 0, next = look;
     const struct song_event *e = song_track(s, t, &count);
     if (s->open && t != song_editing(s)) count = 0; /* only the open clip's row */
     uint16_t color = frame_views[t].audible ? colors[t] : DIM;
-    for (unsigned i = 0; i < count && !s->open; ++i) { /* clip blocks, shaded and numbered, under the notes */
+    uint32_t cover = 0; /* where the blocks so far end */
+    /* Clip blocks in the track's color and numbered, as the grid's cells
+     * are, with what their clip plays (0.4.0). A stop is PANEL with an X. */
+    for (unsigned i = 0; i < count && !s->open; ++i) {
         uint32_t at = song_event_start(&e[i]), stop = at + song_block_length(&e[i]);
         if (at >= end) break;
-        if (!song_is_block(&e[i]) || stop <= song_window) continue;
+        if (!song_is_block(&e[i])) continue;
+        if (i < look && stop > cover) cover = stop;
+        if (stop <= song_window) continue;
         unsigned x = song_x(at), w = song_x(stop) - x, stopped = e[i].a == SONG_BLOCK_STOP;
-        uint16_t shade = stopped ? PANEL : (uint16_t)(colors[t] >> 1 & 0x7befU);
+        uint16_t shade = stopped ? PANEL : colors[t];
         paint_fill(x, y, w > 1 ? w - 1U : 1U, SONG_ROW - 2, shade);
+        if (!stopped) song_row_clip(s, t, e[i].a & (SONG_GRID_ROWS - 1U), at, stop, y);
         if (song_visible(at) && w > 9) {
             if (stopped) text(x + 2, y + 1, "X", 1, DIM, shade);
             else number(x + 2, y + 1, (e[i].a & (SONG_GRID_ROWS - 1U)) + 1, 1, 1, BACK, shade);
         }
     }
-    for (unsigned i = first > 32 ? first - 32 : 0; i < count; ++i) {
-        uint32_t at = song_event_start(&e[i]);
+    /* The track's own notes, but none inside a block, where they're silent,
+     * and one sounding into a block ends where the block starts. */
+    for (unsigned i = look; i < count; ++i) {
+        uint32_t at = song_event_start(&e[i]), off = at + e[i].length;
         if (at >= end) break;
-        if (at + e[i].length <= song_window || !song_is_note(&e[i])) continue;
-        unsigned x = song_x(at), w = song_x(at + e[i].length) - x;
+        if (song_is_block(&e[i])) { if (at + song_block_length(&e[i]) > cover) cover = at + song_block_length(&e[i]); continue; }
+        if (!song_is_note(&e[i]) || at < cover) continue;
+        if (next <= i) for (next = i + 1U; next < count && !song_is_block(&e[next]); ++next) {}
+        if (next < count && song_event_start(&e[next]) < off) off = song_event_start(&e[next]);
+        if (off <= song_window || off <= at) continue;
+        unsigned x = song_x(at), w = song_x(off) - x;
         w = w > 2 ? w - 1 : 1;
         unsigned rise = span ? (unsigned)(e[i].a - song_low[t]) * 13U / span : 6U;
         paint_fill(x, y + 14 - rise, w, 2, color);
@@ -194,12 +252,13 @@ static void song_draw(void)
     song_footer(s, "MARKER");
     song_notice_expire();
     char selection[40], part[12];
+    unsigned idle = 0;
     if (song_port_clip_armed()) strcpy(selection, "REC FROM THE CLIP'S NEXT PASS");
     else if (song_now.recording) {
         strcpy(selection, "REC ");
         strcat(selection, song_rec_modes[song_port_recorder()->mode]);
         strcat(selection, "  PLAY OR REC ENDS");
-    } else {
+    } else { /* the selection, with room left for the REC mode */
         uint32_t length = s->loop_end - s->loop_start;
         strcpy(selection, "SEL ");
         decimal(part, (int)(length / SONG_WHOLE), 1); strcat(selection, part); strcat(selection, ".");
@@ -207,13 +266,15 @@ static void song_draw(void)
         strcat(selection, " BARS:");
         unsigned picked = song_selected();
         if (picked == 0xff) strcat(selection, " ALL");
-        else for (unsigned t = 0; t < SONG_TRACKS && strlen(selection) < 34; ++t)
+        else for (unsigned t = 0; t < SONG_TRACKS && strlen(selection) < 28; ++t)
             if (picked >> t & 1U) { strcat(selection, " T"); decimal(part, (int)t + 1, 1); strcat(selection, part); }
+        idle = 1;
     }
     const char *hint = notice ? notice : song_now.jumping ? "JUMP WAITS FOR THE NEXT BAR"
         : song_now.shift ? "F3-E4 EDIT  F#-A# MANGLE  EDIT JOBS"
         : (previous_buttons & BUTTON(LFO)) ? "LFO + F3-F4 TRACKS  G4 ALL" : selection;
-    song_hint(hint);
+    if (hint == selection && idle) song_hint_mode(selection);
+    else song_hint(hint);
 }
 
 #include "song_step.inc"

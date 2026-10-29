@@ -34,4 +34,8 @@ enum { SONG_DIAG_CEILING = 1U << 19 };
 uint32_t song_diag_largest_free(void);
 uint32_t song_diag_top(void); /* where the search stops */
 int song_diag_engines(void);  /* try each engine on track 6, then put it back */
+/* The full device build's free heap for the song list (0.4.0): the same
+ * probe, 0 when malloc gave a block outside the heap (no result). Call it
+ * stopped, with no audio-critical work going on, and not every frame. */
+uint32_t song_heap_free(void);
 #endif

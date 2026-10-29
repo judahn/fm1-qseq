@@ -20,6 +20,7 @@ static const char *song_store_message(int r, const char *done)
     return !r ? done : r == SONG_STORE_PLAYING ? "STOP FIRST" : r == SONG_STORE_FULL ? "MEMORY FULL" : "COULDN'T, FLASH ERROR";
 }
 #include "song_list_act.inc"
+#include "diag.h" /* the heap probe (0.4.0) */
 
 static void song_kb(char out[12], uint32_t bytes) { decimal(out, (int)((bytes + 1023U) / 1024U), 1); strcat(out, "K"); }
 /* The battery under the release: the sensor's ADC reading, smoothed, and a
@@ -42,6 +43,36 @@ static void song_battery_draw(void)
     frame(124, 15, 24, 7, DIM);
     paint_fill(125, 16, level, 5, level < 5 ? AMBER : GREEN);
 }
+/* Free heap, right of the battery (0.4.0): in the full device build the
+ * largest free block inside the heap, by the diagnostics' probe (diag.h),
+ * so it shows what RAM is left with the engines running. It is measured
+ * once each time the list opens, and only with nothing playing and no kit
+ * coming in, and every block the probe gets is freed at once. "+" means
+ * the top of the probe's search, and "?" that malloc gave a block outside
+ * the heap, so there's no reading. The browser has no heap: a dash. */
+static uint32_t song_heap_bytes; /* the last reading, 0 for none */
+static uint8_t song_heap_due;
+static void song_heap_measure(void)
+{
+#if SONG_DEVICE_FULL && !defined(FM1_OPEN_WEB)
+    struct groove_view v = {0};
+    groove_get_view(track, cursor, &v);
+    if (!song_heap_due || song_port_player()->playing || v.playing || song_store_busy()) return;
+    song_heap_due = 0;
+    song_heap_bytes = song_heap_free();
+#endif
+}
+static void song_heap_line(char out[16])
+{
+    strcpy(out, "HEAP ");
+    if (!song_heap_bytes) { strcat(out, song_heap_due ? "-" : "?"); return; }
+#if SONG_DEVICE_FULL && !defined(FM1_OPEN_WEB)
+    char part[12];
+    decimal(part, (int)(song_heap_bytes / 1024U), 1);
+    strcat(out, part);
+    strcat(out, song_heap_bytes + 16U >= song_diag_top() ? "K+" : "K");
+#endif
+}
 /* Flash use as a bar: songs, then samples and kits, then free. */
 static void song_gauge_bar(unsigned x, unsigned y, unsigned w, unsigned h, const struct song_gauge *g)
 {
@@ -58,14 +89,17 @@ static void song_list_draw(void)
     unsigned naming = song_naming();
     uint32_t sig = signature(song_list_at ^ naming << 9 ^ song_list_cursor << 10 ^ (uint32_t)song_store_kit() << 16, &g, sizeof g);
     sig = signature(sig, song_list_name, sizeof song_list_name) ^ song_list_rows() << 24 ^ song_port_song()->id ^ song_ask_signature();
+    sig = signature(sig, &song_heap_bytes, sizeof song_heap_bytes) ^ song_heap_due;
     if ((!paint_rendering || paint_top < 196) && sig != cache->middle_cache) {
         cache->middle_cache = sig;
         paint_fill(0, 0, 240, 196, BACK);
         if (paint_rendering) {
             text(8, 6, "SONGS", 2, ACCENT, BACK);
             text(76, 5, "QY " FM1_QY_VERSION, 1, DIM, BACK); /* this fork's release, the battery under it */
-            strcpy(line, "FREE "); song_kb(part, g.free); strcat(line, part);
-            text(232 - 6 * (unsigned)strlen(line), 10, line, 1, DIM, BACK);
+            strcpy(line, "FREE "); song_kb(part, g.free); strcat(line, part); /* flash for songs, the free heap under it */
+            text(232 - 6 * (unsigned)strlen(line), 5, line, 1, DIM, BACK);
+            song_heap_line(line);
+            text(232 - 6 * (unsigned)strlen(line), 15, line, 1, DIM, BACK);
             song_gauge_bar(8, 26, 224, 4, &g);
             strcpy(line, "SONGS "); song_kb(part, g.songs); strcat(line, part);
             strcat(line, "  KITS "); song_kb(part, g.samples); strcat(line, part);
@@ -114,6 +148,9 @@ static void song_list_open(void)
     page = music_page = SONG_LIST;
     song_ask_close();
     cache->shown_page = ~0U;
+    song_heap_bytes = 0; /* measured again, once, for this opening */
+    song_heap_due = 1;
+    song_heap_measure();
 }
 /* SAVE on the song list saves the song being worked on: the song is the
  * project. Elsewhere SAVE opens the list (song_buttons.inc). */
@@ -127,6 +164,7 @@ static int song_list_input(const struct fm1_controls *c, uint32_t *pressed, uint
     int answer = song_yes_no(pressed);
     unsigned open = song_asking() || song_naming(), rows = song_list_rows();
     blocked_keys |= key_down; /* the keys do nothing here */
+    song_heap_measure(); /* opened while playing: once it stops */
     if ((*pressed & BUTTON(HOME)) || (answer < 0 && !open)) { /* back to the song view */
         *pressed &= ~BUTTON(HOME);
         page = music_page = SONG;

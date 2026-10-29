@@ -111,12 +111,22 @@ SONG_SMALL static void refind(struct song_player *p, unsigned t, uint32_t at)
     if (!s->clip_length[cell]) { song_player_cut(p, t); p->from[t] = SONG_FROM_STOP; return; }
     pass_at(p, t, cell, &p->base[t], at);
 }
+/* A performance take begins at song clock `at`, and what every track plays
+ * there is kept, so a track no launch changes gets its block too (0.4.0). */
+SONG_SMALL static void take_begins(struct song_player *p, uint32_t at)
+{
+    p->perf = 2;
+    p->began_at = at;
+    memcpy(p->began, p->from, sizeof p->began);
+}
 /* The waiting launch takes track t over at its clock, or now if that has
  * passed (a launch made while stopped), with the source's lanes chased.
- * While a performance is recorded, it goes in the log. */
+ * While a performance is recorded, it goes in the log, and the first one
+ * starts the take. */
 SONG_SMALL static void take_over(struct song_player *p, unsigned t)
 {
     uint32_t now = p->next + p->shift, at = p->launch_at[t] > now ? p->launch_at[t] : now;
+    if (p->perf == 1) take_begins(p, at - p->shift);
     song_player_cut(p, t);
     p->from[t] = p->waiting[t];
     p->waiting[t] = SONG_FROM_NONE;
@@ -126,7 +136,6 @@ SONG_SMALL static void take_over(struct song_player *p, unsigned t)
     else if (p->from[t] < SONG_GRID_ROWS)
         song_chase(p->song, clip_part(p->song, t * SONG_GRID_ROWS + p->from[t]), at - p->base[t], chased, p);
     if (p->perf) {
-        p->perf = 2; /* the take starts with the first launch */
         p->log[p->log_in % 16U] = (struct song_launch){at - p->shift, (uint8_t)t, p->from[t]};
         ++p->log_in;
     }
@@ -161,11 +170,12 @@ SONG_SMALL static void emit_track(struct song_player *p, unsigned t, uint32_t en
     }
     emit_source(p, t, to);
 }
-/* Any track on a clip, or waiting for one, or a clip open in the editor:
- * then the song goes round at its end instead of stopping. */
+/* Any track on a clip, or waiting for one, a clip open in the editor, or
+ * the grid's view: then the song goes round at its end instead of
+ * stopping. */
 SONG_SMALL static unsigned clips_playing(const struct song_player *p)
 {
-    unsigned any = p->song->open != 0;
+    unsigned any = p->song->open != 0 || p->home != SONG_FROM_SONG;
     for (unsigned t = 0; t < SONG_TRACKS; ++t) any |= (p->from[t] < SONG_GRID_ROWS) | (p->waiting[t] < SONG_GRID_ROWS);
     return any;
 }
@@ -193,6 +203,16 @@ SONG_SMALL void song_player_launch(struct song_player *p, unsigned track, unsign
     if (to == p->from[track] && to >= SONG_GRID_ROWS) { p->waiting[track] = SONG_FROM_NONE; return; } /* already there */
     p->waiting[track] = (uint8_t)to;
     p->launch_at[track] = p->playing ? launch_point(p, p->next) + p->shift : 0;
+}
+SONG_SMALL void song_player_view(struct song_player *p, unsigned grid)
+{
+    unsigned home = grid ? SONG_FROM_STOP : SONG_FROM_SONG;
+    p->home = (uint8_t)home;
+    for (unsigned t = 0; t < SONG_TRACKS; ++t) {
+        if (!p->playing) { p->from[t] = (uint8_t)home; p->waiting[t] = SONG_FROM_NONE; }
+        else if (!grid || (p->from[t] == SONG_FROM_SONG && p->waiting[t] >= SONG_GRID_ROWS)) song_player_launch(p, t, home);
+        else if (p->waiting[t] == SONG_FROM_SONG) p->waiting[t] = SONG_FROM_NONE; /* a clip plays on, or one waiting launches */
+    }
 }
 SONG_SMALL void song_player_launch_rec(struct song_player *p, unsigned track, unsigned row)
 {

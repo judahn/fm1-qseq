@@ -39,7 +39,7 @@ export async function phase4(browser, root) {
     // two moves and keep the second.
     const s = o.sweep;
     r.held(B.FX, () => r.tap(B.PLAY));
-    r.tap(B.REC); r.turn(2, 2); r.turn(3, -1); r.tap(B.REC);
+    r.long(B.REC); r.turn(3, -1); r.tap(B.REC);   // the record settings on OVERDUB: no count-in, and go
     s.recording = info(29, 0, 0);
     r.render(100);
     const turns = [];

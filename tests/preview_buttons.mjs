@@ -79,7 +79,7 @@ export async function phaseButtons(browser, root) {
     fx.shiftCopy = [r.page(), info(29, 0, 11) !== clip || clip > 0];
     r.held(B.FX, () => render(250));                // held alone past 600 ms: no effects page
     fx.longHold = r.page();
-    r.tap(B.REC); r.tap(B.REC);                     // step entry (the chooser starts on STEP)
+    r.step();                                       // SHIFT+REC: step entry
     r.tap(B.FX);
     fx.step = r.page();
     r.tap(B.REC);

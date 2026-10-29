@@ -82,12 +82,13 @@ export async function phase3(browser, root) {
     a.stillOnSong = r.page();
 
     // 3. An overdub on track 7, from the top, with a bar of count-in and
-    // 16th quantize. REC opens the chooser, REC again goes.
+    // 16th quantize. REC held opens the record settings, on OVERDUB, a new
+    // song's mode, and REC there goes (0.4.0).
     r.held(B.FX, () => r.tap(B.PLAY));             // to the top
     r.turn(0, 6);                                  // track 7
-    r.tap(B.REC);
+    r.long(B.REC);
     t.chooserPage = r.page();
-    r.turn(2, 2); r.turn(4, 5);
+    r.turn(4, 5);
     t.settings = [state(3), state(4), state(5), state(6), state(7)];
     r.render(4);
     t.recPng = r.png();
@@ -138,10 +139,10 @@ export async function phase3(browser, root) {
       Math.abs(t.countInFrames - 4 * beatFrames) < 128 &&
       [1, 2, 3].every(k => Math.abs((clicks[k].block - first) * 128 - k * beatFrames) < 128);
     t.clicksOnBeats = clicks.slice(4).every((h, k) => hats[2 * k] && hats[2 * k].block === h.block);
-    // Requantize from the chooser: strength 0 gives back the raw timing, 100
-    // puts it back on the grid. Then three undos take the whole take away,
-    // and three redos bring it back.
-    r.tap(B.REC);
+    // Requantize from the record settings: strength 0 gives back the raw
+    // timing, 100 puts it back on the grid. Then three undos take the whole
+    // take away, and three redos bring it back.
+    r.long(B.REC);
     r.turn(5, -20);
     t.strength0 = takeNotes().map(n => n.clock);
     r.turn(5, 20);
@@ -153,7 +154,7 @@ export async function phase3(browser, root) {
     t.redone = takeNotes().map(n => n.clock);
 
     // 4. Playback: the take plays in exact time with the rest.
-    r.tap(B.HOME); r.tap(B.SEQ);
+    r.tap(B.HOME);
     t.backToSong = r.page();
     r.held(B.FX, () => r.tap(B.PLAY));
     c.sim_song_capture(1);
@@ -171,7 +172,7 @@ export async function phase3(browser, root) {
 
     // 5. Loop recording over bars 3 and 4, no count-in: each pass adds, and
     // the loop goes back off afterwards.
-    r.tap(B.REC);
+    r.long(B.REC);
     r.turn(2, 2); r.turn(3, -1);
     l.settings = [state(3), state(4)];
     const before = notesOf(6).filter(n => n.clock >= from && n.clock < to).length;
@@ -210,9 +211,9 @@ export async function phase3(browser, root) {
   k.yes('undo puts the deleted bars back', a.deleteUndoOk);
   k.eq('SEL adds a marker', a.markersAdded, 1);
   k.eq('undo takes the marker back', a.markersAfterUndo, 0);
-  k.eq('REC opens the chooser', t.chooserPage, 23);
-  k.eq('chooser: overdub, a bar of count-in, 1/16 at 100%, metronome while recording', t.settings, [2, 1, 5, 100, 2]);
-  k.eq('REC again goes back to the song view', t.page, 19);
+  k.eq('REC held opens the record settings', t.chooserPage, 23);
+  k.eq('record settings: overdub, a bar of count-in, 1/16 at 100%, metronome while recording', t.settings, [2, 1, 5, 100, 2]);
+  k.eq('REC there goes back to the song view', t.page, 19);
   k.eq('the take is recording', t.recording, 1);
   k.eq('overdub keeps the old notes playing (no quiet track)', t.quiet, 255);
   k.eq('PLAY ends the take: not recording, still playing, no clicks, song view', t.ended, [0, 1, 0, 19]);
@@ -223,10 +224,10 @@ export async function phase3(browser, root) {
   k.yes('the clicks land with the hats on the beats', t.clicksOnBeats);
   k.eq('requantize at strength 0 gives back the raw timing', t.strength0, t.raw);
   k.eq('strength 100 puts it back on the grid', t.regridded, t.notes);
-  k.eq('undo from the chooser stays there', t.undonePage, 23);
+  k.eq('undo from the record settings stays there', t.undonePage, 23);
   k.eq('three undos take the take and the strength back', t.undone, { notes: 0, strength: 100 });
   k.eq('three redos bring the take back', t.redone, t.notes);
-  k.eq('HOME then SEQ: the song view', t.backToSong, 19);
+  k.eq('HOME goes back to the song view', t.backToSong, 19);
   k.yes('the take plays back on exact blocks', t.playbackOk);
   k.eq('no clicks when only playing', t.clicksAfter, 0);
   k.eq('loop recording, no count-in', l.settings, [4, 0]);

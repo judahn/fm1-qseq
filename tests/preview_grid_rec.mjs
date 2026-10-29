@@ -5,9 +5,11 @@
 // clip plays on, launched, and the launch keys launch again. A FREE take
 // started while playing (launch quantize off: the next beat) ends at the bar
 // line after REC. REC on the clip now playing overdubs it from its next
-// pass, and PLAY ends that with playing going on. PLAY in a count-in calls
-// the take off and stops. Each take is one undo step, and undo takes a new
-// clip away with it. Saves docs/grid-rec-*.png.
+// pass, and PLAY ends that with playing going on. With SHIFT+SEL on REPLACE
+// (0.4.0), REC empties the clip first, keeping its length, and records into
+// it. PLAY in a count-in calls the take off and stops. Each take is one undo
+// step, and undo takes a new clip away with it, or gives a replaced clip
+// back. Saves docs/grid-rec-*.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
 
 export async function phaseGridRec(browser, root) {
@@ -51,8 +53,8 @@ export async function phaseGridRec(browser, root) {
     c.sim_song_capture(1);
     render(720);                                    // a bar more: the clip plays on
     a.replayed = r.heard().filter(h => h.track === 0 && h.velocity && pitches.includes(h.pitch)).length;
-    r.key(4);                                       // A3, track 3's key: a launch again (its empty cell stops it)
-    a.launchKey = waiting(2);
+    r.key(0);                                       // F3, track 1's key: a launch again
+    a.launchKey = waiting(0);
 
     // 2. FREE while playing, track 2 row 1, the launch quantize off: it starts
     // on the next beat, and REC late in its second bar ends it at that bar line.
@@ -90,6 +92,25 @@ export async function phaseGridRec(browser, root) {
     d.after = { state: state(), playing: info(7), notes: clipNotes(0, 0).length - had, length: info(39, 0, cell(0, 0)), from: from(0),
       undo: undos() - steps };
 
+    // 3b. REPLACE: SHIFT+SEL switches to it, and REC on track 1's clip,
+    // playing, empties it at once, keeping its length, then records into it
+    // from its next pass. SHIFT+SEL again: OVERDUB.
+    const p = o.replace = {};
+    r.held(B.FX, () => r.tap(B.SCL));
+    p.mode = info(29, 0, 3);
+    const steps3 = undos();
+    r.tap(B.REC);
+    p.emptied = { notes: clipNotes(0, 0).length, length: info(39, 0, cell(0, 0)), state: state() };
+    until(() => state() & 2);
+    render(30);
+    hold(14, 30);                                   // G4
+    render(10);
+    r.tap(B.PLAY);                                  // PLAY ends it, playing goes on
+    p.after = { state: state(), playing: info(7), pitches: clipNotes(0, 0).map(n => n.pitch), length: info(39, 0, cell(0, 0)),
+      from: from(0), undo: undos() - steps3 };
+    r.held(B.FX, () => r.tap(B.SCL));
+    p.back = info(29, 0, 3);
+
     // 4. From a stop again, track 3 row 1: PLAY in the count-in calls it off.
     const x = o.countIn = {};
     r.tap(B.PLAY);                                  // stop
@@ -101,9 +122,12 @@ export async function phaseGridRec(browser, root) {
     r.tap(B.PLAY);
     x.after = { state: state(), playing: info(7), length: info(39, 0, cell(2, 0)), undo: undos() - steps2 };
 
-    // 5. Undo takes the overdub back, then the FREE clip and the first clip whole.
+    // 5. Undo gives the replaced clip back, takes the overdub back, then the
+    // FREE clip and the first clip whole.
     r.turn(0, -2);
     const undo = () => { c.sim_control(0, B.HOME, 1); r.tap(B.SAVE); c.sim_control(0, B.HOME, 0); };
+    undo();
+    o.undoReplace = clipNotes(0, 0).length;
     undo();
     o.undoOverdub = clipNotes(0, 0).length;
     undo();
@@ -116,7 +140,7 @@ export async function phaseGridRec(browser, root) {
   savePng(root, 'grid-rec-armed', out.fromStop, 'armedPng');
   savePng(root, 'grid-rec-recording', out.fromStop, 'recordingPng');
   await page.close();
-  const t = checker('grid rec'), a = out.fromStop, f = out.free, d = out.overdub, x = out.countIn;
+  const t = checker('grid rec'), a = out.fromStop, f = out.free, d = out.overdub, p = out.replace, x = out.countIn;
   t.eq('the grid', out.grid, 27);
   t.eq('K2 is the REC length, here 1 bar', out.lengthKnob, 'REC LEN 1 BAR');
   t.eq('REC from a stop: armed (a new clip), cell 1, playing, the grid stays', a.armed, [1 | 8, 0, 1, 27]);
@@ -127,7 +151,7 @@ export async function phaseGridRec(browser, root) {
   t.eq('after: no take, a 1-bar clip with the 2 notes, playing on, launched on track 1, one undo step', a.after,
     { state: 0, length: 1920, notes: 2, playing: 1, from: 0, undo: 1 });
   t.atLeast('the clip plays on: its notes again', a.replayed, 2);
-  t.eq('and the track keys launch again', a.launchKey, 0xfe);
+  t.eq('and the track keys launch again', a.launchKey, 0);
   t.eq('FREE with the launch quantize off', f.knobs, ['REC LEN FREE', 'LAUNCH Q OFF']);
   t.eq('armed, a new FREE clip', f.armed, 1 | 4 | 8);
   t.eq('recording, no end yet', f.recording, 2 | 4 | 8);
@@ -139,8 +163,15 @@ export async function phaseGridRec(browser, root) {
   t.eq('then recording into it (no new clip)', d.recording, 2);
   t.eq('PLAY ends it: playing goes on, one note more, its length kept, still launched, one undo step', d.after,
     { state: 0, playing: 1, notes: 1, length: 1920, from: 0, undo: 1 });
+  t.eq('SHIFT+SEL: REPLACE', p.mode, 1);
+  t.eq('REC on the clip in REPLACE: emptied at once, its length kept, armed for its next pass', p.emptied,
+    { notes: 0, length: 1920, state: 1 });
+  t.eq('PLAY ends it: playing on, only the new note in it, its length kept, still launched, one undo step', p.after,
+    { state: 0, playing: 1, pitches: [67], length: 1920, from: 0, undo: 1 });
+  t.eq('SHIFT+SEL again: OVERDUB', p.back, 2);
   t.eq('REC from a stop (FREE): armed, playing the count-in', x.armed, [1 | 4 | 8, 1]);
   t.eq('PLAY in the count-in: called off, stopped, no clip, no undo step', x.after, { state: 0, playing: 0, length: 0, undo: 0 });
+  t.eq('undo: the replaced clip comes back whole', out.undoReplace, 3);
   t.eq('undo: the overdub\'s note goes', out.undoOverdub, 2);
   t.eq('undo: the FREE clip goes', out.undoFree, 0);
   t.eq('undo: the first clip goes, notes and all', out.undoFirst, [0, 0]);

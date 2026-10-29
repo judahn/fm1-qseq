@@ -8,7 +8,9 @@
  * held it is still SHIFT. ARP there is the stock arpeggiator's: the stock
  * code opens its settings on a hold, a tap turns it on or off for the
  * track, and HOME on its settings comes back. PLAY during a take ends the
- * recording and playing goes on. */
+ * recording and playing goes on. REC on the song view, the automation view
+ * and the grid tells a tap from a hold (0.4.0): a tap records, a hold opens
+ * the record settings, and SHIFT+REC is step entry. */
 static uint8_t song_save_down, song_fx_from, song_fx_used, song_arp_from, song_arp_back;
 static uint32_t song_fx_ms;
 static int release_keys(void);
@@ -77,4 +79,35 @@ static void song_play_ends_take(uint32_t *pressed)
     *pressed &= ~BUTTON(PLAY);
     song_perf_end();
     song_port_record_end(1);
+}
+/* What a tap of REC (step 0) or SHIFT+REC (step 1) does on a page (0.4.0).
+ * The song view and the automation view: stopped, a take in the song's
+ * live mode with its count-in, or step entry at the playhead (in the open
+ * clip, with one in the editor). Playing, REC arms an open clip's next pass
+ * and otherwise says to stop first, and step entry waits for a stop too.
+ * The grid has its own (grid_rec_go). */
+static void song_rec_go(unsigned from, unsigned step, uint32_t now)
+{
+    struct song *s = song_port_song();
+    unsigned playing = song_port_player()->playing;
+    notice = NULL;
+    notice_until = now + 2000U;
+    if (from == SONG_GRID) grid_rec_go(step, now);
+    else if (step && playing) notice = "STOP FIRST FOR STEP ENTRY";
+    else if (step) song_step_enter();
+    else if (playing) notice = s->open && !song_port_record_clip(0) ? "REC FROM THE CLIP'S NEXT PASS" : "STOP FIRST TO RECORD";
+    else if (song_port_record(s->rec_mode, track)) notice = "STOP FIRST";
+}
+/* REC down with nothing to end (song_rec_down): let go within 600 ms it is
+ * a tap, acted on as it comes up, and held it opens the record settings.
+ * Leaving the page meanwhile drops it. 1 when the settings opened. */
+static int song_rec_held(const struct fm1_controls *c, uint32_t now)
+{
+    unsigned from = song_rec_from, held = (c->buttons & BUTTON(REC)) != 0;
+    if (!from || (held && now - song_rec_ms < 600U)) return 0;
+    song_rec_from = 0;
+    if (page != from) return 0;
+    if (held) { song_rec_open(from); return 1; }
+    song_rec_go(from, 0, now);
+    return 0;
 }

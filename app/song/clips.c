@@ -98,10 +98,15 @@ SONG_SMALL static void empty(struct song *s, unsigned cell)
     unsigned part = song_owner(s, song_cell_part(cell));
     while (s->count[part]) (void)song_remove(s, part, s->count[part] - 1U);
 }
-SONG_SMALL int song_clip_delete(struct song *s, unsigned cell)
+SONG_SMALL int song_clip_empty(struct song *s, unsigned cell)
 {
     if (cell >= SONG_CELLS || !s->clip_length[cell]) return -1;
     empty(s, cell);
+    return 0;
+}
+SONG_SMALL int song_clip_delete(struct song *s, unsigned cell)
+{
+    if (song_clip_empty(s, cell)) return -1;
     song_clip_resize(s, cell, 0);
     return 0;
 }

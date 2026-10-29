@@ -195,6 +195,7 @@ SONG_SMALL void song_player_init(struct song_player *p, struct song *s, const st
     p->touch_track = 0xff;
     memset(p->program, 0xff, sizeof p->program);
     memset(p->from, SONG_FROM_SONG, sizeof p->from);
+    p->home = SONG_FROM_SONG;
     memset(p->waiting, SONG_FROM_NONE, sizeof p->waiting);
     memset(p->blk, SONG_FROM_NONE, sizeof p->blk);
 #endif
@@ -213,7 +214,7 @@ SONG_SMALL void song_player_start(struct song_player *p, uint64_t frame)
     p->shift = s->open ? p->playhead : 0;
     p->edit_base = from;
     p->jumping = 0;
-    if (p->perf) p->perf = 2; /* PLAY starts an armed performance take */
+    if (p->perf) take_begins(p, from); /* PLAY starts an armed performance take */
     relocate(p, from, 0, 0);
     if (s->open) refind(p, song_editing(s), from + p->shift);
     p->frame = frame;
@@ -244,7 +245,7 @@ SONG_SMALL void song_player_stop(struct song_player *p)
     p->playing = p->jumping = 0;
 #if SONG_UI
     memset(p->hits, 0, sizeof p->hits);
-    memset(p->from, SONG_FROM_SONG, sizeof p->from); /* every track back to the song */
+    memset(p->from, p->home, sizeof p->from); /* every track back to the song, or stopped in the grid */
     memset(p->waiting, SONG_FROM_NONE, sizeof p->waiting);
     memset(p->base, 0, sizeof p->base);
 #endif

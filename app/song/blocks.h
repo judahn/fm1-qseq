@@ -31,11 +31,15 @@ void song_blocks_join(struct song *s, unsigned tracks);
 int song_job_expand(struct song *s, const struct song_range *r);
 /* Recording a performance from the player's log of launches (player.h):
  * each becomes a block from its launch to the track's next launch, stop or
- * return to the song, a stop as a stop block. `row` is the block each track
- * has going. Begin arms the player, drain writes what the log holds, and
- * end closes every block where playing got to and grows the song to it. */
+ * return to the song, a stop as a stop block. What a track played as the
+ * take began is a block from there too (0.4.0): in the grid every track
+ * plays a clip or is silent, so the song gets what was heard over the
+ * take, silence as stop blocks. A track on the song is left alone. `row`
+ * is the block each track has going. Begin arms the player, drain writes
+ * what the log holds, and end closes every block where playing got to and
+ * grows the song to it. */
 struct song_player;
-struct song_take { uint32_t from[SONG_TRACKS]; uint8_t row[SONG_TRACKS]; };
+struct song_take { uint32_t from[SONG_TRACKS]; uint8_t row[SONG_TRACKS], begun; };
 void song_take_begin(struct song_take *k, struct song_player *p);
 void song_take_drain(struct song_take *k, struct song_player *p);
 void song_take_end(struct song_take *k, struct song_player *p);

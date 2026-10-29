@@ -55,9 +55,11 @@ struct song_player {
      * the grid, SONG_FROM_SONG or SONG_FROM_STOP, a launch waiting for its
      * clock, and where the clip's pass began. Those are transport clocks:
      * the song clock plus `shift`, running on through loops and jumps, so
-     * clips keep their phase. A clip's notes are timed on the transport. */
+     * clips keep their phase. A clip's notes are timed on the transport.
+     * `home` is what every track plays when it isn't launched (0.4.0): the
+     * song in the song view, nothing in the grid (song_player_view). */
     uint32_t shift, base[SONG_TRACKS], launch_at[SONG_TRACKS];
-    uint8_t from[SONG_TRACKS], waiting[SONG_TRACKS];
+    uint8_t from[SONG_TRACKS], waiting[SONG_TRACKS], home;
     /* A track on the song inside a clip block (blocks.h) plays that clip,
      * row in blk (SONG_FROM_STOP for a stop, SONG_FROM_NONE outside one),
      * from base, a song clock here, until blk_end. blk_next is the track's
@@ -73,9 +75,12 @@ struct song_player {
     uint32_t edit_base, song_at;
     /* Recording a performance (design 8f): perf is 1 while armed and 2 once
      * the take runs, when the song's loop and end are ignored. Every launch
-     * that takes effect meanwhile is logged, at its song clock. */
+     * that takes effect meanwhile is logged, at its song clock, and what
+     * each track played as the take began is kept in `began`, from song
+     * clock began_at (0.4.0). */
     struct song_launch { uint32_t clock; uint8_t track, to; } log[16];
-    uint8_t perf, log_in, log_out;
+    uint32_t began_at;
+    uint8_t perf, log_in, log_out, began[SONG_TRACKS];
 #endif
 };
 #if SONG_UI
@@ -116,8 +121,16 @@ int song_player_bake(const struct song_player *live, struct song *s, unsigned tr
  * stopped, at the song's launch quantize from where playing has reached,
  * exactly on that clock. Stopped, it takes over as playing starts. A track
  * playing a clip or stopped stays that way through loops and jumps, until
- * it is launched again or playing stops, which hands every track back. */
+ * it is launched again or playing stops, which hands every track back to
+ * `home`. */
 void song_player_launch(struct song_player *p, unsigned track, unsigned to);
+/* Playback follows the view (0.4.0). The song view (grid 0) plays only the
+ * song: every track goes back to it. The grid (1) plays only launched
+ * clips: every track on the song stops, unless a clip's launch waits for
+ * it, and a return to the song still waiting is called off. Playing, that
+ * happens at the next launch point, and stopped, at once. In the grid the
+ * transport goes round at the song's end instead of stopping. */
+void song_player_view(struct song_player *p, unsigned grid);
 /* A launch for recording into the cell (0.3.0): the same, but with the
  * launch quantize off it waits for the next beat. */
 void song_player_launch_rec(struct song_player *p, unsigned track, unsigned row);

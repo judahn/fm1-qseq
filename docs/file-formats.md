@@ -39,7 +39,7 @@ uploading the file gives the device the same bytes back, so device to file to de
 | 1 + 4n | Time signatures, 1 to 32: bar (2, from 0), beats (1, 1 to 16), unit (1: 4, 8 or 16). The first at bar 0, then rising |
 | 1 + 12n | Markers, 0 to 16: clock (4), name (8, zero padded). In clock order |
 | 9 | Loop start (4), loop end (4), loop on (1). Start no later than end |
-| 10 | Settings: swing (0 to 50), swing grid, swing tracks, key root (0 to 11), scale (0 to 12), recording mode (0 to 4), count-in (0 to 2), metronome (0 to 2), input quantize (0 to 14), strength (0 to 100) |
+| 10 | Settings: swing (0 to 50), swing grid, swing tracks, key root (0 to 11), scale (0 to 12), recording mode (0 to 4: step, replace, overdub, punch, loop, where step, written before 0.4.0, loads as overdub), count-in (0 to 2), metronome (0 to 2), input quantize (0 to 14), strength (0 to 100) |
 | 32 | Knob controllers, 4 per track (0 is the engine's default) |
 | 1 + 5n | Glitch table entries in use: index (1, 1 to 31), attribute word (4) |
 | 16 | Humanize: timing per track (8), velocity per track (8) |

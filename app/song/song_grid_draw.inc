@@ -4,9 +4,10 @@
  * waits. A cell being recorded into (0.3.0) blinks red while armed and is
  * red while recording, with its progress through its length (a FREE take
  * with no end yet shows the bar it is in). The footer has the row, K2's
- * REC LENGTH, the cell's length and K4's launch quantize. */
+ * REC LENGTH, the cell's length and K4's launch quantize, and the bottom
+ * line, when idle, the song's REC mode (0.4.0). */
 
-enum { GRID_REC = 0xf800 }; /* the REC red of the header and the REC chooser */
+enum { GRID_REC = 0xf800 }; /* the REC red of the header and the record settings */
 static const char *const grid_rec_names[6] = {"1 BAR", "2 BARS", "4 BARS", "8 BARS", "16 BARS", "FREE"};
 static uint8_t grid_rec_len = 2; /* 4 bars, kept while the FM-1 is on */
 static unsigned grid_bars(void) { return grid_rec_len < 5 ? 1U << grid_rec_len : 0U; }
@@ -98,10 +99,10 @@ static void song_grid_draw(void)
         }
     }
     if (paint_rendering && paint_top + PAINT_ROWS <= 178) return;
-    if (cache->seq_cache != 0x9a1eU) { /* the function buttons */
-        cache->seq_cache = 0x9a1eU;
+    if (cache->seq_cache != 0x9a1eU + !grid_row) { /* the function buttons: REC on the SONG row records a performance */
+        cache->seq_cache = 0x9a1eU + !grid_row;
         paint_fill(0, 180, 240, 12, BACK);
-        text(8, 181, "SEL OPEN  ENV NAME  SHIFT+REC PERFORM", 1, DIM, BACK);
+        text(8, 181, grid_row ? "SEL OPEN  ENV NAME  SHIFT+REC STEP" : "REC PERFORM", 1, DIM, BACK);
     }
     if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
     char line[12], value[12] = "SONG";
@@ -125,8 +126,9 @@ static void song_grid_draw(void)
     song_notice_expire();
     const char *hint = notice ? notice : song_naming() ? SONG_NAMING_HINT : song_grid_rec_state() ? grid_hint()
         : song_perf_state() == 2 ? "REC: LAUNCHES BECOME BLOCKS" : song_perf_state() ? "REC ARMED: LAUNCH OR PLAY"
-        : (previous_buttons & BUTTON(FX)) ? "F3 COPY G3 CUT A3 PASTE E4 DELETE"
-        : grid_page ? "F3-F4 LAUNCH  G4-G5 ROWS 9-16" : "F3-F4 LAUNCH  G4-G5 ROWS 1-8";
-    song_hint(hint);
+        : (previous_buttons & BUTTON(FX)) ? "F3 COPY G3 CUT A3 PASTE E4 DELETE" : NULL;
+    if (hint) song_hint(hint);
+    else song_hint_mode(grid_row ? grid_page ? "F3-F4 LAUNCH  G4-G5 ROWS 9-16" : "F3-F4 LAUNCH  G4-G5 ROWS 1-8"
+                                 : grid_page ? "F3-F4 STOP  G4-G5 ROWS 9-16" : "F3-F4 STOP  G4-G5 ROWS 1-8");
 }
 

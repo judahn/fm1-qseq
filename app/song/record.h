@@ -16,7 +16,9 @@
  *            new set of raw timing.
  * A chord's notes (chord mode, design 8g) come with their lead, the clocks
  * after the chord's first note, so input quantize moves the chord as a
- * whole, by its first note, and a strum survives. */
+ * whole, by its first note, and a strum survives. STEP is step entry
+ * (SHIFT+REC), which a song never keeps as its mode (0.4.0): a song's
+ * rec_mode is one of the four live modes, OVERDUB to begin with. */
 enum { SONG_REC_STEP, SONG_REC_REPLACE, SONG_REC_OVERDUB, SONG_REC_PUNCH, SONG_REC_LOOP, SONG_REC_MODES };
 enum { SONG_TAKE = 512, SONG_REC_HELD = 16 };
 struct song_take_note { uint32_t raw, at; uint16_t length; uint8_t pitch, velocity; }; /* raw: the clock, the lead above bit 24 */

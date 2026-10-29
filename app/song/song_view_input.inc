@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* song-mode: the song view's input, included by song_panel.inc: transport,
- * snap and zoom, the loop, markers, the selection and arranging keys, and
- * the knobs recording parameters during a take. The automation view runs
- * its controls through here too (song_auto.inc). */
+ * REC (song_rec.inc), snap and zoom, the loop, markers, the selection and
+ * arranging keys, and the knobs recording parameters during a take. The
+ * automation view runs its controls through here too (song_auto.inc). */
 static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
 {
     struct song *s = song_port_song();
@@ -13,7 +13,8 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
         *pressed &= ~BUTTON(SAVE);
         song_save_press();
     }
-    if (song_port_recording() && (*pressed & BUTTON(REC))) { /* REC ends the take and playing goes on (PLAY: song_buttons.inc) */
+    if ((song_port_recording() || song_perf_state()) && (*pressed & BUTTON(REC))) { /* REC ends the take at once and playing goes on (PLAY: song_buttons.inc) */
+        song_perf_end();
         song_port_record_end(1);
         *pressed &= ~BUTTON(REC);
     }
@@ -22,11 +23,11 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
         else if (p->playing) song_port_stop();
         else song_start(now);
     }
-    if (*pressed & BUTTON(REC)) { /* the mode chooser */
+    if (*pressed & BUTTON(REC)) { /* SHIFT+REC: step entry. REC: a take as it comes up, or held, the settings (0.4.0) */
         *pressed &= ~BUTTON(REC);
-        if (!p->playing) { page = music_page = SONG_REC; cache->shown_page = ~0U; return 1; }
-        notice = clip && !song_port_record_clip(0) ? "REC FROM THE CLIP'S NEXT PASS" : "STOP FIRST TO RECORD";
-        notice_until = now + 2000U;
+        if (shift) song_rec_go(page, 1, now);
+        else song_rec_down(now);
+        if (page == SONG_STEP) return 1;
     }
     if (*pressed & BUTTON(ENV)) {
         if (!shift) s->loop_on ^= 1U;
@@ -43,7 +44,8 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
         cache->shown_page = ~0U;
         return 1;
     }
-    if ((*pressed & BUTTON(SCL)) && !clip) song_marker_key(now);
+    if ((*pressed & BUTTON(SCL)) && shift) song_rec_toggle(now); /* SHIFT+SEL: REPLACE or OVERDUB (0.4.0) */
+    else if ((*pressed & BUTTON(SCL)) && !clip) song_marker_key(now);
     if ((*pressed & BUTTON(EDIT)) && shift) { /* SHIFT+EDIT: the edit jobs (EDIT alone stays sound editing) */
         *pressed &= ~BUTTON(EDIT);
         song_job_open();

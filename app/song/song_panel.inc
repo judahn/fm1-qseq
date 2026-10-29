@@ -19,9 +19,9 @@ static void song_start(uint32_t now)
 #endif
 
 /* Panel input. Returns 1 when a song page consumed this poll. SEQ opens the
- * song view, and from there the clip grid (8f), and back. With a clip open in
- * the editor SEQ closes it and goes to the grid, and SHIFT+SEQ hands every
- * track back to the song. Without the song pages SEQ opens the diagnostics
+ * song view, and from there the clip grid (8f), and back, and playback
+ * follows (song_view_follow). With a clip open in the editor SEQ closes it
+ * and goes to the grid. Without the song pages SEQ opens the diagnostics
  * page and from there the stock step page. On the step page SEQ keeps its
  * stock long press (actions), and a tap comes back to the song. GLO on a
  * song page: a tap opens or closes the settings, a hold is still the stock
@@ -50,10 +50,8 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
     if ((*pressed & BUTTON(SEQ)) && !(c->buttons & BUTTON(HOME))) {
         if (page == STEPS) { song_seq_on_steps = 1; return 0; }
 #if SONG_UI
-        if (song_port_recorder()->active || song_grid_rec_state()) { notice = "STOP RECORDING FIRST"; notice_until = now + 1500U; return 1; }
-        if (page >= SONG && (c->buttons & BUTTON(FX))) { /* SHIFT+SEQ: every track back to the song */
-            for (unsigned t = 0; t < SONG_TRACKS; ++t) song_port_launch(t, SONG_FROM_SONG);
-            notice = "EVERY TRACK BACK TO THE SONG";
+        if (song_port_recorder()->active || song_grid_rec_state() || song_perf_state()) {
+            notice = "STOP RECORDING FIRST";
             notice_until = now + 1500U;
             return 1;
         }
@@ -133,6 +131,18 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
     return 0;
 #endif
 }
+#if SONG_UI
+/* Playback follows the view (0.4.0, song_player_view): the song view, the
+ * automation view and step entry play the song, and the grid and a clip
+ * opened from it play launched clips. The other pages keep what plays. */
+static void song_view_follow(void)
+{
+    struct song_player *p = song_port_player();
+    unsigned grid = page == SONG_GRID || song_port_song()->open;
+    if (page != SONG_GRID && page != SONG && page != SONG_AUTO && page != SONG_STEP) return;
+    if (grid != (p->home == SONG_FROM_STOP)) song_player_view(p, grid);
+}
+#endif
 /* Every poll's edits are one undo step. A take keeps its own step open.
  * The engine's tempo and the song's meet here (song_tempo.c): a change
  * made to the engine's since the last poll goes into the song first, and
@@ -149,7 +159,9 @@ static int song_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t 
     int result = song_save_release(c, now);
     result |= song_fx_tap(c, *pressed, key_down, now);
     result |= song_arp(c, pressed, now);
+    result |= song_rec_held(c, now);
     if (!result) result = song_input_pages(c, pressed, key_down, now);
+    song_view_follow();
     if (song_port_take_full()) { notice = "SONG FULL, RECORDING ENDED"; notice_until = now + 2500U; }
     if (page != song_open_page) song_ask_close(); /* leaving a page drops its question or naming */
     song_clip_follow(song_port_song()); /* an open clip's length is its loop end */

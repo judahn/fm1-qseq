@@ -75,9 +75,9 @@ export async function phase8(browser, root) {
     // 240 after it.
     tap(B.GLO); turn(3, -2); turn(4, 4); tap(B.GLO);
     const before = notes(0), noteKey = n => n[0] + ':' + n[1];
-    tap(B.REC);
+    r.long(B.REC);                                  // the record settings, on OVERDUB
     o.chooser = pageNow();
-    turn(2, 2); turn(3, -2); turn(4, 5);
+    turn(3, -2); turn(4, 5);
     tap(B.REC);
     o.recording = info(29, 0, 0);
     render(230);
@@ -93,7 +93,7 @@ export async function phase8(browser, root) {
     // the pointer, then A4 (minor) and D4 enter D minor after it. F5 enters
     // D minor again, once. With SHIFT held a root and a type key do neither.
     tap(B.GLO); turn(4, -1); tap(B.GLO);
-    tap(B.REC); turn(2, -2); tap(B.REC);
+    r.long(B.REC); turn(2, 3); tap(B.REC);          // the record settings on STEP, and REC: step entry
     o.stepPage = pageNow();
     const fresh = (before, from) => { /* the notes added since `before`, from clock `from` */
       const was = new Map();
@@ -160,12 +160,12 @@ export async function phase8(browser, root) {
   t.eq('and only that one ends', q.cut.offs, [62]);
   t.eq('F5, F#5, G5: the last chord, an octave down, an octave up', q.top, [[62, 65, 69], [50, 53, 57], [74, 77, 81]]);
   t.eq('smooth: C, F, G, C move by steps', q.smooth, [[60, 64, 67], [60, 65, 69], [59, 62, 67], [60, 64, 67]]);
-  t.eq('REC: the chooser', q.chooser, 23);
+  t.eq('REC held: the record settings', q.chooser, 23);
   t.eq('recording', q.recording, 1);
   t.eq('the chord recorded as three notes', q.recorded.pitches, [60, 64, 67]);
   t.yes('quantized as a whole: the first on the 16th grid, the strum kept', q.recorded.starts.length === 3 && q.recorded.starts[0] % 120 === 0 &&
     q.recorded.starts[1] - q.recorded.starts[0] === 120 && q.recorded.starts[2] - q.recorded.starts[0] === 240, q.recorded.starts);
-  t.eq('REC, REC in step mode: step entry', q.stepPage, 20);
+  t.eq('STEP picked on the record settings, REC: step entry', q.stepPage, 20);
   t.eq('six notes entered, two chords', q.step.added, 6);
   t.eq('C major then D minor, each strummed at its step', q.step.entered, [[0, 60], [60, 64], [120, 67],
     [q.step.second, 62], [q.step.second + 60, 65], [q.step.second + 120, 69]]);

@@ -134,11 +134,17 @@ SONG_SMALL static void close_block(struct song_take *k, struct song *s, unsigned
 SONG_SMALL void song_take_begin(struct song_take *k, struct song_player *p)
 {
     memset(k->row, SONG_FROM_NONE, sizeof k->row);
+    k->begun = 0;
     p->log_in = p->log_out = 0;
     p->perf = 1;
 }
 SONG_SMALL void song_take_drain(struct song_take *k, struct song_player *p)
 {
+    if (p->perf == 2 && !k->begun) { /* what each track played as the take began */
+        k->begun = 1;
+        for (unsigned t = 0; t < SONG_TRACKS; ++t)
+            if (p->began[t] != SONG_FROM_SONG) { k->from[t] = p->began_at; k->row[t] = p->began[t]; }
+    }
     for (; p->log_out != p->log_in; ++p->log_out) {
         const struct song_launch *l = &p->log[p->log_out % 16U];
         close_block(k, p->song, l->track, l->clock);

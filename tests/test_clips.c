@@ -1,12 +1,14 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* Clips (phase 7a), the model and saving: the grid's parts, a clip opened in
  * the editor and put back, undo across both, the cell copy, cut, paste and
- * delete, and song files with clips, version 1 included. The player's side
- * is in test_clips_play.c. */
+ * delete, a clip emptied for REPLACE (0.4.0), and song files with clips,
+ * version 1 included, and the recording mode in them (0.4.0). The player's
+ * side is in test_clips_play.c. */
 #include "harness.h"
 #include "clips.h"
 #include "glitch.h"
 #include "undo.h"
+#include "record.h"
 #include "song_file.h"
 #include "pool.h"
 
@@ -182,6 +184,42 @@ static void test_cells(void)
     song.undo = NULL;
 }
 
+/* REC in REPLACE on a cell with a clip (0.4.0): the clip is emptied first,
+ * notes past its end too, its length kept, in the take's undo step, so one
+ * undo gives back the clip as it was. An empty cell is refused. Open in the
+ * editor, where the clip's events sit on its track, it empties there. */
+static void test_empty(void)
+{
+    song_clear(&song, 8, 12000);
+    song_undo_init(&undo);
+    song.undo = &undo;
+    unsigned cell = song_cell(2, 4);
+    song_add_note(&song, 2, 0, 40, 100, 100);
+    song.clip_length[cell] = 3840;
+    clip_note(cell, 0, 60, 100);
+    clip_note(cell, 960, 62, 100);
+    clip_note(cell, 4000, 64, 100);
+    unsigned events = song.events;
+    song_undo_begin(&undo, &song);
+    CHECK_EQ(song_clip_empty(&song, cell), 0);
+    clip_note(cell, 480, 67, 100);                          /* the take's note, in the same step */
+    song_undo_end(&undo, &song);
+    CHECK(song.clip_length[cell] == 3840 && song.count[song_cell_part(cell)] == 1 && song.count[2] == 1);
+    CHECK_EQ(song.event[song.first[song_cell_part(cell)]].a, 67);
+    CHECK_EQ(song_undo_count(&undo, 0), 1);
+    CHECK_EQ(song_undo(&undo, &song), 0);
+    CHECK(song.count[song_cell_part(cell)] == 3 && song.events == events && song.clip_length[cell] == 3840);
+    CHECK_EQ(song.event[song.first[song_cell_part(cell)] + 2].a, 64);
+    CHECK_EQ(song_clip_empty(&song, song_cell(2, 5)), -1);
+    song_clip_open(&song, cell);
+    CHECK_EQ(song_clip_empty(&song, cell), 0);
+    CHECK(song.count[2] == 0 && song.count[song_cell_part(cell)] == 1); /* the parts traded while it's open */
+    song_clip_close(&song);
+    CHECK(song.count[song_cell_part(cell)] == 0 && song.count[2] == 1 && song.clip_length[cell] == 3840);
+    CHECK(consistent(&song));
+    song.undo = NULL;
+}
+
 /* Files: clips, row names and the launch quantize round trip byte for byte,
  * open or not, and a version 1 file loads with an empty grid. */
 enum { SECTORS = 16, BYTES = SECTORS * POOL_SECTOR };
@@ -300,13 +338,33 @@ static void test_fx_lane_file(void)
     CHECK_EQ(song_file_crc(&other, sounds, sizeof sounds), clean); /* as if they had never been there */
 }
 
+/* The recording mode (0.4.0): a new song's is OVERDUB, each live mode saves
+ * and loads as it was, and STEP, the default before 0.4.0, loads as
+ * OVERDUB, since a song's mode is now always a live one. */
+static void test_rec_mode_file(void)
+{
+    const uint8_t *data, *block;
+    uint32_t length, n;
+    song_clear(&song, 4, 12000);
+    CHECK_EQ(song.rec_mode, SONG_REC_OVERDUB);
+    for (unsigned m = SONG_REC_STEP; m < SONG_REC_MODES; ++m) {
+        song.rec_mode = (uint8_t)m;
+        data = write_song(&song, &length);
+        CHECK(data != NULL);
+        CHECK_EQ(song_file_read(&other, data, length, &block, &n), 0);
+        CHECK_EQ(other.rec_mode, m == SONG_REC_STEP ? SONG_REC_OVERDUB : m);
+    }
+}
+
 int main(void)
 {
     test_open_close();
     test_undo_parts();
     test_resize();
     test_cells();
+    test_empty();
     test_file();
     test_fx_lane_file();
+    test_rec_mode_file();
     return report("test_clips");
 }

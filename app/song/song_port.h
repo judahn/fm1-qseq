@@ -70,10 +70,12 @@ void song_port_clip_disarm(void);
 void song_port_record_end(unsigned keep_playing);
 void song_port_record_end_at(uint32_t clock); /* an open clip's take, ending at its end, playing on */
 /* Recording into a cell from the grid (song_grid_take.c, 0.3.0): REC on a
- * cell, `bars` long when empty (0 for FREE). REC again ends it, or sets a
- * FREE take's end at the next bar line. The take ending calls ended(), with
- * whether it began and its clip clock. State: 0 none, 1 armed, 2 recording,
- * plus 4 while FREE has no end and 8 for a new clip. */
+ * cell, `bars` long when empty (0 for FREE). A clip already there is
+ * overdubbed, or emptied first when the song's mode is REPLACE (0.4.0).
+ * REC again ends it, or sets a FREE take's end at the next bar line. The
+ * take ending calls ended(), with whether it began and its clip clock.
+ * State: 0 none, 1 armed, 2 recording, plus 4 while FREE has no end and 8
+ * for a new clip. */
 int song_grid_rec(unsigned cell, unsigned bars);
 void song_grid_rec_key(void);
 unsigned song_grid_rec_state(void);
@@ -93,11 +95,13 @@ void song_tempo_adopt(void);
 enum { SONG_BATTERY_EMPTY = 505, SONG_BATTERY_FULL = 622 };
 void song_port_battery(unsigned raw, uint32_t now);
 unsigned song_port_battery_shown(void);
-/* Recording a performance in the grid (song_perf.c): REC arms it, and the
- * take starts with the next launch or PLAY. Each launch writes its track a
- * block from its launch point to the track's next launch, stop or return
- * to the song. Stopping playback, or REC again, ends the take, one undo
- * step. State: 0 off, 1 armed, 2 taking. */
+/* Recording a performance in the grid (song_perf.c): REC on the SONG row
+ * arms it, and the take starts with the next launch or PLAY. Each launch
+ * writes its track a block from its launch point to the track's next
+ * launch, stop or return to the song, and what each track played as the
+ * take began is written from there (0.4.0), a silent track as a stop
+ * block. Stopping playback, or REC again, ends the take, one undo step.
+ * State: 0 off, 1 armed, 2 taking. */
 int song_perf_arm(void);
 void song_perf_end(void);
 void song_perf_poll(void);

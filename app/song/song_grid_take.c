@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* song-mode: recording into a cell from the grid (design 8f, 0.3.0), the
  * port's side. An empty cell becomes a clip of the REC length, or up to 16
- * bars when FREE, and a clip already there is overdubbed as loop recording.
+ * bars when FREE, and a clip already there is overdubbed as loop recording,
+ * or with the song's mode on REPLACE emptied first (0.4.0).
  * Playing, the cell launches on its track at the launch quantize (the next
  * beat with it off) and the take starts there, or from its next pass when
  * it plays already. From a stop, playing starts with the count-in. While
@@ -33,6 +34,10 @@ SONG_SMALL int song_grid_rec(unsigned cell, unsigned bars)
     grid.state = TAKING;
     song_undo_begin(song_port_undo(), s); /* before the clip opens, so the step keeps the song's loop */
     if (grid.fresh) s->clip_length[cell] = (uint16_t)(bars ? song_bar_clock(s, bars) : song_clip_max(s));
+    else if (s->rec_mode == SONG_REC_REPLACE) { /* emptied, keeping its length, in the take's step */
+        (void)song_clip_empty(s, cell);
+        if (p->from[t] == row) song_player_cut(p, t);
+    }
     if (!p->playing) { /* the count-in, then the cell from its top */
         if (!song_port_clip_open(cell) && !song_port_record(SONG_REC_LOOP, t)) return 0;
     } else if (p->from[t] == row && p->waiting[t] == SONG_FROM_NONE) { /* playing it: from its next pass */

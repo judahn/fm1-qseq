@@ -15,14 +15,14 @@ show which page or mode is active. The key lights work as described below.
 | Control | Name in this guide | In song mode |
 |---|---|---|
 | Buttons | FX | SHIFT on every song page while held. A tap opens the effects page from the song view, the grid, the automation view and the settings |
-| | SEL | Markers, delete, open a clip, depending on the page |
+| | SEL | Markers, delete, open a clip, depending on the page. SHIFT+SEL switches REC between REPLACE and OVERDUB |
 | | ENV, LFO | Loop and metronome, picking, depending on the page |
 | | EDIT | Sound editing, as in the stock firmware. SHIFT+EDIT opens the edit jobs |
 | | GLO | Song settings. A hold is still the stock mixer |
 | | HOME, SAVE | Leave to the stock overview, and the song list |
 | | ARP | The arpeggiator, as on the stock pages: a tap turns it on or off, a hold opens its settings. In step entry, the glitch layer |
 | | SEQ | The song view, and from there the clip grid |
-| | PLAY, REC | Transport and recording |
+| | PLAY, REC | Transport and recording. A tap of REC records, SHIFT+REC is step entry, and a hold opens the record settings |
 | | OCT- / OCT+ | Move the keys an octave, two at most each way. On the song list, the edit jobs and while naming they are NO and YES |
 | Encoders | SELECT | The track |
 | | ALGO (ALGORITHM) | Turns pages on pages that have them |
@@ -48,8 +48,8 @@ OCT- and OCT+ still move the keyboard's octave.
 | Song view | SEQ from any stock page, or from the grid | SEQ to the grid, HOME to the stock overview |
 | Clip grid | SEQ in the song view | SEQ back to the song view |
 | A clip in the editor | SEL on a grid cell | SEQ closes it and goes back to the grid |
-| REC chooser | REC in the song view, stopped | REC or PLAY starts, HOME leaves |
-| Step entry | REC, pick STEP with K1, then REC or PLAY | REC leaves, PLAY leaves and plays from the pointer's bar |
+| Record settings | Hold REC in the song view, the automation view or the grid | HOME goes back. REC or PLAY goes back and records there |
+| Step entry | SHIFT+REC in the song view, or on a row of the grid | REC leaves, PLAY leaves and plays from the pointer's bar |
 | Song settings | Tap GLO on a song page | Tap GLO again |
 | Device settings | SHIFT+GLO on a song page (or HOME+GLO anywhere) | HOME, or SEQ |
 | Automation view | SHIFT+LFO in the song view | SHIFT+LFO again |
@@ -68,7 +68,6 @@ These work on every song page:
 | HOME+SAVE | Undo, up to 64 steps (fewer when steps are large). HOME or SAVE can go down first, and the song list doesn't open |
 | SHIFT+HOME+SAVE | Redo |
 | HOME+PLAY | Stop everything and go to the stock overview |
-| SHIFT+SEQ | Every track back to the song (clips, see below) |
 | SELECT | The track |
 | OCT- / OCT+ | The keyboard's octave. NO and YES on the song list, the edit jobs and while naming |
 
@@ -78,13 +77,17 @@ stops, at most every 15 seconds, and the song list offers it after a restart.
 
 ## Song view
 
-Tracks are rows, bars run across. The loop region is shaded and is also the selection.
+Tracks are rows, bars run across. The loop region is shaded and is also the selection. Only the song plays
+here, on every track. Coming from the grid, every track goes back to the song at the next launch point, or at
+once when stopped or with the launch quantize off.
 
 | Control | Action |
 |---|---|
 | PLAY | Play and stop. During a take, end the recording and play on |
 | SHIFT+PLAY | Back to the loop start, or the song start when the loop is off |
-| REC | Stopped: the REC chooser. Playing with a clip open: record into the clip (below). During a take, end the recording and play on |
+| REC | A tap, stopped: a take in the song's mode (see Recording). Playing with a clip open: record into the clip (below). During a take, end the recording and play on |
+| SHIFT+REC | Step entry at the playhead, stopped |
+| Hold REC | The record settings |
 | K1 | Move the playhead one snap step. While playing, a jump waits for the next bar line |
 | SHIFT+K1 | Marker to marker |
 | K2 | Loop start |
@@ -94,6 +97,7 @@ Tracks are rows, bars run across. The loop region is shaded and is also the sele
 | ENV | Loop on or off |
 | SHIFT+ENV | Metronome: off, on, or only while recording |
 | SEL | Stopped: add a marker at the playhead, or remove the one already there. Playing: add one at the nearest snap step |
+| SHIFT+SEL | REC's mode: REPLACE or OVERDUB (from PUNCH or LOOP, OVERDUB) |
 | SHIFT+LFO | The automation view |
 | SHIFT+EDIT | The edit jobs |
 | Hold LFO, tap F3 to F4 | Add or remove tracks 1 to 8 from the selection |
@@ -127,17 +131,37 @@ song).
 
 ## Recording
 
-REC in the song view, while stopped, opens the chooser.
+REC works the same way in the song view, the automation view and the grid:
+
+- **A tap** (REC let go within 600 ms) records live, in the song's mode. It acts as REC comes up. In the song
+  view and the automation view, stopped, the take starts at once with its count-in. Playing, it says to stop
+  first, unless a clip is open in the editor (A clip in the editor). The grid records into the cell at the
+  cursor (Recording into a cell).
+- **SHIFT+REC** is step entry, stopped: at the playhead in the song view, in the clip with one open, and on a
+  row of the grid in the cell's clip.
+- **A hold** of 600 ms opens the record settings. HOME goes back to the page it was opened from.
+- A REC that ends something acts as it goes down: it ends a take, calls off a count-in, or ends or disarms a
+  performance.
+
+The song's mode is one of the four live modes, and a new song's is OVERDUB. SHIFT+SEL switches it between
+REPLACE and OVERDUB, and from PUNCH or LOOP to OVERDUB, in the song view, the clip editor and the grid, with a
+notice. Those show the mode in red at the right end of the bottom line while nothing else needs it. The mode is
+saved with the song. A song saved before 0.4.0 with STEP, the old default, loads in OVERDUB.
+
+The record settings:
 
 | Control | Setting |
 |---|---|
 | SELECT | The track to record |
-| K1 | Mode: STEP, REPLACE, OVERDUB, PUNCH (inside the loop only) or LOOP (each pass overdubs) |
+| K1 | REPLACE, OVERDUB, PUNCH (inside the loop only), LOOP (each pass overdubs) or STEP |
 | K2 | Count-in: off, 1 or 2 bars |
 | K3 | Input quantize: off, or 1/64 to 1/1, each with a triplet |
 | K4 | Quantize strength, 0 to 100% |
-| REC or PLAY | Go: step entry for STEP, otherwise a take with its count-in |
-| HOME | Leave |
+| REC or PLAY | Go back to the page and do what a tap of REC does there, or with STEP what SHIFT+REC does |
+| HOME | Go back to the page |
+
+A live mode picked with K1 becomes the song's mode, the one shown in red in the list. STEP never does: picking
+it and leaving keeps the last live mode. In the grid PUNCH and LOOP record as OVERDUB.
 
 During a take:
 
@@ -147,7 +171,7 @@ During a take:
 | K1 to K4 | Record their parameters on the take track. Which parameter each knob drives is on settings page 3 |
 
 Recorded notes are stored already quantized. The take keeps its raw timing, so turning K3 or K4 in the
-chooser afterwards (stopped) requantizes the last take. Undo takes the whole take back. If the song's memory
+record settings afterwards requantizes the last take. Undo takes the whole take back. If the song's memory
 fills during a take, the take ends there and says so.
 
 ## Step entry
@@ -232,7 +256,8 @@ SHIFT+LFO in the song view. The conductor row sits above track 1. Turning SELECT
 | SHIFT+SEL | Clear the shown lanes in the selection |
 | SHIFT+K1 | Move to the next or previous change on the row |
 
-Everything else works as in the song view. Controller lanes are recorded with K1 to K4 during a take.
+Everything else works as in the song view, REC included, but SHIFT+SEL clears lanes here, and the bottom
+line doesn't show REC's mode. Controller lanes are recorded with K1 to K4 during a take.
 Tempo runs 20 to 300 BPM. Time signatures run 1/4 to 8/4, 1/8 to 16/8 and 1/16 to 16/16.
 
 ## Glitch
@@ -256,7 +281,7 @@ On the song view, the grid, the automation view and the settings, ARP and FX wor
 | Hold FX | SHIFT, as everywhere on the song pages |
 
 A tap is a press and release within 600 ms with no other button, key or knob used meanwhile. In step entry,
-the song list, the edit jobs and the REC chooser FX is only SHIFT, and ARP opens no settings.
+the song list, the edit jobs and the record settings FX is only SHIFT, and ARP opens no settings.
 
 ## Edit jobs
 
@@ -274,10 +299,18 @@ and EXPAND CLIPS. With a clip open, the jobs that reach other tracks or the song
 ## Song list
 
 SAVE on any page, as SAVE comes up. A memory gauge shows songs, kits and free space, and the header shows the
-firmware's version, as the boot screen does. Under it are the battery's reading from its sensor, for example
-`BAT 580`, smoothed and updated at most once a second, and a bar. The bar is full at 622, a full battery
-read on a device with USB unplugged, and empty at 505, an estimate. K2 picks an action and YES does it. The line at the bottom always says what YES will do and to
+firmware's version, as the boot screen does, with the free flash at the right. Under the version are the
+battery's reading from its sensor, for example `BAT 580`, smoothed and updated at most once a second, and a
+bar. The bar is full at 622, a full battery read on a device with USB unplugged, and empty at 505, an
+estimate. K2 picks an action and YES does it. The line at the bottom always says what YES will do and to
 what, for example `OCT+ LOAD VERSE   OCT- BACK`.
+
+Right of the battery, under the free flash, the full build shows the free heap in KB after `HEAP`: the RAM
+left with the engines running, as the largest free block inside the heap, found by the diagnostics' memory
+probe. It is measured once each time the list opens, only while nothing plays, and every block the probe gets
+is freed at once. Opened while playing, it reads `HEAP -` until playing stops. A "+" means it reached the top
+of the probe's search, so it's that much or more, and `HEAP ?` that malloc gave a block outside the heap, so
+there's no reading. The browser preview has no heap and always shows `HEAP -`.
 
 | Control | Action |
 |---|---|
@@ -313,7 +346,10 @@ build a song from a factory sound set and upload it.
 ## Clip grid
 
 SEQ in the song view. Eight tracks across, 16 rows in two pages of 8, and a SONG row on top. A clip is one
-track's loop, a beat to 16 bars long. A track plays either the song or a clip, never both.
+track's loop, a beat to 16 bars long. Only launched clips play here: a track plays a clip or nothing, and the
+song can't be heard. Coming from the song view, every track playing the song stops at the next launch point,
+or at once when stopped or with the launch quantize off, and the transport runs on. In the grid the song goes
+round at its end instead of stopping, so the transport keeps running until PLAY.
 
 | Control | Action |
 |---|---|
@@ -321,15 +357,16 @@ track's loop, a beat to 16 bars long. A track plays either the song or a clip, n
 | K1 | The row cursor, the SONG row first |
 | K2 | REC LENGTH: 1, 2, 4, 8 or 16 bars, or FREE. It starts on 4 bars and keeps the last pick while the FM-1 is on |
 | K4 | Launch quantize: off, beat, bar, 2 bars or 4 bars |
-| F3 to F4 | Launch that track's cell in the cursor row. An empty cell stops the track. On the SONG row the track goes back to the song |
+| F3 to F4 | Launch that track's cell in the cursor row. An empty cell stops the track. On the SONG row they stop their track |
 | G4 to G5 | Launch rows 1 to 8 of the page on every track (a scene). Tracks with nothing in the row stop |
-| SHIFT+SEQ | Every track back to the song |
 | SEL | Open the clip at the cursor. An empty cell gets a new one-bar clip |
+| SHIFT+SEL | REC's mode: REPLACE or OVERDUB (Recording) |
 | ENV | Name the row: K1 picks the letter, K2 changes it, YES (OCT+) keeps the name, NO (OCT-) leaves the old one. SAVE does nothing while naming |
 | SHIFT + F3, G3, A3 or B3, E4 | Copy, cut, paste, paste, delete the cell |
-| PLAY | Play and stop. Launching while stopped starts playback. Stopping gives every track back to the song. During a take, end the recording and play on |
-| REC | Record into the cell at the cursor (below). REC again ends it |
-| SHIFT+REC | Record a performance (Clips in the song) |
+| PLAY | Play and stop. Launching a clip while stopped starts playback. Stopping leaves every track stopped. During a take, end the recording and play on |
+| REC | A tap: record into the cell at the cursor (below), and on the SONG row record a performance (Clips in the song). REC again ends it |
+| SHIFT+REC | Step entry in the cell's clip from its start, stopped. An empty cell first gets a clip of the REC length, 4 bars when it's FREE. On the SONG row it says step entry needs a row |
+| Hold REC | The record settings. HOME comes back to the grid |
 
 Launches wait for the launch quantize, counted on the song's bar lines. The loop's wrap and the song's end
 count as launch points too. A clip starts from its beginning and keeps its phase through song loops and
@@ -339,47 +376,59 @@ Pasting copied song bars into a cell turns them into a clip. Several copied trac
 
 ### Recording into a cell
 
-REC records into the cell at the cursor, on the cursor's track. The cell blinks red while it's armed and is red
-while it records, with how far it has got. The bottom line says what is happening.
+A tap of REC records into the cell at the cursor, on the cursor's track. The cell blinks red while it's armed
+and is red while it records, with how far it has got. The bottom line says what is happening.
 
 - **An empty cell** becomes a clip of the REC length. Playing, it launches on its track at the launch quantize
   (with the launch quantize off, at the next beat), and recording starts there. The track leaves the song or
-  its other clip, as with any launch. Stopped, REC starts playing with the REC chooser's count-in, and
-  recording starts after it. With a length set, recording ends by itself at the end of the clip, and the clip
+  its other clip, as with any launch. Stopped, REC starts playing with the record settings' count-in, and
+  recording starts after it. The other tracks play their launched clips meanwhile, so from a stop they're
+  silent. With a length set, recording ends by itself at the end of the clip, and the clip
   plays on, launched. With FREE, REC ends it at the next bar line (it can run to 16 bars), and the clip is
   that many bars long.
-- **A cell with a clip** is overdubbed as loop recording, from its next pass (from its first if it launches for
-  the take), until REC or PLAY.
+- **A cell with a clip** follows the song's mode. In OVERDUB, PUNCH or LOOP it is overdubbed as loop
+  recording, from its next pass (from its first if it launches for the take), until REC or PLAY. In REPLACE
+  the clip is emptied as REC is tapped, keeping its length, and then recorded into the same way. The
+  emptying is part of the take's undo step, so undo brings the old clip back, even when the take was called
+  off.
 - While a cell is armed or recording, the keys play its track (at the keyboard's octave, with chord mode when
   the track has it) and go into the take, instead of launching. OCT- and OCT+ move the octave. SELECT stays on
   the track, and the SHIFT keys, SEL and ENV wait. The keys launch again when the take ends.
 - PLAY or REC ends the take, and playing goes on. In the count-in, before anything is recorded, PLAY or REC
   calls it off, stops, and an empty cell stays empty.
 
-The REC chooser's input quantize applies, and the metronome when it is set to play while recording. The take,
-and a new clip with it, is one undo step. SEQ waits until the take is over.
+The record settings' input quantize applies, and the metronome when it is set to play while recording. The
+take, and a new clip with it, is one undo step. SEQ waits until the take is over.
 
 ### A clip in the editor
 
 SEL on a cell opens the clip in the song view's editor, looped to its own length. K3, labelled CLIP END,
-sets that length. Step entry, recording, automation, glitch and the jobs that stay inside the track all work
-on the clip. SELECT stays on the clip's track, and the markers are hidden. SEQ closes it.
+sets that length. Step entry (SHIFT+REC), recording, automation, glitch and the jobs that stay inside the
+track all work on the clip. SELECT stays on the clip's track, and the markers are hidden. SEQ closes it and
+goes back to the grid. SHIFT+REC on a row of the grid opens the cell's clip straight into step entry.
 
-The song keeps playing while a clip is open, so a part can be written against the other tracks. REC while
-playing records into the clip as loop recording from its next pass, and the rest plays on. REC or PLAY ends the
-recording and playing goes on, and PLAY again stops. Recording from a stop works as in the song view.
+The open clip plays with the grid's other launched clips while it is open, not with the song, so a part can
+be written against them. REC while playing records into the clip as loop recording from its next pass, and
+the rest plays on. REC or PLAY ends the recording and playing goes on, and PLAY again stops. Recording from a
+stop works as in the song view.
 
 ## Clips in the song
 
 A block in a track's row plays a clip from the grid: "clip 3 from bar 9 to bar 17". Inside a block the clip
 loops from the block's start and the track's own notes stay quiet. A stop block keeps the track silent. In
-the song view blocks show as shaded bars with the clip's row number, and a stop shows an X. A block ends at
-its length or where the next one on its track starts. Editing a clip changes it everywhere it's used.
+the song view a block shows in the track's color with the clip's row number in black, as the grid's cells
+do, and the clip's notes on it. The track's own notes aren't drawn inside a block, since they don't play
+there. A stop shows dark with an X. A block ends at its length or where the next one on its track starts.
+Editing a clip changes it everywhere it's used.
 
-**Recording a performance.** In the grid, SHIFT+REC arms it. The take starts with the next launch, or with PLAY.
-Each launch writes a block for its track from the launch point to that track's next launch, stop or return
-to the song. Tracks left on the song are untouched. The song's loop is ignored and the song grows to hold
-the take. REC, PLAY or stopping ends it, PLAY with playing going on, and the whole take is one undo step.
+**Recording a performance.** In the grid, a tap of REC on the SONG row arms it. The take starts with the next
+launch, or with PLAY. The song gets what was heard over the take. Each launch writes a block for its track
+from the launch point to that track's next launch or stop. A track that was silent gets a stop block, and a
+track playing a clip as the take starts gets a block of that clip from there. A block plays its clip from the
+top, so a clip that was partway through a pass as the take started plays from its top there instead. Played
+back, the song sounds like the performance. The song's loop is
+ignored and the song grows to hold the take. REC, PLAY or stopping ends it, PLAY with playing going on, and
+the whole take is one undo step. SEQ waits while a performance is armed or running.
 
 **By hand.** Copy a cell in the grid (SHIFT+F3), go to the song view, and paste with SHIFT+A3 or SHIFT+B3. The
 block lands at the playhead, the clip's length long, and becomes the selection. SHIFT+C4 (Duplicate) then

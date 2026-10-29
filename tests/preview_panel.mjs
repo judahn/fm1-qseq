@@ -8,7 +8,9 @@
 // This fork's release (the probe, and CHANGELOG.md's latest) is on the boot
 // screen between the bars and M-VAVE, the same line heads the song list, and
 // the page's version badge carries it. Under it on the list, the battery:
-// the simulator's 900 as BAT 900, and its bar. The mix page has a tile a
+// the simulator's 900 as BAT 900, and its bar, and right of it the free
+// heap, a dash in the browser, which has no heap (0.4.0). A held REC opens
+// the record settings, and HOME there goes back. The mix page has a tile a
 // track, with its MUTE and SOLO rows. Saves docs/panel-boot.png,
 // docs/panel-song-list.png and docs/panel-mix.png.
 import fs from 'node:fs';
@@ -67,9 +69,13 @@ export async function phasePanel(browser, root) {
     r.tap(B.GLO); look('song settings'); r.tap(B.GLO); r.render(8);
     r.tap(B.PLAY); r.render(8);
     o.wakeStopped = r.info(51);
-    r.tap(B.REC); look('recording chooser'); r.tap(B.HOME); r.render(8);
+    r.long(B.REC); look('record settings'); r.tap(B.HOME); r.render(8);  // REC held (0.4.0)
+    o.recBack = r.page();
     r.held(B.FX, () => r.tap(B.SAVE)); look('song list');
     const list = r.pixels();
+    /* Right of the battery, the free heap: the browser has none, so a dash. */
+    o.heapBox = drawn(Array.from(list, (v, i) => (i % 240 >= 150 && (i / 240 | 0) >= 13 && (i / 240 | 0) < 25 ? v : 0)), 13, 25);
+    o.heapDash = [15, 16, 17, 18, 19, 20, 21].map(y => [226, 227, 228, 229, 230, 231].map(x => (list[y * 240 + x] ? 1 : 0)).join('')).join('/');
     o.sameLine = mask(list, 76, 5) === mask(boot, left, 194);
     o.battery = r.info(55);
     const box = { left: 240, right: -1, top: 240, bottom: -1 };   /* what is drawn left of the bar, under the release */
@@ -109,7 +115,11 @@ export async function phasePanel(browser, root) {
   t.eq('the mix page: a tile a track, its MUTE row lit on track 2 and its SOLO row on track 3', q.mixTiles,
     ['00', '10', '01', '00', '00', '00', '00', '00']);
   t.eq('the song pages were reached', [q.pages['song view'], q.pages['clip grid'], q.pages['song settings'],
-    q.pages['recording chooser'], q.pages['song list']], [19, 27, 21, 23, 25]);
+    q.pages['record settings'], q.pages['song list']], [19, 27, 21, 23, 25]);
+  t.eq('HOME on the record settings goes back to the song view', q.recBack, 19);
+  t.eq('the song list: HEAP and a dash right of the battery, 6 letters to the right edge, since the browser has no heap',
+    q.heapBox, { left: 232 - 6 * 6, right: 232 - 2, top: 15, bottom: 21 });
+  t.eq('the dash', q.heapDash, '000000/000000/000000/111110/000000/000000/000000');
   t.eq('the wake runs while the song plays', q.wakePlaying, 1);
   t.eq('and stops with it', q.wakeStopped, 0);
   t.yes('the song played through the page changes', q.playingThrough);

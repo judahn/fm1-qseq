@@ -1,8 +1,35 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* song-mode: REC's mode chooser. REC in the song view opens it, and REC or
- * PLAY goes: step entry, or a real-time take with its count-in. K1 picks
- * the mode, K2 the count-in, K3 input quantize and K4 its strength. Turning
- * K3 or K4 after a take requantizes that take from its raw timing. */
+/* song-mode: the record settings (0.4.0, REC's mode chooser before). A
+ * hold of REC on the song view, the automation view or the grid opens it,
+ * HOME goes back there, and REC or PLAY goes back and does what a tap of
+ * REC does there, or SHIFT+REC with STEP picked. K1 picks from REPLACE,
+ * OVERDUB, PUNCH, LOOP and STEP. A live mode becomes the song's, and STEP
+ * never does, so picking STEP and leaving keeps the last live mode. K2
+ * sets the count-in, K3 input quantize and K4 its strength, and turning K3
+ * or K4 after a take requantizes that take from its raw timing. REC
+ * itself is timed here too: a tap, let go within 600 ms, acts as it comes
+ * up (song_buttons.inc), and SHIFT+SEL switches the live mode between
+ * REPLACE and OVERDUB. */
+static uint8_t song_rec_from, song_rec_back, song_rec_pick; /* REC down on a page, the page to go back to, K1's pick */
+static uint32_t song_rec_ms;
+static void song_rec_go(unsigned from, unsigned step, uint32_t now); /* song_buttons.inc */
+/* The list's order: the live modes, then STEP (record.h counts STEP first). */
+static unsigned song_rec_listed(unsigned pick) { return (pick + 1U) % SONG_REC_MODES; }
+static void song_rec_down(uint32_t now) { song_rec_from = (uint8_t)page; song_rec_ms = now; }
+static void song_rec_open(unsigned from)
+{
+    song_rec_back = (uint8_t)from;
+    song_rec_pick = (uint8_t)((song_port_song()->rec_mode + SONG_REC_MODES - 1U) % SONG_REC_MODES);
+    page = music_page = SONG_REC;
+    cache->shown_page = ~0U;
+}
+static void song_rec_toggle(uint32_t now) /* SHIFT+SEL: REPLACE and OVERDUB, and PUNCH or LOOP to OVERDUB */
+{
+    struct song *s = song_port_song();
+    s->rec_mode = s->rec_mode == SONG_REC_OVERDUB ? SONG_REC_REPLACE : SONG_REC_OVERDUB;
+    notice = s->rec_mode == SONG_REC_REPLACE ? "REC: REPLACE" : "REC: OVERDUB";
+    notice_until = now + 1500U;
+}
 
 static void song_quantize_name(unsigned q, char out[12])
 {
@@ -17,7 +44,7 @@ static void song_rec_draw(void)
     const struct song *s = song_port_song();
     const struct song_recorder *r = song_port_recorder();
     char line[40], part[12];
-    uint32_t sig = signature(track | (uint32_t)r->taken << 8, &s->rec_mode, 5);
+    uint32_t sig = signature(track | (uint32_t)r->taken << 8 | (uint32_t)song_rec_pick << 16, &s->rec_mode, 5);
     if (!paint_rendering || paint_top < 192) {
         if (sig != cache->middle_cache) {
             cache->middle_cache = sig;
@@ -26,15 +53,15 @@ static void song_rec_draw(void)
                 text(8, 7, "RECORD", 2, ACCENT, BACK);
                 text(184, 7, "T", 2, colors[track], BACK);
                 number(198, 7, (int)track + 1, 1, 2, colors[track], BACK);
-                for (unsigned m = 0; m < SONG_REC_MODES; ++m) {
-                    unsigned y = 36 + m * 20, on = m == s->rec_mode;
+                for (unsigned i = 0; i < SONG_REC_MODES; ++i) { /* the song's live mode stays red with STEP picked */
+                    unsigned y = 36 + i * 20, on = i == song_rec_pick, m = song_rec_listed(i);
                     paint_fill(6, y, 228, 17, on ? PANEL : BACK);
-                    text(12, y + 5, song_rec_modes[m], 1, on ? (m ? 0xf800 : AMBER) : DIM, on ? PANEL : BACK);
+                    text(12, y + 5, song_rec_modes[m], 1, m == s->rec_mode ? 0xf800 : on ? AMBER : DIM, on ? PANEL : BACK);
                 }
                 static const char *const explain[SONG_REC_MODES] = {
-                    "ENTER NOTES ONE STEP AT A TIME", "PLAYED NOTES REPLACE WHAT'S THERE",
-                    "PLAYED NOTES ARE ADDED", "RECORDS ONLY INSIDE THE LOOP", "THE LOOP REPEATS, EACH PASS ADDS"};
-                text(8, 140, explain[s->rec_mode], 1, TEXT, BACK);
+                    "PLAYED NOTES REPLACE WHAT'S THERE", "PLAYED NOTES ARE ADDED", "ONLY INSIDE THE LOOP, GRID: OVERDUB",
+                    "THE LOOP REPEATS, EACH PASS ADDS", "NOTES ONE STEP AT A TIME (SHIFT+REC)"};
+                text(8, 140, explain[song_rec_pick], 1, TEXT, BACK);
                 strcpy(line, "COUNT IN ");
                 if (s->count_in) { decimal(part, s->count_in, 1); strcat(line, part); strcat(line, s->count_in > 1 ? " BARS" : " BAR"); }
                 else strcat(line, "OFF");
@@ -54,29 +81,30 @@ static void song_rec_draw(void)
     song_quantize_name(s->quantize, quantize);
     decimal(strength, s->strength, 1);
     strcat(strength, "%");
-    knob(0, "MODE", song_rec_modes[s->rec_mode], colors[0]);
+    knob(0, "MODE", song_rec_modes[song_rec_listed(song_rec_pick)], colors[0]);
     knob(1, "COUNT IN", count, colors[1]);
     knob(2, "QUANTIZE", quantize, colors[2]);
     knob(3, "STRENGTH", strength, colors[3]);
-    song_hint("REC OR PLAY TO GO  HOME TO LEAVE");
+    song_hint("REC OR PLAY TO GO  HOME GOES BACK");
 }
 static int song_rec_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
 {
     (void)key_down;
     struct song *s = song_port_song();
     struct song_recorder *r = song_port_recorder();
-    if (*pressed & (BUTTON(PLAY) | BUTTON(REC))) {
-        *pressed &= ~(BUTTON(PLAY) | BUTTON(REC));
-        if (s->rec_mode == SONG_REC_STEP) { song_step_enter(); return 1; }
-        page = music_page = SONG;
+    if (*pressed & (BUTTON(PLAY) | BUTTON(REC) | BUTTON(HOME))) { /* back, and REC or PLAY goes */
+        unsigned go = (*pressed & (BUTTON(PLAY) | BUTTON(REC))) != 0;
+        *pressed &= ~(BUTTON(PLAY) | BUTTON(REC) | BUTTON(HOME));
+        page = music_page = song_rec_back;
         cache->shown_page = ~0U;
-        if (song_port_record(s->rec_mode, track)) { notice = "STOP FIRST"; notice_until = now + 1500U; }
+        if (go) song_rec_go(song_rec_back, song_rec_listed(song_rec_pick) == SONG_REC_STEP, now);
         return 1;
     }
     *pressed &= ~(BUTTON(FX) | BUTTON(ENV) | BUTTON(SCL) | BUTTON(LFO) | BUTTON(ARP));
-    if (*pressed & (BUTTON(HOME) | BUTTON(EDIT) | BUTTON(GLO) | BUTTON(SAVE))) return 0;
+    if (*pressed & (BUTTON(EDIT) | BUTTON(GLO) | BUTTON(SAVE))) return 0;
     select_track(c->encoders[0]);
-    s->rec_mode = (uint8_t)clamp(s->rec_mode + c->encoders[2], 0, SONG_REC_MODES - 1);
+    song_rec_pick = (uint8_t)clamp(song_rec_pick + c->encoders[2], 0, SONG_REC_MODES - 1);
+    if (song_rec_listed(song_rec_pick) != SONG_REC_STEP) s->rec_mode = (uint8_t)song_rec_listed(song_rec_pick);
     s->count_in = (uint8_t)clamp(s->count_in + c->encoders[3], 0, 2);
     unsigned quantize = s->quantize, strength = s->strength;
     s->quantize = (uint8_t)clamp(s->quantize + c->encoders[4], 0, 14);

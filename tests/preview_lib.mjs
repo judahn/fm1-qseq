@@ -22,6 +22,10 @@ function installRig() {
     r.tap = b => { r.c.sim_control(0, b, 1); r.c.sim_control(0, b, 0); };
     r.key = k => { r.c.sim_control(1, k, 1); r.c.sim_control(1, k, 0); };
     r.held = (b, fn) => { r.c.sim_control(0, b, 1); fn(); r.c.sim_control(0, b, 0); };
+    /* A button held past 600 ms of rendered time (215 blocks), then let go:
+     * REC's hold opens the record settings (0.4.0). */
+    r.long = b => { r.c.sim_control(0, b, 1); r.render(215); r.c.sim_control(0, b, 0); };
+    r.step = () => r.held(r.B.FX, () => r.tap(r.B.REC)); /* SHIFT+REC: step entry */
     r.turn = (encoder, delta) => r.c.sim_control(2, encoder, delta);
     r.render = n => { /* with `meter` on, the output's level is summed too */
       for (let i = 0; i < n; i++) {

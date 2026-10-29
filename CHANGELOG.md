@@ -2,6 +2,42 @@
 
 The version is `FM1_QY_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.4.0
+
+- A tap of REC records. Stopped in the song view or the automation view it starts a take in the song's mode,
+  with its count-in, and in the grid it records into the cell at the cursor. It acts as REC comes up. A REC that
+  ends a take, calls off a count-in or ends a performance still acts as it goes down.
+- SHIFT+REC is step entry: at the playhead in the song view, in the clip with one open in the editor, and in the
+  grid in the cell's clip from its start. An empty cell gets a clip of the REC length first, 4 bars when it's
+  FREE. Step entry still starts only while stopped. On the grid's SONG row it says it needs a row.
+- REC held for 600 ms opens the record settings (the REC chooser before) from the song view, the automation
+  view and the grid, and HOME goes back there. The list reads REPLACE, OVERDUB, PUNCH, LOOP, then STEP. A live
+  mode picked there becomes the song's. STEP never does: with it picked, REC or PLAY goes to step entry, and the
+  song keeps its live mode. With a live mode picked, REC or PLAY goes back and does what a tap of REC does
+  there.
+- New songs record in OVERDUB. A song saved with STEP, the old default, loads in OVERDUB.
+- SHIFT+SEL switches the mode between REPLACE and OVERDUB, and from PUNCH or LOOP to OVERDUB, in the song view,
+  the clip editor and the grid. The mode shows in red at the right end of the bottom line in the song view and
+  the grid.
+- In the grid REC on a clip follows the song's mode. REPLACE empties the clip first, keeping its length, in the
+  same undo step as the take, and the other modes overdub it. REC on the SONG row arms a performance, which
+  SHIFT+REC did before.
+- Playback follows the view. The song view, the automation view and step entry play only the song, and the grid
+  and a clip opened from it play only launched clips. Going to the grid stops every track playing the song at
+  the next launch point, the transport running on, and SEQ back to the song view sends every track back to the
+  song there. Stopped, or with LAUNCH Q off, it happens at once. SHIFT+SEQ is gone, since this is automatic.
+- On the grid's SONG row F3 to F4 stop their track, since the song can't be heard in the grid. G4 to G5 still
+  launch rows.
+- A performance writes what was heard over the take. Launched clips become blocks as before, and tracks that
+  were silent get stop blocks, so the song plays back as the performance sounded.
+- Clip blocks in the song view are drawn in the track's full color with the clip's number in black, as the
+  grid's cells are, and the clip's notes on them. The track's own notes, silent inside a block, aren't drawn
+  there.
+- In the full build the song list's header shows the free heap right of the battery: the largest free block
+  inside the heap, measured once each time the list opens and only while nothing plays. "+" means the top of
+  the probe's search, and "?" that there's no reading. The browser preview has no heap and shows a dash. The
+  free flash moved up a line to make room.
+
 ## 0.3.3
 
 - The mix page shows each track once: a tile a track, with a MUTE row and a SOLO row that light when they're on.

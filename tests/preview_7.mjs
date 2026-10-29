@@ -2,9 +2,11 @@
 // Phase 7a of the preview check: the clip grid through the panel. SEQ opens
 // it, SEL makes a clip and opens it in the song view's editor, step entry
 // fills it, K3 sets a second clip's length, a track key launches a clip
-// (starting playback), a scene key launches row 1 on every track at the next
-// bar line, checked against exact block arithmetic, then the SONG row and
-// SHIFT+SEQ hand the tracks back. Copy, paste, delete and undo on a cell, a
+// (starting playback) and only launched clips play in the grid (0.4.0), a
+// scene key launches row 1 on every track at the next bar line, checked
+// against exact block arithmetic, then the SONG row's key stops a track and
+// SEQ to the song view hands every track back to the song. Copy, paste,
+// delete and undo on a cell, a
 // row name (YES keeps it, NO leaves the old one), the launch quantize, and
 // the clips surviving a save and a load.
 // Saves docs/phase7-*.png.
@@ -36,7 +38,7 @@ export async function phase7(browser, root) {
     o.clipPage = pageNow();
     o.opened = info(42) & 255;
     o.newLength = info(39, 0, cell(0, 0));
-    tap(B.REC); tap(B.REC);
+    r.step();                                       // SHIFT+REC: step entry in the clip
     o.stepPage = pageNow();
     held(B.FX, () => key(4));                       // SHIFT+A3: quarters
     for (const k of [0, 4, 7, 11]) key(k);
@@ -50,7 +52,7 @@ export async function phase7(browser, root) {
     turn(0, 1);
     tap(B.SCL);
     turn(4, 1);                                     // CLIP END to bar 3
-    tap(B.REC); tap(B.REC);
+    r.step();
     held(B.FX, () => key(2));                       // SHIFT+G3: halves
     for (const k of [0, 7, 4, 11]) key(k);
     tap(B.REC);                                     // out of step entry, still in the clip
@@ -76,7 +78,7 @@ export async function phase7(browser, root) {
     for (let bar = 0; bar < 2; bar++) for (const n of o.clip1) want.push({ pitch: n.pitch, block: blockOf(start, at0 + bar * 1920 + n.clock) });
     const got = h.filter(x => x.track === 0 && x.velocity).slice(0, want.length);
     o.clipTiming = { want: want.length, ok: JSON.stringify(got.map(x => [x.pitch, x.block])) === JSON.stringify(want.map(x => [x.pitch, x.block])) };
-    o.songOnOthers = h.filter(x => x.track !== 0 && x.velocity).length > 0;
+    o.othersSilent = h.filter(x => x.track !== 0 && x.velocity).length;
 
     // 4. G4 launches row 1 everywhere at the next bar line: tracks 1 and 2
     // play their clips, the rest stop. The waiting keys blink meanwhile.
@@ -95,24 +97,26 @@ export async function phase7(browser, root) {
     o.launchBar = launchAt % 1920 === 0;
     const first1 = h.find(x => x.track === 1 && x.velocity && x.block >= bar - 2);
     o.track2OnTheBar = first1 && first1.block === bar && first1.pitch === o.clip2.notes[0].pitch;
-    o.stoppedAfter = h.filter(x => x.track >= 2 && x.velocity && x.block > bar).length;
-    o.offsAtBar = h.filter(x => x.track >= 2 && !x.velocity && x.block === bar).length;
+    o.stoppedAfter = h.filter(x => x.track >= 2 && x.velocity).length;
     o.clip2Repeats = h.filter(x => x.track === 1 && x.velocity && x.block >= bar).length;
     o.relaunched = h.some(x => x.track === 0 && x.velocity && x.block === bar && x.pitch === clipPitches[0]);
 
-    // 5. The SONG row's F3 hands track 1 back alone, then SHIFT+SEQ the rest.
+    // 5. The SONG row's F3 stops track 1 alone, since the grid plays no song.
+    // SEQ to the song view: every track goes back to the song at the bar.
     turn(2, -1);
     key(0);
     render(1500);
     o.afterSongRow = [0, 1].map(from);
-    held(B.FX, () => tap(B.SEQ));
-    o.allWaiting = [1, 2].map(waiting);
+    tap(B.SEQ);
+    o.seqPage = pageNow();
+    o.allWaiting = [0, 1, 2].map(waiting);
     render(1500);
-    o.afterShiftSeq = [0, 1, 2, 7].map(from);
+    o.afterSeq = [0, 1, 2, 7].map(from);
     o.songAgain = heard().filter(x => x.track === 5 && x.velocity && x.block > bar + 3000).length > 0;
     tap(B.PLAY);
     o.stopped = info(7);
     c.sim_song_capture(0);
+    tap(B.SEQ);                                     // the grid again
 
     // 6. Copy row 1's clip to row 2, delete it, undo. Name row 1. Launch quantize.
     turn(2, 1);
@@ -162,7 +166,7 @@ export async function phase7(browser, root) {
   t.eq('SEL opens the cell in the song view\'s editor', q.clipPage, 19);
   t.eq('the clip open is track 1, row 1', q.opened, 8);
   t.eq('an empty cell gets a new clip a bar long', q.newLength, 1920);
-  t.eq('REC, REC: step entry in the clip', q.stepPage, 20);
+  t.eq('SHIFT+REC: step entry in the clip', q.stepPage, 20);
   t.eq('SEQ closes the clip and goes back to the grid', q.backToGrid, 27);
   t.eq('no clip open after', q.closed, 0);
   t.eq('the four quarters are in the clip', q.clip1.map(n => n.clock), [0, 480, 960, 1440]);
@@ -174,19 +178,19 @@ export async function phase7(browser, root) {
   t.eq('track 1 plays its row 1 clip', q.from0, 0);
   t.yes('track 1\'s key lit, track 2\'s not', q.ledLit);
   t.yes('the clip plays from its start, bar after bar, on exact blocks', q.clipTiming.ok, q.clipTiming);
-  t.yes('the other tracks play the song', q.songOnOthers);
-  t.eq('G4: tracks 1 and 2 wait for row 1, the rest to stop', q.waiting, [0, 0, 0xfe, 0xfe]);
+  t.eq('in the grid the other tracks, with nothing launched, are silent', q.othersSilent, 0);
+  t.eq('G4: tracks 1 and 2 wait for row 1, the rest stay stopped', q.waiting, [0, 0, 0xfd, 0xfd]);
   t.yes('a waiting key blinks', q.blinked);
   t.eq('after the bar line: clips on tracks 1 and 2, the rest stopped', q.sources, [0, 0, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe]);
   t.yes('the scene launch waits for a bar line', q.launchBar);
   t.yes('track 2\'s clip starts exactly on the bar line', q.track2OnTheBar);
-  t.eq('no notes from the stopped tracks after it', q.stoppedAfter, 0);
-  t.over('the stopped tracks\' notes end on it', q.offsAtBar, 0);
+  t.eq('no notes from the stopped tracks at all', q.stoppedAfter, 0);
   t.atLeast('track 2\'s clip notes after the launch', q.clip2Repeats, 3);
   t.yes('track 1\'s clip launched again restarts on the bar line', q.relaunched);
-  t.eq('the SONG row\'s F3 hands track 1 back alone', q.afterSongRow, [0xff, 0]);
-  t.eq('SHIFT+SEQ: every track waits to go back', q.allWaiting, [0xff, 0xff]);
-  t.eq('after the bar line, every track on the song', q.afterShiftSeq, [0xff, 0xff, 0xff, 0xff]);
+  t.eq('the SONG row\'s F3 stops track 1 alone', q.afterSongRow, [0xfe, 0]);
+  t.eq('SEQ goes to the song view', q.seqPage, 19);
+  t.eq('there every track waits to go back to the song', q.allWaiting, [0xff, 0xff, 0xff]);
+  t.eq('after the bar line, every track on the song', q.afterSeq, [0xff, 0xff, 0xff, 0xff]);
   t.yes('the song plays again on a stopped track', q.songAgain);
   t.eq('PLAY stops', q.stopped, 0);
   t.eq('SHIFT+F3, then SHIFT+A3 on row 2: the clip copied there', q.pasted, [1920, 4]);

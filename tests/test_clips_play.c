@@ -2,8 +2,9 @@
 /* Clips (phase 7a) in the player: launches landing exactly on the launch
  * quantize, a clip keeping its phase across a song loop and a jump, clean
  * note-offs as a track changes source, swing and glitch on clip notes, a
- * clip open in the editor, and the song going round while clips play. The
- * model and saving are in test_clips.c. */
+ * clip open in the editor, the song going round while clips play, and
+ * playback following the view (0.4.0). The model and saving are in
+ * test_clips.c. */
 #include "harness.h"
 #include "clips.h"
 #include "glitch.h"
@@ -227,11 +228,71 @@ static void test_editing_and_end(void)
     CHECK(balanced());
 }
 
+/* Playback follows the view (0.4.0). Stopped, at once: every track stopped
+ * in the grid's view and on the song in the song view's, and stopping hands
+ * every track to the view's. Playing the song, the grid's view stops every
+ * track at the next bar line, except one whose clip's launch waits for it,
+ * and silence follows on the rest while the song goes round at its end.
+ * The song view's sends every track back to the song at the next bar line,
+ * where the song picks up, and with no clip left it stops at its end. */
+static void test_view(void)
+{
+    song_clear(&song, 2, 12000);
+    for (unsigned t = 0; t < 3; ++t)
+        for (unsigned beat = 0; beat < 8; ++beat) song_add_note(&song, t, beat * 480U, 40 + t, 100, 100);
+    unsigned cell = song_cell(1, 0), wrong = 0;
+    song.clip_length[cell] = 1920;
+    clip_note(cell, 0, 70, 100);
+    song_player_init(&player, &song, &listener);
+    CHECK_EQ(player.home, SONG_FROM_SONG);
+    song_player_view(&player, 1);
+    CHECK(player.home == SONG_FROM_STOP && player.from[0] == SONG_FROM_STOP && player.from[7] == SONG_FROM_STOP);
+    song_player_start(&player, 0);
+    song_player_stop(&player);
+    CHECK(player.from[0] == SONG_FROM_STOP && player.from[7] == SONG_FROM_STOP);
+    song_player_view(&player, 0);
+    CHECK(player.home == SONG_FROM_SONG && player.from[0] == SONG_FROM_SONG && player.waiting[0] == SONG_FROM_NONE);
+    /* The song plays, then the grid's view at 1000, track 2's clip launched just before. */
+    reset_capture();
+    song_player_start(&player, 0);
+    uint32_t block = run_to(0, 1000);
+    song_player_launch(&player, 1, 0);
+    song_player_view(&player, 1);
+    CHECK(player.waiting[0] == SONG_FROM_STOP && player.waiting[1] == 0 && player.waiting[2] == SONG_FROM_STOP);
+    CHECK(player.launch_at[0] == 1920 && player.launch_at[2] == 1920);
+    run_blocks(&player, block, block_at(5000) - block);    /* past the song's end at 3840 */
+    block = block_at(5000);
+    CHECK(player.playing);                                  /* the song went round */
+    CHECK(player.from[0] == SONG_FROM_STOP && player.from[1] == 0 && player.from[2] == SONG_FROM_STOP);
+    unsigned after = 0;
+    for (unsigned i = 0; i < heard_count; ++i) after += heard[i].velocity && heard[i].track != 1 && heard[i].block >= block_at(1920);
+    CHECK_EQ(after, 0);
+    CHECK_EQ(landed(0, 40, 0, 480, &wrong), 4);            /* the song's first bar, then nothing */
+    CHECK_EQ(landed(1, 70, 1920, 1920, &wrong), 2);        /* the clip at 1920 and 3840, on the transport */
+    CHECK_EQ(wrong, 0);
+    /* Back to the song view's: every track waits for the next bar line, the
+     * song's 1920 at transport 5760. */
+    reset_capture();
+    song_player_view(&player, 0);
+    CHECK(player.waiting[0] == SONG_FROM_SONG && player.waiting[1] == SONG_FROM_SONG && player.waiting[7] == SONG_FROM_SONG);
+    CHECK_EQ(player.launch_at[0], 5760);
+    run_blocks(&player, block, block_at(9000) - block);
+    CHECK(player.from[0] == SONG_FROM_SONG && player.from[1] == SONG_FROM_SONG);
+    CHECK_EQ(landed(0, 40, 5760, 480, &wrong), 4);         /* the song's second bar, from the bar line */
+    CHECK_EQ(landed(2, 42, 5760, 480, &wrong), 4);
+    CHECK_EQ(landed(1, 70, 0, 1920, &wrong), 0);           /* the clip gone */
+    CHECK_EQ(wrong, 0);
+    CHECK(!player.playing);                                 /* no clip left: the song's end stops it */
+    CHECK(player.from[0] == SONG_FROM_SONG);
+    CHECK(balanced());
+}
+
 int main(void)
 {
     test_launch_quantize();
     test_phase();
     test_switching();
     test_editing_and_end();
+    test_view();
     return report("test_clips_play");
 }

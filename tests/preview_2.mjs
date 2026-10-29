@@ -16,7 +16,7 @@ export async function phase2(browser, root) {
     r.tap(B.SEQ);
     r.turn(2, 12);                                 // K1: to the song end, bar 13
     const p0 = r.info(8);
-    r.tap(B.REC); r.tap(B.REC);                    // REC's chooser, then STEP: step entry on track 1
+    r.step();                                      // SHIFT+REC: step entry on track 1
     o.stepPage = r.page();
     o.pointer = r.info(17) - p0;
     // One bar: an 8th, three 8th triplets, a dotted 8th, a 16th tied to an
@@ -82,7 +82,7 @@ export async function phase2(browser, root) {
     // In step entry an out-of-scale key snaps up: C#4 enters D4. At the song
     // end, where the track is empty.
     r.turn(2, 20);
-    r.tap(B.REC); r.tap(B.REC);
+    r.step();
     const p1 = r.info(17), count = r.info(0, 0);
     r.key(8);
     o.snapped = { added: r.info(0, 0) - count, at: r.info(1, 0, count) - p1, pitch: r.info(2, 0, count) };
@@ -97,7 +97,7 @@ export async function phase2(browser, root) {
   savePng(root, 'phase2-settings', out, 'settingsPng');
   await page.close();
   const t = checker('2'), q = out;
-  t.eq('REC, REC opens step entry', q.stepPage, 20);
+  t.eq('SHIFT+REC opens step entry', q.stepPage, 20);
   t.eq('the pointer starts at the playhead', q.pointer, 0);
   t.eq('a chord goes in when every key is up (held, then released)', q.chord, [0, 3]);
   t.eq('the bar went in as entered', q.stored, q.want);
