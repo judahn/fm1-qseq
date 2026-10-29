@@ -62,6 +62,9 @@ int groove_tuning_capture(struct groove_tuning t[GROOVE_TRACKS]) { return groove
 int groove_tuning_apply(const struct groove_tuning t[GROOVE_TRACKS]) { (void)t; return 0; }
 void groove_clock_set(unsigned mode) { (void)mode; }
 void groove_edit_checkpoint(unsigned operation) { (void)operation; }
+void groove_edit_forget_history(void) {}
+void groove_get_view(unsigned track, unsigned step, struct groove_view *v) { (void)track; (void)step; memset(v, 0, sizeof *v); }
+void groove_mix_toggle(unsigned track, int solo) { (void)track; (void)solo; }
 int groove_factory_build(unsigned index, struct groove_project *p) { (void)index; (void)p; return -1; }
 void groove_midi_config_apply(const struct groove_midi_config *c) { (void)c; }
 void groove_midi_config_read(struct groove_midi_config *c) { memset(c, 0, sizeof *c); }

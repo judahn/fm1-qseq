@@ -275,8 +275,8 @@ and EXPAND CLIPS. With a clip open, the jobs that reach other tracks or the song
 
 SAVE on any page, as SAVE comes up. A memory gauge shows songs, kits and free space, and the header shows the
 firmware's version, as the boot screen does. Under it are the battery's reading from its sensor, for example
-`BAT 812`, smoothed and updated at most once a second, and a bar. The bar's empty and full readings are guesses
-until they are measured on a device. K2 picks an action and YES does it. The line at the bottom always says what YES will do and to
+`BAT 580`, smoothed and updated at most once a second, and a bar. The bar is full at 622, a full battery
+read on a device with USB unplugged, and empty at 505, an estimate. K2 picks an action and YES does it. The line at the bottom always says what YES will do and to
 what, for example `OCT+ LOAD VERSE   OCT- BACK`.
 
 | Control | Action |

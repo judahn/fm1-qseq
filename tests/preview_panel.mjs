@@ -44,6 +44,8 @@ export async function phasePanel(browser, root) {
     o.bootWant = { left, endsInLastCell: true, top: 194, bottom: 200 };
     o.bootPng = b.png();
     r.render(400);
+    const mix = r.state();                           // with no project to restore, nothing starts muted or soloed (0.3.2)
+    o.bootMix = [4, 5].map(k => Array.from({ length: 8 }, (_, t) => mix[8 + t * 20 + k]).join(''));
     look('overview');
     r.tap(B.EDIT); look('sound editing'); r.tap(B.EDIT); r.render(8);
     r.held(B.HOME, () => r.tap(B.GLO)); look('device settings'); r.tap(B.HOME); r.render(8);
@@ -65,7 +67,7 @@ export async function phasePanel(browser, root) {
       for (let x = 70; x < 122; x++)
         if (list[y * 240 + x]) { box.left = Math.min(box.left, x); box.right = Math.max(box.right, x); box.top = Math.min(box.top, y); box.bottom = Math.max(box.bottom, y); }
     o.batteryBox = box;
-    o.batteryBar = [124, 125, 141, 142, 147].map(x => list[18 * 240 + x] !== 0);
+    o.batteryBar = [124, 125, 135, 146, 147].map(x => list[18 * 240 + x] !== 0);
     o.listPng = r.png();
     r.tap(B.HOME); r.render(8);
     // The same steps at full speed and at the device's pace.
@@ -92,6 +94,7 @@ export async function phasePanel(browser, root) {
   const latest = (fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8').match(/^## (\S+)/m) || [])[1];
   const t = checker('panel'), q = out;
   for (const [name, lit] of Object.entries(q.lit)) t.yes(`every button lit: ${name} (page ${q.pages[name]})`, lit);
+  t.eq('at boot no track is muted or soloed (the engine\'s default mutes 6 and 7)', q.bootMix, ['00000000', '00000000']);
   t.eq('the song pages were reached', [q.pages['song view'], q.pages['clip grid'], q.pages['song settings'],
     q.pages['recording chooser'], q.pages['song list']], [19, 27, 21, 23, 25]);
   t.eq('the wake runs while the song plays', q.wakePlaying, 1);
@@ -103,7 +106,7 @@ export async function phasePanel(browser, root) {
   t.yes('the song list\'s header shows the same line', q.sameLine);
   t.eq('the battery: the simulator\'s reading, smoothed', q.battery, 900);
   t.eq('BAT 900 under the release, 7 letters wide', q.batteryBox, { left: 76, right: 76 + 6 * 7 - 2, top: 15, bottom: 21 });
-  t.eq('its bar: the frame, 17 of 22 lit from 700 to 950, the rest dark', q.batteryBar, [true, true, true, false, true]);
+  t.eq('its bar: the frame and all 22 lit, 900 being past full (622)', q.batteryBar, [true, true, true, true, true]);
   t.eq('the page\'s version badge: FM1 Open\'s release, then this one', q.badge, 'V14 · QY ' + latest);
   return { phase: 'panel', checks: t.list, out };
 }

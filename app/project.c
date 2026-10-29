@@ -814,8 +814,18 @@ void groove_project_poll(void)
         if (r == FM1_FLASH_BUSY) return;
         session_pending = 1; if (r) settings_result = r;
     }
-    if (restore_pending && groove_project_load_slot(settings.slot) != FM1_FLASH_BUSY) {
+    int restored = restore_pending ? groove_project_load_slot(settings.slot) : FM1_FLASH_BUSY;
+    if (restored != FM1_FLASH_BUSY) {
         restore_pending = 0;
+        /* song-mode: with no project to restore, no track starts muted or
+         * soloed (the engine's default mutes tracks 6 and 7, 0.3.2) */
+        for (unsigned t = 0; restored && t < GROOVE_TRACKS; ++t) {
+            struct groove_view v = {0};
+            groove_get_view(t, 0, &v);
+            if (v.solo) groove_mix_toggle(t, 1);
+            if (v.muted) groove_mix_toggle(t, 0);
+        }
+        if (restored) groove_edit_forget_history();
         groove_project_clean();
     }
     if (!restore_pending && session_pending) {

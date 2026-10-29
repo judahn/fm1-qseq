@@ -87,9 +87,10 @@ void song_grid_take_ended(unsigned began, uint32_t clock);
 void song_tempo_follow(unsigned force);
 void song_tempo_adopt(void);
 /* The battery's ADC reading (fm1_controls), each poll, and the smoothed
- * value shown, at most once a second (0.3.0). The two readings for empty
- * and full are guesses until a device is measured: replace them then. */
-enum { SONG_BATTERY_EMPTY = 700, SONG_BATTERY_FULL = 950 }; /* uncalibrated guesses */
+ * value shown, at most once a second (0.3.0). Full is a full battery read on
+ * a device, unplugged (0.3.2). Empty is an estimate, 0.81 of full, which is
+ * 3.4 V if full is 4.2 V: lower it if a flat battery reads less. */
+enum { SONG_BATTERY_EMPTY = 505, SONG_BATTERY_FULL = 622 };
 void song_port_battery(unsigned raw, uint32_t now);
 unsigned song_port_battery_shown(void);
 /* Recording a performance in the grid (song_perf.c): REC arms it, and the

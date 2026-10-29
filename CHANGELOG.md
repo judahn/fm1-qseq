@@ -2,6 +2,13 @@
 
 The version is `FM1_QY_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.3.2
+
+- The battery bar on the song list is set from a device: full at 622, a full battery read with USB unplugged,
+  and empty at 505, an estimate. It read empty before, since the guessed ends were 700 to 950.
+- No track starts muted. The engine's default sounds muted tracks 6 and 7, so the song at power-on had them
+  muted. A song you load keeps the mutes it was saved with.
+
 ## 0.3.1
 
 - A new song is named with the lowest number no saved song uses (1, 2, 3 and so on) instead of NEW SONG, so renaming

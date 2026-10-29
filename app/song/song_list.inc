@@ -23,8 +23,8 @@ static const char *song_store_message(int r, const char *done)
 
 static void song_kb(char out[12], uint32_t bytes) { decimal(out, (int)((bytes + 1023U) / 1024U), 1); strcat(out, "K"); }
 /* The battery under the release: the sensor's ADC reading, smoothed, and a
- * bar from SONG_BATTERY_EMPTY to SONG_BATTERY_FULL (uncalibrated guesses,
- * song_port.h). It changes at most once a second, and repaints only itself. */
+ * bar from SONG_BATTERY_EMPTY to SONG_BATTERY_FULL (song_port.h). It
+ * changes at most once a second, and repaints only itself. */
 static void song_battery_draw(void)
 {
     if (paint_rendering && paint_top >= 26) return;
