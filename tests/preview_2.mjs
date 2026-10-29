@@ -22,12 +22,12 @@ export async function phase2(browser, root) {
     // One bar: an 8th, three 8th triplets, a dotted 8th, a 16th tied to an
     // 8th (the length changes before the tie), an 8th rest, and a chord built
     // key by key.
-    shiftKey(6); r.key(7);                         // 8th, C4
-    shiftKey(1); r.key(9); r.key(11); r.key(12);   // 8th triplets D4 E4 F4
-    shiftKey(1); shiftKey(3); r.key(14);           // dotted 8th G4
-    shiftKey(3); shiftKey(3); shiftKey(4); r.key(16); // plain 16th A4
-    shiftKey(6); r.key(26);                        // an 8th, then tie
-    r.key(24);                                     // 8th rest
+    shiftKey(6); r.key(7);                         // SHIFT+B: 8th, C4
+    shiftKey(1); r.key(9); r.key(11); r.key(12);   // SHIFT+F#: 8th triplets D4 E4 F4
+    shiftKey(1); shiftKey(3); r.key(14);           // SHIFT+G#: dotted 8th G4
+    shiftKey(3); shiftKey(3); shiftKey(7); r.key(16); // SHIFT+C: plain 16th A4
+    shiftKey(6); shiftKey(10);                     // an 8th, then SHIFT+D# ties
+    shiftKey(8);                                   // SHIFT+C#: 8th rest
     const beforeChord = r.info(0, 0);
     c.sim_control(1, 7, 1); c.sim_control(1, 11, 1); c.sim_control(1, 14, 1);
     const whileHeld = r.info(0, 0);

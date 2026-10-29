@@ -29,7 +29,7 @@ static uint32_t song_key_leds(uint32_t bits, unsigned visible)
     }
     if (visible < SONG || !s->key_scale || groove_pad_count(track)) return bits;
     unsigned mask = song_scale_mask(s);
-    for (unsigned key = 0; key < (visible == SONG_STEP ? 24U : 27U); ++key) {
+    for (unsigned key = 0; key < 27; ++key) {
         unsigned note = groove_key_note(track, key, octave);
         if (note < 128 && (mask >> (note % 12U) & 1U)) bits |= 1U << key;
     }
@@ -38,8 +38,9 @@ static uint32_t song_key_leds(uint32_t bits, unsigned visible)
 }
 #if SONG_UI
 /* Chord mode plays the keys on the song pages (song_chord.c): 1 when it
- * took them. In step entry each root's chord is the entry. A type key
- * names the type it picked. The stock pages play the keys as ever. */
+ * took them. In step entry the chord a root or F5 to G5 plays is the
+ * entry, and keys pressed with SHIFT never get here (blocked_keys). A type
+ * key names the type it picked. The stock pages play the keys as ever. */
 static int song_chord_panel(uint32_t keys, unsigned mode)
 {
     const struct song *s = song_port_song();

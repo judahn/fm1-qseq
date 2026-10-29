@@ -37,9 +37,9 @@ export async function phase7b(browser, root) {
     tap(B.SEQ); tap(B.SEQ);
     o.gridPage = pageNow();
     const fill = (length, keys) => { tap(B.SCL); tap(B.REC); tap(B.REC); held(B.FX, () => key(length)); for (const k of keys) key(k); tap(B.SEQ); };
-    fill(7, [0, 4, 7, 11]);
-    turn(0, 1); fill(9, [0, 7]);
-    turn(0, -1); turn(2, 1); fill(7, [12, 14, 16, 17]);
+    fill(4, [0, 4, 7, 11]);                         // SHIFT+A3: quarters
+    turn(0, 1); fill(2, [0, 7]);                    // SHIFT+G3: halves
+    turn(0, -1); turn(2, 1); fill(4, [12, 14, 16, 17]);
     o.clips = [info(39, 0, cell(0, 0)), info(39, 0, cell(1, 0)), info(39, 0, cell(0, 1))];
     turn(2, -1);
 

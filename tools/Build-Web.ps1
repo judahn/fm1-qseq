@@ -117,6 +117,9 @@ if (!$LocalPreview -and (![Uri]::TryCreate($SourceUrl, [UriKind]::Absolute, [ref
 $versionMatch = [regex]::Match([IO.File]::ReadAllText((Join-Path $root 'app/version.h')), '(?m)^#define FM1_RELEASE_VERSION "(V(?:0[1-9]|[1-9][0-9]{1,2}))"\s*$')
 if (!$versionMatch.Success) { throw 'Set FM1_RELEASE_VERSION in app/version.h.' }
 $releaseVersion = $versionMatch.Groups[1].Value
+# song-mode: this fork's release (semver), which the workbench adds to the page's version badge.
+$qyMatch = [regex]::Match([IO.File]::ReadAllText((Join-Path $root 'app/version.h')), '(?m)^#define FM1_QY_VERSION "([0-9]+\.[0-9]+\.[0-9]+)"\s*$')
+if (!$qyMatch.Success) { throw 'Set FM1_QY_VERSION in app/version.h.' }
 $notices = @("APP: GPLv3 with the FM1 SDK linking exception; no warranty. SDK and firmware resources have separate redistribution terms in THIRD_PARTY.md. Source: $SourceUrl")
 if ($PackageJson) {
     $package = $PackageJson | ConvertFrom-Json
@@ -152,7 +155,7 @@ if ($web -match '/\*FM1_[A-Z_]+\*/') { throw 'Unexpanded HTML placeholder.' }
 # song-mode: the songs and kits workbench (web/workbench), one script before the page ends.
 $songScripts = @('bytes','song_file','song_clips','kit_file','midi_file','song_midi','wav','link','templates','ui_common','ui_songs','ui_kits') |
     ForEach-Object { [IO.File]::ReadAllText((Join-Path $root "web/workbench/$_.js")) }
-$songScript = "<script>`n" + ($songScripts -join "`n") + "</script>`n"
+$songScript = "<script>`nglobalThis.FM1_QY_VERSION = '$($qyMatch.Groups[1].Value)';`n" + ($songScripts -join "`n") + "</script>`n"
 if ($songScript -match '</script>[\s\S]*</script>') { throw 'A workbench script closes its own tag.' }
 $end = $web.LastIndexOf('</html>')
 if ($end -lt 0) { throw 'Missing </html>.' }

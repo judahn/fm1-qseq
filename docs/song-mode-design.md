@@ -78,25 +78,22 @@ QY70's function keys:
 | ENV | Back-delete: move back one length and delete there |
 | LFO | SELECT: hold it and press keys to choose which notes at the pointer to edit |
 
-**Rest and tie on keys.** The FM-1 has 27 keys, two more than the QY70's 25. In step mode the top three keys
-stop playing notes, and entry uses the two octaves below them (F3 to E5, with the octave buttons for range):
+**Rest and tie on keys.** The FM-1 has 27 keys, two more than the QY70's 25. In step mode all 27 enter notes,
+and the functions sit on SHIFT plus a key, by the key's note name in any octave (Judah, 10/28). The first plan
+kept the top three keys for rest, repeat and tie, and put the lengths on the lower octave, shortest first.
+
+**SHIFT plus keys (step mode), in every octave:**
 
 | Key | Action |
 |---|---|
-| F5 | Rest: move on one length |
-| F#5 | Repeat: enter the last note or chord again (quick hi-hat runs) |
-| G5 | Tie: lengthen the last note by the current length. The length can be changed first, so a quarter plus an 8th tie works (QY700 behavior) |
+| F G A B C D E (white) | Whole, half, quarter, 8th, 16th, 32nd, 64th: the longest on F |
+| F# | Triplet on or off |
+| G# | Dot, double dot, off |
+| C# | Rest: move on one length |
+| D# | Tie: lengthen the last note by the current length. The length can be changed first, so a quarter plus an 8th tie works (QY700 behavior) |
+| A# | Repeat: enter the last note or chord again (quick hi-hat runs) |
 
-**SHIFT plus keys (step mode):**
-
-| Keys, lower octave | Action |
-|---|---|
-| F3 G3 A3 B3 C4 D4 E4 (white) | 64th, 32nd, 16th, 8th, quarter, half, whole |
-| F#3 | Triplet on or off |
-| G#3 | Dot, double dot, off |
-
-Shorter lengths sit on the left, longer on the right, so lengths read like the keyboard. The other black keys
-stay free for later.
+With SHIFT held no key enters a note or strikes a chord. K1 still lengthens turning right.
 
 **Knobs (step mode):** K1 length, K2 velocity, K3 gate. K4 moves the pointer by the current length. SHIFT plus
 K4 jumps from note to note. SELECT picks the track. Landing on a note plays it, as on the QY70.
@@ -505,7 +502,7 @@ Judah, 10/28: chords are a play setting on each instrument track, not the QY70's
   the roots.
 - **Chord types on the next 12 keys,** F4 to E5. A press picks the type, and it stays picked, so chords play
   with one hand. Picking a type while a root is held changes the chord that's sounding. The same keys hold the
-  types in step mode, where the top three keys stay rest, repeat and tie.
+  types in step mode.
 - **Types (proposed):** major, minor, 7, maj7, m7, sus2, sus4, dim, aug, 6, add9 and "in key". In key builds
   each root's chord from the song's key and scale (8a), so in C major the D key plays D minor. The common types
   sit on the white keys and the color ones on the black keys. The exact layout gets tuned on the device.
@@ -534,7 +531,8 @@ strum waits as well as while the song plays, and a strum's first notes go out as
 - **The type keys.** White keys: F4 in key, G4 major, A4 minor, B4 7, C5 m7, D5 maj7, E5 6. Black keys: F#4 sus2,
   G#4 sus4, A#4 dim, C#5 aug, D#5 add9. A new song starts on in key.
 - **The top three keys** in real-time play: F5 plays the last chord again, F#5 an octave down and G5 an octave
-  up, each strummed afresh. In step entry they stay rest, repeat and tie.
+  up, each strummed afresh. In step entry they enter those chords (since 10/28, when rest, repeat and tie moved
+  to SHIFT).
 - **In key** is the root and the second and fourth notes of the song's scale above it, whether the root is in
   the scale or not. So in C major D gives D minor and C# gives C# dim. A pentatonic or blues scale gives its own
   stacked shapes, and with no key set it's major.

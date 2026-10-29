@@ -3,7 +3,7 @@
 This covers the song mode as it is built, in the full device build (`FM1_SONG_DEVICE_FULL=1`) and in the
 browser preview, which has all of it. The default device build is the hardware test build: it has only a
 diagnostics page, described at the end. Song playback timing has been measured on the FM-1 with that build.
-The full build hasn't run on the device yet.
+The full build has run on the FM-1 since 0.1.0.
 
 Names are the ones printed on the panel and shown on the screen.
 
@@ -152,13 +152,13 @@ chooser afterwards requantizes the last take. Undo takes the whole take back.
 
 | Control | Action |
 |---|---|
-| Keys F3 to E5 | Enter a note at the pointer. Hold several to build a chord, which goes in when every key is up |
-| F5 | Rest: move on one step |
-| F#5 | Repeat the last entry |
-| G5 | Tie: lengthen the last entry by the current length |
-| SHIFT + F3 G3 A3 B3 C4 D4 E4 | Length: 1/64, 1/32, 1/16, 1/8, 1/4, 1/2, 1/1 |
-| SHIFT+F#3 | Triplet on or off |
-| SHIFT+G#3 | Dot, double dot, off |
+| Keys F3 to G5 | Enter a note at the pointer. Hold several to build a chord, which goes in when every key is up |
+| SHIFT + F G A B C D E | Length: 1/1, 1/2, 1/4, 1/8, 1/16, 1/32, 1/64 |
+| SHIFT+F# | Triplet on or off |
+| SHIFT+G# | Dot, double dot, off |
+| SHIFT+C# | Rest: move on one step |
+| SHIFT+D# | Tie: lengthen the last entry by the current length |
+| SHIFT+A# | Repeat the last entry |
 | K1 | Length |
 | K2 | Velocity, 1 to 127, named by the nearest of PPP to FFFF. Past the top: random R1 to R4 |
 | K3 | Gate: 50, 90, 99 or 100% |
@@ -169,6 +169,9 @@ chooser afterwards requantizes the last take. Undo takes the whole take back.
 | Hold LFO, tap keys | Pick which notes at the pointer K1 to K3 and delete act on |
 | ARP | The glitch layer (below), and ARP again to leave it |
 | SELECT | The track |
+
+With SHIFT held a key works by its note name, in any octave, so SHIFT+F3, SHIFT+F4 and SHIFT+F5 all pick 1/1. It
+enters no note.
 
 When the pointer lands on notes they're selected and play, and K1 to K3 change them in place. On an empty spot
 the knobs set the next entry.
@@ -251,8 +254,9 @@ and EXPAND CLIPS. With a clip open, the jobs that reach other tracks or the song
 
 ## Song list
 
-SHIFT+SAVE. A memory gauge shows songs, kits and free space. K2 picks an action and YES does it. The line at
-the bottom always says what YES will do and to what, for example `OCT+ LOAD VERSE   OCT- BACK`.
+SHIFT+SAVE. A memory gauge shows songs, kits and free space, and the header shows the firmware's version, as the
+boot screen does. K2 picks an action and YES does it. The line at the bottom always says what YES will do and to
+what, for example `OCT+ LOAD VERSE   OCT- BACK`.
 
 | Control | Action |
 |---|---|
@@ -279,8 +283,8 @@ What YES does:
 
 A question goes when another song is picked or K2 or K4 turns. The note keys do nothing on the list. Nothing
 is written while the song plays: stop first. On the recovery row (RESTORE THE UNSAVED SONG) LOAD restores
-the copy and DELETE drops it, asking first. RENAME and DUPLICATE don't work there. SAVE, SAVE AS and NEW
-work as anywhere, since they act on the song being worked on.
+the copy and DELETE removes it from flash, asking first, so a restart doesn't offer it again. RENAME and
+DUPLICATE don't work there. SAVE, SAVE AS and NEW work as anywhere, since they act on the song being worked on.
 
 In the full build the stock factory sound sets are left out, so a new song starts blank. The workbench can
 build a song from a factory sound set and upload it.
@@ -382,7 +386,8 @@ Settings on page 5:
 
 One chord sounds at a time, at velocity 100, while its key is held. A chord records as plain notes with its
 strum. Input quantize moves a strummed chord as a whole, by its first note. In step entry a root enters its
-chord at the pointer, strummed when strum is on, and the top three keys stay rest, repeat and tie.
+chord at the pointer, strummed when strum is on, and F5, F#5 and G5 enter the last chord again, an octave down
+or an octave up. Rest, tie and repeat stay on SHIFT there.
 
 ## Diagnostics page
 

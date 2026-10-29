@@ -9,18 +9,21 @@ code from any other sequencer.
 
 This project is not affiliated with Yamaha, Ableton or M-VAVE.
 
+The release version is `FM1_QY_VERSION` in `app/version.h` (semver, with [CHANGELOG.md](CHANGELOG.md)), and
+releases are tagged `v<version>`.
+
 ## Status
 
 **Song playback timing has been measured on an FM-1, with the default build.** That timing test chose how
 song notes reach the engine (method B, below). The results are in
-[docs/hardware-test-plan.md](docs/hardware-test-plan.md). **The full build hasn't run on the device yet.**
+[docs/hardware-test-plan.md](docs/hardware-test-plan.md). The full build has run on an FM-1 since 0.1.0 (10/28).
 
 There are two device builds, and the browser preview:
 
 | Build | What's in it | App size |
 |---|---|---|
 | Default (`./build.sh`) | The hardware test build: FM1 Open V14 plus a diagnostics page that plays a built-in test song and measures its timing. To fit, it leaves out the 16 factory preset projects and the workbench's project, sample and voice transfers. Firmware updates still work | 453,480 bytes of 453,921 |
-| Full (`FM1_SONG_DEVICE_FULL=1`) | The whole song mode, without the diagnostics page. It leaves out the stock step and pattern pages (their sync and MIDI pages move to the device settings), the stock project pages, the demo projects, the factory sound sets and the built-in FM factory voices | 518,472 bytes of 548,129 |
+| Full (`FM1_SONG_DEVICE_FULL=1`) | The whole song mode, without the diagnostics page. It leaves out the stock step and pattern pages (their sync and MIDI pages move to the device settings), the stock project pages, the demo projects, the factory sound sets and the built-in FM factory voices | 520,680 bytes of 548,129 |
 | Browser preview | The whole song mode on FM1 Open's simulator, in one HTML file | |
 
 ### What installing the full build costs
@@ -163,8 +166,8 @@ still here. We haven't tried it with our changes.
 
 ## Installing on the device
 
-This is how FM1 Open's workbench installs firmware. The default build went onto an FM-1 for the timing test.
-**The full build hasn't been installed yet.**
+This is how FM1 Open's workbench installs firmware. The default build went onto an FM-1 for the timing test,
+and the full build has been installed the same way since 0.1.0.
 
 1. Build the page: `./build.sh --package`, or the full build command above.
 2. Open `build/official-web/FM1-Official-Open-Source.html` (or the `-songfull` one) in desktop Chrome or Edge.
@@ -262,7 +265,7 @@ each failure with its phase, name, actual and expected values, then the totals p
 | Variable | Effect |
 |---|---|
 | `PLAYWRIGHT_MODULE` | Where Playwright is, when it isn't installed in this repo |
-| `PREVIEW_PHASES=7b,8` | Run only these phases (also `diagnostics` and `panel`) |
+| `PREVIEW_PHASES=7b,8` | Run only these phases (also `diagnostics`, `panel`, `keys` and `yes/no`) |
 | `PREVIEW_DUMP=1` | Print each phase's full record too |
 
 The checks save screenshots to `docs/`. Screens of the device come out the same on every run. Shots of the

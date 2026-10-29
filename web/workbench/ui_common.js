@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* The workbench's "Songs and kits" section (phase 5b): its frame in the
  * library tab, the target (the page's simulator or an FM-1 over USB), the
- * pool gauge, status and files. ui_songs.js and ui_kits.js fill it in. */
+ * pool gauge, status and files. ui_songs.js and ui_kits.js fill it in.
+ * It also adds this fork's release to the page's version badge. */
 (function (root) {
   'use strict';
   if (typeof document === 'undefined') return;
@@ -83,6 +84,8 @@
     style.textContent = css;
     document.head.append(style);
     library.insertAdjacentHTML('beforeend', html);
+    const badge = $('release-version'); /* FM1 Open's release, then this fork's, from Build-Web.ps1 */
+    if (badge && root.FM1_QY_VERSION) badge.textContent += ' · QY ' + root.FM1_QY_VERSION;
     $('sw-refresh').onclick = ui.act(async () => { await ui.run(ui.refresh); ui.status('Up to date.'); });
     $('sw-target').onchange = () => ui.status('Refresh to read ' + ($('sw-target').value === 'sim' ? 'the simulator.' : 'the FM-1.'));
     for (const part of ui.parts) part.mount();

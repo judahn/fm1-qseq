@@ -43,6 +43,7 @@ static void song_list_draw(void)
         paint_fill(0, 0, 240, 196, BACK);
         if (paint_rendering) {
             text(8, 6, "SONGS", 2, ACCENT, BACK);
+            text(76, 10, "QY " FM1_QY_VERSION, 1, DIM, BACK); /* this fork's release */
             strcpy(line, "FREE "); song_kb(part, g.free); strcat(line, part);
             text(232 - 6 * (unsigned)strlen(line), 10, line, 1, DIM, BACK);
             song_gauge_bar(8, 26, 224, 4, &g);

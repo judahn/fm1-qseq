@@ -121,7 +121,7 @@ int song_store_use_kit(unsigned id);         /* rebinds the pads, nothing writte
 int song_store_delete_kit(unsigned id);
 unsigned song_store_recovery(void);          /* 1 while a recovery copy waits at boot */
 int song_store_restore(void);
-void song_store_skip_recovery(void);
+int song_store_drop_recovery(void);          /* DELETE on the list: the copy goes from flash */
 unsigned song_store_unsaved(void);           /* 1 when the song changed since its last save or load */
 struct song_gauge { uint32_t pool, songs, samples, free; unsigned events; };
 void song_store_gauge(struct song_gauge *g);

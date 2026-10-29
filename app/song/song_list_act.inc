@@ -88,10 +88,7 @@ static void song_list_yes(uint32_t now)
         song_list_done(r, a == LIST_NEW ? "NEW SONG, NOT SAVED YET" : on == 2 ? "UNSAVED SONG RESTORED" : "SONG LOADED", now);
     } else if (a == LIST_DELETE) {
         if (!asked) { song_ask(ask, NULL, 1); return; }
-        int r = 0;
-        if (on == 2) song_store_skip_recovery();
-        else r = song_store_delete(id);
-        song_list_done(r, "DELETED", now);
+        song_list_done(on == 2 ? song_store_drop_recovery() : song_store_delete(id), "DELETED", now);
     } else if (a == LIST_DUPLICATE) song_list_done(song_store_duplicate(id), "DUPLICATED", now);
     else { /* rename: K1 the letter's place, K2 the letter, until YES or NO */
         memset(song_list_name, ' ', sizeof song_list_name);

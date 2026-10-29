@@ -10,6 +10,7 @@
 /* kind: 0 for a note, else the status of a controller (pitch is its number,
  * velocity its value) or program change (pitch is the program). */
 #if SONG_UI
+#include "version.h"
 uint32_t song_store_probe(unsigned what); /* song_store_list.inc */
 int sim_song_kit_copy_run(void);
 #endif
@@ -85,6 +86,7 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     case 49: return song.chord[track & 7U] | (uint32_t)song.chord_type[track & 7U] << 8; /* phase 8 */
     case 50: return song_port_blocks();
     case 52: { char n[17]; uint32_t v; song_store_name(song_store_id(index), n); memcpy(&v, n, 4); return v; } /* a stored name */
+    case 53: { static const char q[16] = FM1_QY_VERSION; uint32_t v; memcpy(&v, q + (index & 3U) * 4U, 4); return v; } /* the release */
 #endif
     case 18: return index < count ? e[index].b : 0;
     case 19: return song.swing | (uint32_t)song.swing_grid << 8 | (uint32_t)song.swing_tracks << 16;

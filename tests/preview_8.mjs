@@ -6,8 +6,9 @@
 // A chord let go mid-strum leaves the rest unplayed. F5, F#5 and G5 play
 // the last chord again, an octave down and up. Smooth voicing over C, F, G
 // and C. A recorded chord lands as notes, quantized as a whole by its first
-// note. In step entry a root enters its chord strummed, and the type keys
-// work there too. A drum track ignores chord mode, and the settings are in
+// note. In step entry a root enters its chord strummed, the type keys work
+// there too, F5 enters the last chord again, and with SHIFT held no key
+// strikes a chord. A drum track ignores chord mode, and the settings are in
 // the saved song. Saves docs/phase8-*.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
 
@@ -89,19 +90,32 @@ export async function phase8(browser, root) {
     o.songPng = png();
 
     // 8. Step entry: the strum back to a 16th. C4 enters C major strummed at
-    // the pointer, then A4 (minor) and D4 enter D minor after it.
+    // the pointer, then A4 (minor) and D4 enter D minor after it. F5 enters
+    // D minor again, once. With SHIFT held a root and a type key do neither.
     tap(B.GLO); turn(4, -1); tap(B.GLO);
     tap(B.REC); turn(2, -2); tap(B.REC);
     o.stepPage = pageNow();
-    const pointer = info(17), step0 = notes(0), was = new Map();
-    for (const n of step0) was.set(noteKey(n), (was.get(noteKey(n)) || 0) + 1);
+    const fresh = (before, from) => { /* the notes added since `before`, from clock `from` */
+      const was = new Map();
+      for (const n of before) was.set(noteKey(n), (was.get(noteKey(n)) || 0) + 1);
+      return notes(0).filter(n => { const k = noteKey(n); if (was.get(k)) { was.set(k, was.get(k) - 1); return false; } return true; })
+        .map(n => [n[0] - from, n[1]]);
+    };
+    const pointer = info(17), step0 = notes(0);
     press(7); render(2); lift(7); render(2);
     key(16);
     const second = info(17);
     press(9); render(2); lift(9); render(2);
-    const entered = notes(0).filter(n => { const k = noteKey(n); if (was.get(k)) { was.set(k, was.get(k) - 1); return false; } return true; })
-      .map(n => [n[0] - pointer, n[1]]);
+    const entered = fresh(step0, pointer);
     o.step = { added: entered.length, entered, second: second - pointer };
+    const third = info(17), step1 = notes(0);
+    press(24); render(2); lift(24); render(2);
+    o.again = { entered: fresh(step1, third), moved: info(17) - third };
+    const step2 = notes(0), type = setting(0) >> 8;
+    c.sim_song_capture(1);
+    r.held(B.FX, () => { press(7); render(2); lift(7); press(19); render(2); lift(19); render(2); });
+    o.shifted = { entered: fresh(step2, 0).length, heard: heard().length, sameType: (setting(0) >> 8) === type };
+    render(2);
     o.stepPng = png();
     tap(B.REC);
 
@@ -155,6 +169,9 @@ export async function phase8(browser, root) {
   t.eq('six notes entered, two chords', q.step.added, 6);
   t.eq('C major then D minor, each strummed at its step', q.step.entered, [[0, 60], [60, 64], [120, 67],
     [q.step.second, 62], [q.step.second + 60, 65], [q.step.second + 120, 69]]);
+  t.eq('F5 in step entry enters the last chord, D minor, again, once', q.again.entered, [[0, 62], [60, 65], [120, 69]]);
+  t.eq('and moves on one step', q.again.moved, q.step.second);
+  t.eq('with SHIFT a root and a type key strike nothing, enter nothing, pick no type', q.shifted, { entered: 0, heard: 0, sameType: true });
   t.eq('the 808 takes the setting', q.drumSetting, 1);
   t.match('and the page says it\'s a drum track', q.drumKnobs[0], /MODE DRUMS/);
   t.eq('a type key on the 808 changes nothing', q.drumType, 0);

@@ -2,7 +2,8 @@
 // Phase 5a of the preview check: storage. Save, change, load and compare,
 // through the song list (K2 the action, YES does it). A kit made through the
 // transfer calls, switched to and back. A recovery copy after a stop, offered
-// and restored after a reboot on the same flash. Saves docs/phase5a-*.png.
+// and restored after a reboot on the same flash, and on another reboot
+// deleted, so the next one offers nothing. Saves docs/phase5a-*.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
 
 export async function phase5a(browser, root) {
@@ -70,12 +71,15 @@ export async function phase5a(browser, root) {
     o.songPng = r.png();
 
     // 6. Reboot on the same flash: SEQ offers the copy, YES restores it.
-    const bytes = 536576, image = new Uint8Array(r.c.memory.buffer, r.c.sim_flash(), bytes).slice();
-    r.boot();
-    new Uint8Array(r.c.memory.buffer, r.c.sim_flash(), bytes).set(image);
-    r.c.sim_boot(0);
-    r.render(32);
-    r.tap(B.SEQ);
+    const bytes = 536576, flash = () => new Uint8Array(r.c.memory.buffer, r.c.sim_flash(), bytes).slice(), image = flash();
+    const reboot = from => {
+      r.boot();
+      new Uint8Array(r.c.memory.buffer, r.c.sim_flash(), bytes).set(from);
+      r.c.sim_boot(0);
+      r.render(32);
+      r.tap(B.SEQ);
+    };
+    reboot(image);
     o.reboot = { page: r.page(), waiting: store(4), songs: store(0) };
     r.render(4);
     o.restorePng = r.png();
@@ -83,6 +87,16 @@ export async function phase5a(browser, root) {
     o.restoreLabel = r.knobs()[1];
     r.tap(B.YES);
     o.restored = { sameBytes: store(16) === changed, id: store(1), waiting: store(4) };
+
+    // 7. The same flash again, and this time DELETE on the recovery row: K2
+    // to DELETE, YES asks, YES drops the copy from flash. Rebooted on that,
+    // SEQ offers nothing and opens the song view.
+    reboot(image);
+    r.turn(3, 6);
+    r.tap(B.YES); r.tap(B.YES);
+    o.dropped = { waiting: store(4), copy: store(6), songs: store(0), page: r.page() };
+    reboot(flash());
+    o.afterDrop = { page: r.page(), waiting: store(4), songs: store(0) };
     return o;
   });
   savePng(root, 'phase5a-song-list', out, 'listPng');
@@ -121,5 +135,7 @@ export async function phase5a(browser, root) {
   t.eq('the offer comes with K2 on LOAD', q.restoreLabel, 'ACTION LOAD');
   t.yes('restored, the song is what was played', q.restored.sameBytes);
   t.eq('restored, nothing waits any more', q.restored.waiting, 0);
+  t.eq('DELETE on the recovery row drops the copy from flash', q.dropped, { waiting: 0, copy: 0, songs: 2, page: 25 });
+  t.eq('rebooted on that flash nothing is offered: SEQ opens the song view', q.afterDrop, { page: 19, waiting: 0, songs: 2 });
   return { phase: '5a', checks: t.list, out };
 }

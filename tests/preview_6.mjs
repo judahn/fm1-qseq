@@ -141,7 +141,7 @@ export async function phase6(browser, root) {
       r.turn(0, -1);
       r.turn(2, 12);                                // the playhead to bar 13
       r.tap(B.REC); r.tap(B.REC); r.tap(B.ARP);
-      r.held(B.FX, () => r.key(7));                 // quarters
+      r.held(B.FX, () => r.key(4));                 // SHIFT+A3: quarters
       r.turn(2, 3); r.key(7); r.turn(2, -1); r.key(9);
       r.tap(B.ARP); r.tap(B.REC);
     };

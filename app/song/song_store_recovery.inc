@@ -43,7 +43,18 @@ SONG_SMALL int song_store_restore(void)
     waiting = 0;
     return r;
 }
-void song_store_skip_recovery(void) { waiting = 0; }
+/* DELETE on the list's recovery row: the copy goes from flash, so a restart
+ * doesn't offer it again. The song being worked on gets a fresh copy at the
+ * next stop if it's still unsaved. */
+SONG_SMALL int song_store_drop_recovery(void)
+{
+    if (song_port_player()->playing) return SONG_STORE_PLAYING;
+    int r = pool_find(&pool, POOL_RECOVERY, 1) ? pool_delete(&pool, POOL_RECOVERY, 1) : 0;
+    if (r) return r;
+    waiting = 0;
+    recovery.written_crc = 0;
+    return 0;
+}
 /* 1 when the song has changed since it was last saved or loaded, so loading
  * another or starting a new one would lose that. While playing, recording
  * or taking in a kit it can't look, and says 1. */

@@ -26,7 +26,7 @@ silent if its samples don't carry over from V15. Everything else plays normally.
 The full song mode build (`FM1_SONG_DEVICE_FULL=1`) is a separate test that needs your OK. It has every song
 page, and it makes room by giving 23 of the 131 storage sectors (92 KB) to code: the 15 stock project slots
 (sectors 0 to 14) and the first 8 sectors of the sample area (17 to 24). Its app limit is 548,129 bytes, and it
-uses 518,472. It delivers by method B and has no diagnostics page.
+uses 520,680 (0.2.0). It delivers by method B and has no diagnostics page.
 
 What it means for the data on the device:
 - Sector 25 on keeps its place: the song and kit pool (25 to 125, about 404 KB), the DX7 voice banks (126 to

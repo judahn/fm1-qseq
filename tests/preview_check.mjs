@@ -3,6 +3,7 @@
 // phase, each on a fresh simulator in its own page and module:
 //   1  the test song, the loop, transport knobs, a jump, and the page routes (preview_1.mjs)
 //   2  step entry and the settings page (preview_2.mjs)
+//   keys  step entry's keys: SHIFT by note name in every octave, F5 to G5 as notes (preview_keys.mjs)
 //   diagnostics  the hardware test build's page, A and B, in build/preview-test (preview_diag.mjs)
 //   panel  every button light on, the wake, a page change at the LCD's device pace (preview_panel.mjs)
 //   3  the selection, clipboard, undo and real-time takes (preview_3.mjs)
@@ -27,6 +28,7 @@ import path from 'node:path';
 import { report } from './preview_lib.mjs';
 import { phase1 } from './preview_1.mjs';
 import { phase2 } from './preview_2.mjs';
+import { phaseKeys } from './preview_keys.mjs';
 import { phaseDiag } from './preview_diag.mjs';
 import { phasePanel } from './preview_panel.mjs';
 import { phase3 } from './preview_3.mjs';
@@ -43,8 +45,9 @@ import { phaseYesNo } from './preview_yesno.mjs';
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const phases = [['1', phase1], ['2', phase2], ['diagnostics', phaseDiag], ['panel', phasePanel], ['3', phase3], ['4', phase4], ['4b', phase4b],
-  ['5a', phase5a], ['5b', phase5b], ['6', phase6], ['7', phase7], ['7b', phase7b], ['8', phase8], ['yes/no', phaseYesNo]];
+const phases = [['1', phase1], ['2', phase2], ['keys', phaseKeys], ['diagnostics', phaseDiag], ['panel', phasePanel], ['3', phase3],
+  ['4', phase4], ['4b', phase4b], ['5a', phase5a], ['5b', phase5b], ['6', phase6], ['7', phase7], ['7b', phase7b], ['8', phase8],
+  ['yes/no', phaseYesNo]];
 const only = process.env.PREVIEW_PHASES ? process.env.PREVIEW_PHASES.split(',') : null;
 const browser = await chromium.launch();
 const runs = [];

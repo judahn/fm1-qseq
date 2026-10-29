@@ -38,7 +38,7 @@ export async function phase7(browser, root) {
     o.newLength = info(39, 0, cell(0, 0));
     tap(B.REC); tap(B.REC);
     o.stepPage = pageNow();
-    held(B.FX, () => key(7));                       // quarters
+    held(B.FX, () => key(4));                       // SHIFT+A3: quarters
     for (const k of [0, 4, 7, 11]) key(k);
     turn(5, -4);                                    // the pointer back over them, for the picture
     o.stepPng = png();
@@ -51,7 +51,7 @@ export async function phase7(browser, root) {
     tap(B.SCL);
     turn(4, 1);                                     // CLIP END to bar 3
     tap(B.REC); tap(B.REC);
-    held(B.FX, () => key(9));                       // halves
+    held(B.FX, () => key(2));                       // SHIFT+G3: halves
     for (const k of [0, 7, 4, 11]) key(k);
     tap(B.REC);                                     // out of step entry, still in the clip
     o.inClipPage = pageNow();

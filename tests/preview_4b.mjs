@@ -24,7 +24,7 @@ export async function phase4b(browser, root) {
     const at = info(8);
     r.tap(B.REC); r.tap(B.REC);
     r.tap(B.ARP);
-    r.held(B.FX, () => r.key(7));                  // SHIFT+C4: quarter notes
+    r.held(B.FX, () => r.key(4));                  // SHIFT+A3: quarter notes
     r.turn(2, 3);                                  // REPEATS x4
     r.key(7);
     r.turn(2, -1);                                 // x3
