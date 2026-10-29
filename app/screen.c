@@ -932,19 +932,22 @@ static __attribute__((noinline)) void mix_draw(const struct groove_view v[8])
         text(8, 35, "MIX  8 TRACKS", 1, TEXT, BACK);
         text(8, 51, "KEYS 1-8 MUTE  9-16 SOLO", 1, DIM, BACK);
     }
-    for (unsigned i = 0; i < 16; ++i) {
-        unsigned t = i & 7U, on = i < 8 ? v[t].muted : v[t].solo;
-        uint32_t sig = on | ((t == track) << 1);
-        if (sig == cache->tile_cache[i])
+    for (unsigned t = 0; t < 8; ++t) { /* song-mode: one tile a track, its mute and solo on it (0.3.3) */
+        uint32_t sig = (v[t].muted != 0) | ((v[t].solo != 0) << 1) | ((t == track) << 2);
+        if (sig == cache->tile_cache[t])
             continue;
-        cache->tile_cache[i] = sig;
-        unsigned x = 8 + (i % 4) * 57, y = 72 + (i / 4) * 29;
-        uint16_t bg = on ? colors[t] : PANEL;
-        paint_fill(x, y, 53, 25, bg);
+        cache->tile_cache[t] = sig;
+        unsigned x = 8 + (t % 4) * 57, y = 72 + (t / 4) * 56;
+        paint_fill(x, y, 53, 50, PANEL);
         if (t == track)
-            frame(x, y, 53, 25, TEXT);
-        text(x + 7, y + 5, i < 8 ? "MUTE" : "SOLO", 1, on ? BACK : DIM, bg);
-        number(x + 37, y + 5, t + 1, 1, 1, on ? BACK : colors[t], bg);
+            frame(x, y, 53, 50, TEXT);
+        number(x + 7, y + 5, t + 1, 1, 1, colors[t], PANEL);
+        for (unsigned row = 0; row < 2; ++row) {
+            unsigned on = row ? v[t].solo : v[t].muted;
+            uint16_t bg = on ? colors[t] : PANEL;
+            paint_fill(x + 3, y + 17 + row * 16, 47, 14, bg);
+            text(x + 7, y + 21 + row * 16, row ? "SOLO" : "MUTE", 1, on ? BACK : DIM, bg);
+        }
     }
 }
 static void radio_line(unsigned slot, unsigned y, const char *value, uint16_t color)
@@ -2857,7 +2860,7 @@ const void *groove_screen_web_targets(void)
             unsigned on = i < 8 ? row.muted : row.solo;
             char label[16] = "T1 MUTE"; label[1] += i & 7U;
             if (i >= 8) memcpy(label + 3, "SOLO", 4);
-            web_target(8 + i % 4 * 57, 72 + i / 4 * 29, 53, 25, 7, i >= 8, i & 7U, label, on, on ? "ON" : "OFF");
+            web_target(8 + i % 4 * 57, 72 + (i & 7U) / 4 * 56 + (i >= 8 ? 32 : 16), 53, 16, 7, i >= 8, i & 7U, label, on, on ? "ON" : "OFF"); /* song-mode: the tile's MUTE and SOLO rows */
         }
     }
     return web_targets;

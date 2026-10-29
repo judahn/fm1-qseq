@@ -8,8 +8,9 @@
 // This fork's release (the probe, and CHANGELOG.md's latest) is on the boot
 // screen between the bars and M-VAVE, the same line heads the song list, and
 // the page's version badge carries it. Under it on the list, the battery:
-// the simulator's 900 as BAT 900, and its bar. Saves docs/panel-boot.png and
-// docs/panel-song-list.png.
+// the simulator's 900 as BAT 900, and its bar. The mix page has a tile a
+// track, with its MUTE and SOLO rows. Saves docs/panel-boot.png,
+// docs/panel-song-list.png and docs/panel-mix.png.
 import fs from 'node:fs';
 import path from 'node:path';
 import { simPage, savePng, checker } from './preview_lib.mjs';
@@ -49,6 +50,15 @@ export async function phasePanel(browser, root) {
     look('overview');
     r.tap(B.EDIT); look('sound editing'); r.tap(B.EDIT); r.render(8);
     r.held(B.HOME, () => r.tap(B.GLO)); look('device settings'); r.tap(B.HOME); r.render(8);
+    r.tap(B.GLO); r.render(8);                       // the mix page, one tile a track (0.3.3)
+    r.key(2); r.key(18); look('mix');                // white keys 2 and 11: mute track 2, solo track 3
+    const tiles = r.pixels();
+    o.mixTiles = Array.from({ length: 8 }, (_, t) => {
+      const x = 8 + (t % 4) * 57 + 48, y = 72 + (t >> 2) * 56, panel = tiles[(y + 3) * 240 + x];
+      return [18, 34].map(dy => (tiles[(y + dy) * 240 + x] !== panel ? 1 : 0)).join('');
+    });
+    o.mixPng = r.png();
+    r.key(2); r.key(18); r.tap(B.GLO); r.render(8);
     r.tap(B.SEQ); look('song view');
     r.tap(B.PLAY); r.render(40); look('song view, playing');
     o.wakePlaying = r.info(51);
@@ -90,11 +100,14 @@ export async function phasePanel(browser, root) {
   out.badge = await page.textContent('#release-version');
   savePng(root, 'panel-boot', out, 'bootPng');
   savePng(root, 'panel-song-list', out, 'listPng');
+  savePng(root, 'panel-mix', out, 'mixPng');
   await page.close();
   const latest = (fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8').match(/^## (\S+)/m) || [])[1];
   const t = checker('panel'), q = out;
   for (const [name, lit] of Object.entries(q.lit)) t.yes(`every button lit: ${name} (page ${q.pages[name]})`, lit);
   t.eq('at boot no track is muted or soloed (the engine\'s default mutes 6 and 7)', q.bootMix, ['00000000', '00000000']);
+  t.eq('the mix page: a tile a track, its MUTE row lit on track 2 and its SOLO row on track 3', q.mixTiles,
+    ['00', '10', '01', '00', '00', '00', '00', '00']);
   t.eq('the song pages were reached', [q.pages['song view'], q.pages['clip grid'], q.pages['song settings'],
     q.pages['recording chooser'], q.pages['song list']], [19, 27, 21, 23, 25]);
   t.eq('the wake runs while the song plays', q.wakePlaying, 1);

@@ -2,6 +2,11 @@
 
 The version is `FM1_QY_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.3.3
+
+- The mix page shows each track once: a tile a track, with a MUTE row and a SOLO row that light when they're on.
+  The keys are the same, 1 to 8 mute and 9 to 16 solo. In the browser, a click on either row toggles it.
+
 ## 0.3.2
 
 - The battery bar on the song list is set from a device: full at 622, a full battery read with USB unplugged,
