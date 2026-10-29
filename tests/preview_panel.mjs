@@ -38,8 +38,10 @@ export async function phasePanel(browser, root) {
     b.c.sim_boot(2);                                 // the boot screen, as the device starts
     b.render(32);
     const boot = b.pixels(), left = (240 - 6 * line.length) >> 1;
-    o.bootBox = drawn(boot, 188, 207);               // the rows between the bars and M-VAVE
-    o.bootWant = { left, right: left + 6 * line.length - 2, top: 194, bottom: 200 };
+    const shown = drawn(boot, 188, 207);             // the rows between the bars and M-VAVE
+    const last = left + 6 * (line.length - 1);       // the last letter's cell, which a narrow one (a 1) doesn't fill
+    o.bootBox = { left: shown.left, endsInLastCell: shown.right >= last && shown.right <= last + 4, top: shown.top, bottom: shown.bottom };
+    o.bootWant = { left, endsInLastCell: true, top: 194, bottom: 200 };
     o.bootPng = b.png();
     r.render(400);
     look('overview');

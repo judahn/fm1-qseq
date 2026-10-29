@@ -25,6 +25,8 @@ static struct kit_import import;
 static struct song_recovery recovery;
 static unsigned kit_id, importing, waiting, was_playing, bank_crc_for, baseline;
 static uint32_t bank_crc, checked_at;
+static int default_name(const char name[12]);
+static void next_number(char name[12]);
 
 /* The sounds block: the 8 sound setups, mute and solo, the shared effects,
  * the arpeggiators and the tuning, as the stock project holds them. */
@@ -144,11 +146,7 @@ SONG_SMALL int song_store_save(unsigned as_new)
     struct song *s = song_port_song();
     if (song_port_player()->playing) return SONG_STORE_PLAYING;
     unsigned id = as_new || !s->id ? pool_next_id(&pool, POOL_SONG) : s->id;
-    if (!s->name[0] || (as_new && !memcmp(s->name, "SONG ", 5))) { /* a default name follows the slot */
-        memcpy(s->name, "SONG        ", 12);
-        s->name[5] = (char)('0' + id / 10U % 10U);
-        s->name[6] = (char)('0' + id % 10U);
-    }
+    if (!s->name[0] || (as_new && default_name(s->name))) next_number(s->name); /* a default name stays a free number */
     capture();
     programs(s);
     uint16_t before = s->id;
@@ -193,7 +191,7 @@ SONG_SMALL int song_store_new(int factory)
     song_clear(s, 8, 12000);
     s->undo = undo;
     song_undo_init(undo);
-    memcpy(s->name, "NEW SONG    ", 12);
+    next_number(s->name); /* quick to rename */
     const char *name = factory >= 0 ? groove_factory_name((unsigned)factory) : NULL;
     if (name) memset(s->name, ' ', 12);
     for (unsigned i = 0; name && name[i] && i < 12; ++i) s->name[i] = name[i];
@@ -244,9 +242,12 @@ SONG_SMALL int song_store_duplicate(unsigned id)
 {
     char name[13] = {0};
     song_store_name(id, name);
-    unsigned length = (unsigned)strlen(name);
-    while (length < 10) name[length++] = ' ';
-    name[10] = ' '; name[11] = '2';
+    if (default_name(name)) next_number(name); /* a numbered song's copy takes the next number */
+    else {
+        unsigned length = (unsigned)strlen(name);
+        while (length < 10) name[length++] = ' ';
+        name[10] = ' '; name[11] = '2';
+    }
     return song_port_player()->playing ? SONG_STORE_PLAYING : copy_song(id, pool_next_id(&pool, POOL_SONG), name);
 }
 SONG_SMALL int song_store_delete(unsigned id)

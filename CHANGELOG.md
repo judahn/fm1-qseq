@@ -2,6 +2,11 @@
 
 The version is `FM1_QY_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.3.1
+
+- A new song is named with the lowest number no saved song uses (1, 2, 3 and so on) instead of NEW SONG, so renaming
+  it is quick. SAVE AS and DUPLICATE of a song still named with a number take the next free one.
+
 ## 0.3.0
 
 - SAVE opens the song list, and SAVE there saves, so a save is SAVE, SAVE. HOME+SAVE and SHIFT+HOME+SAVE still undo and

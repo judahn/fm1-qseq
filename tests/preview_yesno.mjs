@@ -16,6 +16,8 @@ export async function phaseYesNo(browser, root) {
     const written = () => r.c.sim_flash_revision();
     /* A stored song's first four letters, by its place in the list. */
     const name = row => { const v = info(52, 0, row); return String.fromCharCode(v & 255, v >> 8 & 255, v >> 16 & 255, v >> 24 & 255).replace(/\0+$/, ''); };
+    /* The working song's first four letters, trimmed (0.3.1). */
+    const working = () => { const v = info(57); return String.fromCharCode(v & 255, v >> 8 & 255, v >> 16 & 255, v >> 24 & 255).replace(/\0+$/, '').trim(); };
     /* A question is open: its box's corners, in accent or amber. */
     const asking = () => {
       r.render(8);
@@ -46,7 +48,7 @@ export async function phaseYesNo(browser, root) {
     r.tap(B.SAVE);                                 // SAVE opens the song list, the job doesn't run
     o.jobSave = { offGrid: offGrid(), asking: asking(), page: r.page() };
     r.tap(B.SAVE);                                 // SAVE there saves the song
-    o.listSave = { songs: store(0), written: written() !== saves };
+    o.listSave = { songs: store(0), written: written() !== saves, name: working() };
     r.tap(B.HOME); r.held(B.FX, () => r.tap(B.EDIT)); // back to the job, as it was
     r.tap(B.YES); r.tap(B.YES);
     o.jobRan = { offGrid: offGrid(), asking: asking() };
@@ -65,9 +67,9 @@ export async function phaseYesNo(browser, root) {
     for (let k = 0; k < 27; k++) r.key(k);         // the note keys do nothing here
     o.keys = { page: r.page(), songs: store(0), written: written() !== keys, asking: asking(), action: knob(1) };
     r.turn(3, 2); r.tap(B.YES);                    // SAVE AS: song 2, now the one worked on
-    o.saveAs = { songs: store(0), id: store(1) };
+    o.saveAs = { songs: store(0), id: store(1), name: working() };
     r.turn(3, 3); r.turn(2, -5); r.tap(B.YES);     // DUPLICATE song 1: no question
-    o.duplicate = { songs: store(0), asking: asking(), name: name(2), of: name(0) };
+    o.duplicate = { songs: store(0), asking: asking(), name: name(2).trim() };
     r.render(600);                                 // the notice runs out
     r.turn(3, 1); r.turn(2, 2);                    // DELETE, song 3
     r.render(4);
@@ -121,7 +123,7 @@ export async function phaseYesNo(browser, root) {
     // 5. NEW at once from blank, nothing unsaved. Again: the new song isn't saved, so it asks.
     r.turn(3, 3);
     r.tap(B.YES);
-    o.newClean = { asking: asking(), events: [0, 1, 2, 3, 4, 5, 6, 7].reduce((n, t) => n + info(0, t), 0) };
+    o.newClean = { asking: asking(), events: [0, 1, 2, 3, 4, 5, 6, 7].reduce((n, t) => n + info(0, t), 0), name: working() };
     r.tap(B.YES);
     o.newAsks = asking();
     r.tap(B.NO);
@@ -147,6 +149,7 @@ export async function phaseYesNo(browser, root) {
   t.no('jobs: SAVE doesn\'t ask', q.jobSave.asking);
   t.eq('list: SAVE there saves the song', q.listSave.songs, 1);
   t.yes('list: SAVE writes flash', q.listSave.written);
+  t.eq('list: an unnamed song saves as the lowest free number', q.listSave.name, '1');
   t.eq('jobs: YES, YES runs it', q.jobRan.offGrid, 0);
   t.no('jobs: no question after it ran', q.jobRan.asking);
   t.eq('jobs: NO with nothing open goes back to the song view', q.jobNoBack, 19);
@@ -155,9 +158,9 @@ export async function phaseYesNo(browser, root) {
     'ACTION RENAME', 'ACTION DUPLICATE', 'ACTION DELETE', 'ACTION DELETE']);
   t.eq('list: K4 is NEW FROM', q.newFrom, 'NEW FROM BLANK');
   t.eq('list: the note keys do nothing', q.keys, { page: 25, songs: 1, written: false, asking: false, action: 'ACTION LOAD' });
-  t.eq('list: YES on SAVE AS makes song 2', q.saveAs, { songs: 2, id: 2 });
+  t.eq('list: YES on SAVE AS makes song 2, a numbered name taking the next number', q.saveAs, { songs: 2, id: 2, name: '2' });
   t.eq('list: YES on DUPLICATE copies song 1 without asking', [q.duplicate.songs, q.duplicate.asking], [3, false]);
-  t.eq('list: the copy has song 1\'s name', q.duplicate.name, q.duplicate.of);
+  t.eq('list: a numbered song\'s copy takes the next free number', q.duplicate.name, '3');
   t.yes('list: DELETE asks', q.deleteAsks.asking);
   t.eq('list: asking deletes nothing', q.deleteAsks.songs, 3);
   t.eq('list: SAVE is ignored while a question is open', q.saveIgnored, { asking: true, written: false });
@@ -176,7 +179,8 @@ export async function phaseYesNo(browser, root) {
   t.eq('list: with unsaved changes YES asks before loading', q.loadAsks, { asking: true, id: 1 });
   t.eq('list: NO keeps the song', q.loadNo, { asking: false, id: 1 });
   t.eq('list: YES, YES loads', q.loaded, { id: 2, asking: false, unsaved: 0 });
-  t.eq('list: NEW at once with nothing unsaved, from blank', q.newClean, { asking: false, events: 0 });
+  t.eq('list: NEW at once with nothing unsaved, from blank, named the lowest free number (1 was renamed)', q.newClean,
+    { asking: false, events: 0, name: '1' });
   t.yes('list: NEW asks over a new song not saved yet', q.newAsks);
   t.no('list: NO cancels it', q.newNo);
   t.eq('list: SAVE with nothing open saves', q.saveKey, { songs: 3, unsaved: 0 });

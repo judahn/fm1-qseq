@@ -36,6 +36,38 @@ SONG_SMALL static void name_of(unsigned type, unsigned id, char out[17])
     if (e && !pool_header(&pool, e, &h)) memcpy(out, h.name, 16);
 }
 void song_store_name(unsigned id, char out[17]) { name_of(POOL_SONG, id, out); }
+/* Default names (0.3.1): a song starts as the lowest number no saved song
+ * goes by, quick to rename. A blank name, a number alone, or the older
+ * SONG and a number count as a default. */
+SONG_SMALL static unsigned name_number(const char *name, unsigned length)
+{
+    unsigned n = 0, i = 0;
+    while (i < length && name[i] >= '0' && name[i] <= '9' && n < 1000U) n = n * 10U + (unsigned)(name[i++] - '0');
+    if (!i) return 0;
+    while (i < length && (name[i] == ' ' || !name[i])) ++i;
+    return i == length ? n : 0;
+}
+SONG_SMALL static int default_name(const char name[12])
+{
+    unsigned i = 0;
+    while (i < 12 && (name[i] == ' ' || !name[i])) ++i;
+    return i == 12 || name_number(name, 12) || (!memcmp(name, "SONG ", 5) && name_number(name + 5, 7));
+}
+SONG_SMALL static void next_number(char name[12])
+{
+    uint8_t taken[32] = {0}; /* 1 to 255 */
+    char other[17], digits[3];
+    for (unsigned i = 0, count = count_of(POOL_SONG); i < count; ++i) {
+        name_of(POOL_SONG, nth(POOL_SONG, i), other);
+        unsigned n = name_number(other, 12);
+        if (n && n < 256U) taken[n >> 3] |= (uint8_t)(1U << (n & 7U));
+    }
+    unsigned n = 1, k = 0;
+    while (n < 255U && (taken[n >> 3] >> (n & 7U) & 1U)) ++n;
+    for (; n; n /= 10U) digits[k++] = (char)('0' + n % 10U);
+    memset(name, ' ', 12);
+    for (unsigned i = 0; i < k; ++i) name[i] = digits[k - 1U - i];
+}
 void song_store_kit_name(unsigned id, char out[17]) { (void)kit_name(&pool, id, out); }
 uint32_t song_store_bytes(unsigned id)
 {

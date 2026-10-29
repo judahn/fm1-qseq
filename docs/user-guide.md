@@ -296,8 +296,8 @@ What YES does:
 |---|---|
 | LOAD | Loads the picked song. With unsaved changes it asks first (`LOAD VERSE? UNSAVED CHANGES GO`) |
 | SAVE | Saves the song being worked on |
-| SAVE AS | Saves it as a new song |
-| NEW | Starts a new song from K4's pick, not saved yet. With unsaved changes it asks first |
+| SAVE AS | Saves it as a new song. A song still named with a number gets the next free one |
+| NEW | Starts a new song from K4's pick, not saved yet, named with the lowest number no saved song uses (1, 2, 3 and so on), so renaming it is quick. With unsaved changes it asks first |
 | RENAME | Names the picked song: K1 or SELECT picks the letter, K2 changes it, YES keeps the name, NO leaves the old one |
 | DUPLICATE | Copies the picked song |
 | DELETE | Asks (`DELETE VERSE?`), then deletes |

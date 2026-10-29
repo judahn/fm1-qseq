@@ -91,6 +91,7 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     case 54: return groove_tempo_saved() | groove_tempo_current() << 16; /* the engine's tempo (0.3.0) */
     case 55: return song_port_battery_shown();
     case 56: return groove_arp_enabled(track & 7U);
+    case 57: { uint32_t v; memcpy(&v, song.name, 4); return v; } /* the working song's name (0.3.1) */
 #endif
     case 18: return index < count ? e[index].b : 0;
     case 19: return song.swing | (uint32_t)song.swing_grid << 8 | (uint32_t)song.swing_tracks << 16;
