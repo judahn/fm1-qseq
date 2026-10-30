@@ -116,7 +116,7 @@ export async function phaseRec(browser, root) {
     tap(B.SAVE); tap(B.SAVE); tap(B.HOME);          // saved
     held(B.FX, () => tap(B.SCL));
     m.changed = mode();
-    tap(B.SAVE); tap(B.YES); tap(B.YES); tap(B.HOME); // loaded back: YES asks first, the change being unsaved
+    tap(B.SAVE); tap(B.YES); tap(B.YES);            // loaded back: YES asks first, the change being unsaved, then the song view (0.5.1)
     m.loaded = [mode(), pageNow()];
     held(B.FX, () => tap(B.SCL));
     m.back = mode();

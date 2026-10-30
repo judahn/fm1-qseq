@@ -2,15 +2,16 @@
 /* song-mode: step entry input, included by song_step.inc. Every key, F3 to
  * G5, enters notes, and a chord goes in when every key is up. With SHIFT
  * held a key works by its note name in any octave: the white keys pick the
- * length, F longest to E shortest, and the black ones are triplet, dots,
- * rest, tie and repeat. Holding LFO picks notes in a chord, and turning K4
- * meanwhile sweeps a selection, where keys toggle pitches (0.5.0). In
- * chord mode the roots enter their chords, F4 to E5 pick the type, and F5
- * to G5 enter the last chord again, an octave down and an octave up
- * (song_chord_keys). PLAY plays from the pointer's bar and stays here, and
- * while it plays the keys only sound. REC records a take here as in the
- * other views, a hold opens the record settings, and SHIFT+REC leaves, as
- * SEQ does (0.5.0). ALGO zooms the roll and ARP steps the glitch pages. */
+ * length, F longest to E shortest, as K1 does turning right (0.5.1), and
+ * the black ones are triplet, dots, rest, tie and repeat. Holding LFO
+ * picks notes in a chord, and turning K4 meanwhile sweeps a selection,
+ * where keys toggle pitches (0.5.0). In chord mode the roots enter their
+ * chords, F4 to E5 pick the type, and F5 to G5 enter the last chord again,
+ * an octave down and an octave up (song_chord_keys). PLAY plays from the
+ * pointer's bar and stays here, and while it plays the keys only sound. REC
+ * records a take here as in the other views, a hold opens the record
+ * settings, and SHIFT+REC leaves, as SEQ does (0.5.0). ALGO zooms the roll
+ * and ARP steps the glitch pages. */
 static uint32_t step_held; /* entry keys down for the chord being built */
 static uint8_t step_from; /* the page step entry was opened from (0.4.1) */
 static unsigned song_key_note(unsigned note);
@@ -136,7 +137,7 @@ static int song_step_input(const struct fm1_controls *c, uint32_t *pressed, uint
             step_refused(r, now);
         }
     } else {
-        if (c->encoders[2]) step_refused(step_set_length(st, c->encoders[2]), now);
+        if (c->encoders[2]) step_refused(step_set_length(st, -c->encoders[2]), now); /* right halves it, as F to E (0.5.1) */
         if (c->encoders[3]) step_refused(step_set_velocity(st, c->encoders[3]), now);
         if (c->encoders[4]) step_refused(step_set_gate(st, c->encoders[4]), now);
     }

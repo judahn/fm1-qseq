@@ -8,7 +8,9 @@ The full build has run on the FM-1 since 0.1.0.
 Names are the ones printed on the panel and shown on the screen.
 
 Every button light is on, all the time, on every page, so the printed labels can be read. The lights don't
-show which page or mode is active. The key lights work as described below.
+show which page or mode is active. The one exception is PLAY: while the song plays it blinks with the beat,
+lit for the first half of each beat and dark for the second, through a take's count-in too, whether or not
+the metronome is on. The key lights work as described below.
 
 ## The panel
 
@@ -208,7 +210,7 @@ time signature and, at the right, the span ALGO has zoomed to.
 | SHIFT+C# | Rest: move on one step |
 | SHIFT+D# | Tie: lengthen the last entry by the current length |
 | SHIFT+A# | Repeat the last entry |
-| K1 | Length |
+| K1 | Length: 1/1 at the left, and each step right halves it, down to 1/64, the same order as SHIFT+F to E |
 | K2 | Velocity, 1 to 127, named by the nearest of PPP to FFFF. Past the top: random R1 to R4 |
 | K3 | Gate: 50, 90, 99 or 100% |
 | K4 | Move the pointer one step. SHIFT+K4 jumps note to note |
@@ -402,7 +404,7 @@ What YES does:
 
 | Action | YES |
 |---|---|
-| LOAD | Loads the picked song. With unsaved changes it asks first (`LOAD VERSE? UNSAVED CHANGES GO`) |
+| LOAD | Loads the picked song and opens it in the song view. With unsaved changes it asks first (`LOAD VERSE? UNSAVED CHANGES GO`) |
 | SAVE | Saves the song being worked on |
 | SAVE AS | Saves it as a new song. A song still named with a number gets the next free one |
 | NEW | Starts a new song from K4's pick, not saved yet, named with the lowest number no saved song uses (1, 2, 3 and so on), so renaming it is quick. With unsaved changes it asks first |
@@ -412,7 +414,7 @@ What YES does:
 
 A question goes when another song is picked or K2 or K4 turns. The note keys do nothing on the list. Nothing
 is written while the song plays: stop first. On the recovery row (RESTORE THE UNSAVED SONG) LOAD restores
-the copy and DELETE removes it from flash, asking first, so a restart doesn't offer it again. RENAME and
+the copy, also into the song view, and DELETE removes it from flash, asking first, so a restart doesn't offer it again. RENAME and
 DUPLICATE don't work there. SAVE, SAVE AS and NEW work as anywhere, since they act on the song being worked on.
 
 In the full build the stock factory sound sets are left out, so a new song starts blank. The workbench can

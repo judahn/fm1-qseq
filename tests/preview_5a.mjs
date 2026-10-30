@@ -49,6 +49,7 @@ export async function phase5a(browser, root) {
     r.turn(2, -5);
     r.tap(B.YES);
     o.loaded = { id: store(1), sameEvents: dump() === before, sameBytes: store(16) === crc, page: r.page() };
+    r.tap(B.SAVE);                                 // the list again (the load opened the song view, 0.5.1)
     r.render(4);
     o.listPng = r.png();
 
@@ -90,7 +91,7 @@ export async function phase5a(browser, root) {
     r.render(2);
     o.restoreLabel = r.knobs()[1];
     r.tap(B.YES);
-    o.restored = { sameBytes: store(16) === changed, id: store(1), waiting: store(4) };
+    o.restored = { sameBytes: store(16) === changed, id: store(1), waiting: store(4), page: r.page() };
 
     // 7. The same flash again, and this time DELETE on the recovery row: K2
     // to DELETE, YES asks, YES drops the copy from flash. Rebooted on that,
@@ -119,7 +120,7 @@ export async function phase5a(browser, root) {
   t.eq('K2 picks SAVE AS', q.saveAsLabel, 'ACTION SAVE AS');
   t.eq('YES saves as a new song: two songs', q.songsAfterSaveAs, 2);
   t.eq('YES loads song 1, nothing unsaved, so at once', q.loaded.id, 1);
-  t.eq('loading stays on the list', q.loaded.page, 25);
+  t.eq('loading opens the song view', q.loaded.page, 19);
   t.yes('the loaded song has the same events', q.loaded.sameEvents);
   t.yes('the loaded song has the same bytes', q.loaded.sameBytes);
   t.eq('a kit through the transfer calls', q.kitImport, 0);
@@ -140,6 +141,7 @@ export async function phase5a(browser, root) {
   t.eq('the offer comes with K2 on LOAD', q.restoreLabel, 'ACTION LOAD');
   t.yes('restored, the song is what was played', q.restored.sameBytes);
   t.eq('restored, nothing waits any more', q.restored.waiting, 0);
+  t.eq('restored, the song view opens', q.restored.page, 19);
   t.eq('DELETE on the recovery row drops the copy from flash', q.dropped, { waiting: 0, copy: 0, songs: 2, page: 25 });
   t.eq('rebooted on that flash nothing is offered: SEQ opens the song view', q.afterDrop, { page: 19, waiting: 0, songs: 2 });
   return { phase: '5a', checks: t.list, out };

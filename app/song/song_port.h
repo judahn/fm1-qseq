@@ -37,6 +37,7 @@ void song_deliver_note(const uint8_t message[3]);
 void song_deliver_poll(void);                        /* through the block about to render */
 void song_deliver_start(unsigned count_in);
 void song_deliver_render(uint32_t block);            /* browser preview only */
+int song_deliver_beat_lit(void);                     /* PLAY's light: stopped lit, playing with the beat (0.5.1) */
 /* The audio interrupt reads song_isr_mode after each render: 1 wakes the
  * control loop (method B). */
 extern volatile uint8_t song_isr_mode;

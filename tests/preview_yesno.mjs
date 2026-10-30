@@ -105,7 +105,8 @@ export async function phaseYesNo(browser, root) {
     // 4. LOAD song 1 at once, nothing unsaved. Then a change, and LOAD asks: NO keeps the song, YES loads.
     r.turn(3, -4);
     r.tap(B.YES);
-    o.loadClean = { id: store(1), asking: asking(), unsaved: store(17) };
+    o.loadClean = { id: store(1), asking: asking(), unsaved: store(17), page: r.page() };
+    r.held(B.FX, () => r.tap(B.SAVE));             // the list again (0.5.1)
     r.tap(B.NO);                                   // nothing open: back to the song view
     o.noBack = r.page();
     r.tap(B.SCL);                                  // SEL: a marker at the playhead, a change
@@ -118,7 +119,8 @@ export async function phaseYesNo(browser, root) {
     r.tap(B.NO);
     o.loadNo = { asking: asking(), id: store(1) };
     r.tap(B.YES); r.tap(B.YES);
-    o.loaded = { id: store(1), asking: asking(), unsaved: store(17) };
+    o.loaded = { id: store(1), asking: asking(), unsaved: store(17), page: r.page() };
+    r.held(B.FX, () => r.tap(B.SAVE));
 
     // 5. NEW at once from blank, nothing unsaved. Again: the new song isn't saved, so it asks.
     r.turn(3, 3);
@@ -173,12 +175,12 @@ export async function phaseYesNo(browser, root) {
   t.yes('list: YES keeps the new name', q.renamed.now !== q.renamed.old && q.renamed.now.slice(1) === q.renamed.old.slice(1), q.renamed);
   t.eq('list: naming ends with YES', q.renamed.knob, 'ACTION RENAME');
   t.eq('list: NO cancels the naming, the name stays', q.cancelled, { now: q.renamed.now, knob: 'ACTION RENAME' });
-  t.eq('list: YES loads at once with nothing unsaved', q.loadClean, { id: 1, asking: false, unsaved: 0 });
+  t.eq('list: YES loads at once with nothing unsaved, into the song view', q.loadClean, { id: 1, asking: false, unsaved: 0, page: 19 });
   t.eq('list: NO with nothing open goes back to the song view', q.noBack, 19);
   t.eq('list: a marker added is an unsaved change', q.changed, 1);
   t.eq('list: with unsaved changes YES asks before loading', q.loadAsks, { asking: true, id: 1 });
   t.eq('list: NO keeps the song', q.loadNo, { asking: false, id: 1 });
-  t.eq('list: YES, YES loads', q.loaded, { id: 2, asking: false, unsaved: 0 });
+  t.eq('list: YES, YES loads, into the song view', q.loaded, { id: 2, asking: false, unsaved: 0, page: 19 });
   t.eq('list: NEW at once with nothing unsaved, from blank, named the lowest free number (1 was renamed)', q.newClean,
     { asking: false, events: 0, name: '1' });
   t.yes('list: NEW asks over a new song not saved yet', q.newAsks);

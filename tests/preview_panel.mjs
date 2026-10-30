@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception
 // The panel in the preview check. Every button light is on, all the time,
-// on stock and song pages alike, so the printed labels can be read. The
+// on stock and song pages alike, so the printed labels can be read, but
+// PLAY's blinks while the song plays, lit the first half of each beat, the
+// count-in's too, and is lit again once stopped (0.5.1). The
 // wake (delivery method B) runs while the song plays and stops with it.
 // And a page change while the song view's playhead moves every frame (2-bar
 // zoom) paints the whole new page with the LCD at the device's pace, one
@@ -21,7 +23,26 @@ export async function phasePanel(browser, root) {
   const page = await simPage(browser, root);
   const out = await page.evaluate(() => {
     const r = previewRig(), { B } = r, o = { lit: {}, pages: {} };
-    const look = name => { r.render(8); o.lit[name] = r.lights().every(v => v === 1); o.pages[name] = r.page(); };
+    const look = name => {
+      r.render(8);
+      const playing = r.info(7);
+      o.lit[name] = r.lights().every((v, i) => v === 1 || (playing && i === B.PLAY));
+      o.pages[name] = r.page();
+    };
+    /* PLAY's light block by block: its whole lit and dark runs, and whether
+     * they are as long as each other, within a tenth (0.5.1). */
+    const blink = n => {
+      const runs = [[], []], mean = a => a.reduce((x, y) => x + y, 0) / (a.length || 1);
+      let v = r.lights()[B.PLAY], length = 0, first = true;
+      for (let i = 0; i < n; i++) {
+        r.render(1);
+        const w = r.lights()[B.PLAY];
+        if (w === v) { length++; continue; }
+        if (!first) runs[v].push(length);
+        first = false; v = w; length = 1;
+      }
+      return { on: runs[1].length, off: runs[0].length, even: Math.abs(mean(runs[1]) - mean(runs[0])) <= 0.1 * mean(runs[0]) };
+    };
     const word = i => { const w = r.info(53, 0, i); return [w & 255, w >>> 8 & 255, w >>> 16 & 255, w >>> 24]; };
     const bytes = [0, 1, 2, 3].flatMap(word), line = 'QY ' + String.fromCharCode(...bytes.slice(0, bytes.indexOf(0)));
     o.version = line.slice(3);
@@ -64,11 +85,13 @@ export async function phasePanel(browser, root) {
     r.tap(B.SEQ); look('song view');
     r.tap(B.PLAY); r.render(40); look('song view, playing');
     o.wakePlaying = r.info(51);
+    o.blinkPlaying = blink(1400);
     r.tap(B.SEQ); look('clip grid');
     r.tap(B.SEQ); r.render(8);
     r.tap(B.GLO); look('song settings'); r.tap(B.GLO); r.render(8);
     r.tap(B.PLAY); r.render(8);
     o.wakeStopped = r.info(51);
+    o.stoppedLit = r.lights()[B.PLAY];
     r.long(B.REC); look('record settings'); r.tap(B.HOME); r.render(8);  // REC held (0.4.0)
     o.recBack = r.page();
     r.held(B.FX, () => r.tap(B.SAVE)); look('song list');
@@ -86,6 +109,13 @@ export async function phasePanel(browser, root) {
     o.batteryBar = [124, 125, 135, 146, 147].map(x => list[18 * 240 + x] !== 0);
     o.listPng = r.png();
     r.tap(B.HOME); r.render(8);
+    // REC from a stop: through the count-in PLAY blinks, the song's clock
+    // still. REC again calls the take off, and PLAY is lit.
+    const clock = r.info(8);
+    r.tap(B.REC);
+    o.blinkCountIn = { ...blink(600), still: r.info(8) === clock, playing: r.info(7) };
+    r.tap(B.REC); r.render(8);
+    o.calledOff = { playing: r.info(7), lit: r.lights()[B.PLAY] };
     // The same steps at full speed and at the device's pace.
     const run = paced => {
       const q = previewRig();
@@ -120,6 +150,11 @@ export async function phasePanel(browser, root) {
   t.eq('the song list: HEAP and a dash right of the battery, 6 letters to the right edge, since the browser has no heap',
     q.heapBox, { left: 232 - 6 * 6, right: 232 - 2, top: 15, bottom: 21 });
   t.eq('the dash', q.heapDash, '000000/000000/000000/111110/000000/000000/000000');
+  t.yes('PLAY blinks while the song plays, lit and dark in turn, each half a beat', q.blinkPlaying.on >= 2 && q.blinkPlaying.off >= 2 && q.blinkPlaying.even, q.blinkPlaying);
+  t.eq('stopped, PLAY is lit', q.stoppedLit, 1);
+  t.yes('PLAY blinks through a take\'s count-in, the song\'s clock still', q.blinkCountIn.on >= 2 && q.blinkCountIn.off >= 2 && q.blinkCountIn.even &&
+    q.blinkCountIn.still && q.blinkCountIn.playing === 1, q.blinkCountIn);
+  t.eq('REC calls the count-in off: stopped, PLAY lit', q.calledOff, { playing: 0, lit: 1 });
   t.eq('the wake runs while the song plays', q.wakePlaying, 1);
   t.eq('and stops with it', q.wakeStopped, 0);
   t.yes('the song played through the page changes', q.playingThrough);

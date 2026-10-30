@@ -90,6 +90,20 @@ SONG_SMALL void song_player_count_in(struct song_player *p, uint64_t frame, unsi
     p->pre_origin = frame;
     p->frame = frame + p->pre_left * p->pre_units / p->pre_rate;
 }
+#if SONG_UI
+/* PLAY's light (0.5.1): 1 in the first half of each beat at audio frame
+ * `frame`, the count-in's beats too, else the beats of the clock shown. */
+SONG_SMALL int song_player_beat_lit(const struct song_player *p, uint64_t frame)
+{
+    if (p->pre_units && frame >= p->pre_origin &&
+        frame < p->pre_origin + (p->pre_done + p->pre_left) * p->pre_units / p->pre_rate)
+        return (frame - p->pre_origin) * p->pre_rate % p->pre_units < p->pre_units / 2U;
+    const struct song *s = p->song;
+    uint32_t start, clock = song_player_clock(p);
+    uint32_t beat = SONG_WHOLE / song_meter_at(s, song_bar_at(s, clock, &start, NULL))->unit;
+    return (clock - start) % beat < beat / 2U;
+}
+#endif
 SONG_SMALL uint32_t song_player_clock_at(const struct song_player *p, uint64_t frame)
 {
     if (!p->playing || frame >= p->frame) return song_player_clock(p);

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception
 // Step entry's keys in the preview check. With SHIFT a key works by its note
 // name in any octave: F to E pick 1/1 down to 1/64, F# triplet, G# dots,
-// C# rest, D# tie, A# repeat, and no key enters a note. Without SHIFT every
+// C# rest, D# tie, A# repeat, and no key enters a note. K1 runs the same
+// way, 1/1 at the left and halving turning right (0.5.1). Without SHIFT every
 // key enters notes, F5 to G5 too, and the key lights show the scale on all
 // 27. Saves docs/keys-step-shift.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
@@ -20,8 +21,11 @@ export async function phaseKeys(browser, root) {
     r.step();                                      // SHIFT+REC: step entry on track 1
     o.stepPage = r.page();
 
-    // 1. Lengths by note name. K1 down to 1/64 first, so each F shows.
-    o.octaves = [0, 12, 24].map(k => { r.turn(2, -6); shiftKey(k); return length(); });
+    // 0. K1 from 1/16: left to 1/1, then right a step at a time to 1/64.
+    r.turn(2, -9);
+    o.k1 = [length(), ...[1, 2, 3, 4, 5, 6].map(() => { r.turn(2, 1); return length(); })];
+    // 1. Lengths by note name. K1 to 1/64 first, so each F shows.
+    o.octaves = [0, 12, 24].map(k => { r.turn(2, 6); shiftKey(k); return length(); });
     o.whites = [12, 14, 16, 18, 19, 21, 23].map(k => { shiftKey(k); return length(); }); // F4 to E5
     shiftKey(7); o.c = length();                   // C4
     shiftKey(11); o.e = length();                  // E4
@@ -70,6 +74,7 @@ export async function phaseKeys(browser, root) {
   await page.close();
   const t = checker('keys'), q = out;
   t.eq('SHIFT+REC opens step entry', q.stepPage, 20);
+  t.eq('K1: 1/1 at the left, each step right halves it, down to 1/64', q.k1, ['1/1', '1/2', '1/4', '1/8', '1/16', '1/32', '1/64']);
   t.eq('SHIFT+F3, SHIFT+F4 and SHIFT+F5 each pick 1/1', q.octaves, ['1/1', '1/1', '1/1']);
   t.eq('SHIFT+F4 to E5: 1/1 down to 1/64', q.whites, ['1/1', '1/2', '1/4', '1/8', '1/16', '1/32', '1/64']);
   t.eq('SHIFT+C4 picks 1/16', q.c, '1/16');

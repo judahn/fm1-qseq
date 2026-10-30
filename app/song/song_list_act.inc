@@ -2,9 +2,15 @@
 /* song-mode: the song list's actions, included by song_list.inc. The hint
  * that says what YES will do and to what, and YES itself. Loading or a new
  * song asks first when unsaved changes would go, deleting always asks, and
- * a second YES goes ahead. On the recovery row only load (it restores) and
- * delete (it drops the copy) work. */
+ * a second YES goes ahead. A song loaded or restored opens in the song
+ * view. On the recovery row only load (it restores) and delete (it drops
+ * the copy) work. */
 
+static void song_list_close(void) /* to the song view */
+{
+    page = music_page = SONG;
+    cache->shown_page = ~0U;
+}
 static void song_list_trim(char name[17])
 {
     name[16] = 0;
@@ -86,6 +92,7 @@ static void song_list_yes(uint32_t now)
         if (!asked && song_store_unsaved()) { song_ask(ask, "UNSAVED CHANGES GO", 1); return; }
         int r = a == LIST_NEW ? song_store_new(song_list_source) : on == 2 ? song_store_restore() : song_store_load(id);
         song_list_done(r, a == LIST_NEW ? "NEW SONG, NOT SAVED YET" : on == 2 ? "UNSAVED SONG RESTORED" : "SONG LOADED", now);
+        if (!r && a == LIST_LOAD) song_list_close(); /* the loaded song opens in the song view (0.5.1) */
     } else if (a == LIST_DELETE) {
         if (!asked) { song_ask(ask, NULL, 1); return; }
         song_list_done(on == 2 ? song_store_drop_recovery() : song_store_delete(id), "DELETED", now);

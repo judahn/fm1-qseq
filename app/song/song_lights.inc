@@ -1,7 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* song-mode: key lights on the song pages, and the scale snap for played
  * keys. Included by song_panel.inc. The button lights are all on, all the
- * time, on every page (screen.c), so the printed labels can be read. */
+ * time, on every page (screen.c), so the printed labels can be read, but
+ * PLAY's blinks with the beat while the song plays (0.5.1). */
+
+static unsigned song_button_leds(unsigned bits)
+{
+#if SONG_UI
+    if (!song_deliver_beat_lit()) bits &= ~BUTTON(PLAY);
+#endif
+    return bits;
+}
 
 /* Key lights: the scale on pitched tracks, the swinging tracks on the
  * settings page, or in the grid each track key lit while its clip plays and

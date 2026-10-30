@@ -1243,7 +1243,7 @@ static void leds(const struct groove_view *v, unsigned visible)
         | ((visible == FM_EDIT || visible == TONE_EDIT || visible == FM_QUICK || visible == STEP_EDIT) << EDIT)
         | ((visible == FM_ENV) << ENV) | ((visible == FM_LFO) << LFO)
         | ((visible == PROJECT || visible == SOURCE || (visible == ACTIONS && action_confirm)) << SAVE);
-    bits = 0x3fffU; /* song-mode: every button lit on every page, so its printed label can be read */
+    bits = song_button_leds(0x3fffU); /* song-mode: all lit, so the labels can be read, PLAY with the beat */
     changed = bits ^ button_led_cache;
     for (unsigned key = 0; key < 14; ++key)
         if (changed & (1U << key)) fm1_led_set(key, (bits >> key) & 1U);

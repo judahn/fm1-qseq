@@ -93,7 +93,8 @@ kept the top three keys for rest, repeat and tie, and put the lengths on the low
 | D# | Tie: lengthen the last note by the current length. The length can be changed first, so a quarter plus an 8th tie works (QY700 behavior) |
 | A# | Repeat: enter the last note or chord again (quick hi-hat runs) |
 
-With SHIFT held no key enters a note or strikes a chord. K1 still lengthens turning right.
+With SHIFT held no key enters a note or strikes a chord. K1 runs the same way as the keys, 1/1 at the left, halving
+turning right (0.5.1).
 
 **Knobs (step mode):** K1 length, K2 velocity, K3 gate. K4 moves the pointer by the current length. SHIFT plus
 K4 jumps from note to note. SELECT picks the track. Landing on a note plays it, as on the QY70. ALGO zooms the
@@ -702,7 +703,8 @@ trims voices on its own when it runs out.
 - Songs export and import through the browser workbench, as our own song files and as standard MIDI files.
 - Patterns work like Ableton Live's session view: clips per track, launched from a grid (10/28).
 - Every button light stays on, on every page, so the printed labels can be read. Lights that showed state are
-  gone, with no setting to bring them back. The key lights are unchanged (10/28).
+  gone, with no setting to bring them back. The key lights are unchanged (10/28). Since 0.5.1 PLAY's light
+  blinks with the beat while the song plays, lit the first half of each beat, the count-in's beats too.
 - The button printed SEL is SEL on screen too. The stock code's identifier for it is still SCL (10/28).
 - The song holds references to clips, and an Expand job turns them into notes (10/28).
 - Chords are a play setting per track, roots on the left and types on the right, with strum. The QY70's

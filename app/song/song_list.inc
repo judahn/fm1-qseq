@@ -167,8 +167,7 @@ static int song_list_input(const struct fm1_controls *c, uint32_t *pressed, uint
     song_heap_measure(); /* opened while playing: once it stops */
     if ((*pressed & BUTTON(HOME)) || (answer < 0 && !open)) { /* back to the song view */
         *pressed &= ~BUTTON(HOME);
-        page = music_page = SONG;
-        cache->shown_page = ~0U;
+        song_list_close();
         return 1;
     }
     if ((*pressed & BUTTON(SAVE)) && !open) song_save_key(now); /* not while something waits for YES or NO */

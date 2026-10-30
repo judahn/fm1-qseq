@@ -157,6 +157,13 @@ SONG_SMALL void song_port_stop(void)
     song_player_chase(song_port_player(), song_port_player()->playhead); /* stopping: lanes chase too */
 #endif
 }
+#if SONG_UI
+SONG_SMALL int song_deliver_beat_lit(void)
+{
+    const struct song_player *p = song_port_player();
+    return !p->playing || song_player_beat_lit(p, (uint64_t)song_port_blocks() * FM1_BLOCK_FRAMES);
+}
+#endif
 /* Every caller moves the playhead on purpose (a knob, a marker, SHIFT+PLAY,
  * step entry, a song loaded), so the place becomes the start point too
  * (0.5.0). Playing, it is where the pending jump goes. */

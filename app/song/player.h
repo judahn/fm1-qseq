@@ -108,6 +108,9 @@ uint32_t song_player_target(const struct song_player *p);
 void song_player_count_in(struct song_player *p, uint64_t frame, unsigned bars);
 /* The clock playing at an audio frame up to the last advance. */
 uint32_t song_player_clock_at(const struct song_player *p, uint64_t frame);
+#if SONG_UI
+int song_player_beat_lit(const struct song_player *p, uint64_t frame); /* PLAY's light, playing (0.5.1) */
+#endif
 /* Sends every automated lane's value as of `clock` (lanes.h). Playback
  * does this itself on start, jumps and loop wraps. */
 void song_player_chase(struct song_player *p, uint32_t clock);

@@ -2,6 +2,15 @@
 
 The version is `FM1_QY_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.5.1
+
+- K1 in step entry runs from the whole note: 1/1 at the left, and each step right halves the length, down to
+  1/64. It used to lengthen turning right. Now it runs the same way as SHIFT+F to E and as ALGO's zoom.
+- LOAD on the song list opens the loaded song in the song view, and so does restoring the unsaved copy. NEW
+  and the other actions still stay on the list.
+- PLAY's light blinks with the beat while the song plays, lit for the first half of each beat, on every page
+  and through a take's count-in, whether or not the metronome is on. Stopped, it is lit as before.
+
 ## 0.5.0
 
 - PLAY in step entry plays and stays there, from the start of the pointer's bar: the song, or in a clip the
