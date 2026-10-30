@@ -3,6 +3,7 @@
  * notes across the range edges, triplets, chords and empty ranges, with
  * undo and redo after each one. */
 #include "jobs_harness.h"
+#include "clips.h"
 
 static void test_quantize(void)
 {
@@ -53,6 +54,20 @@ static void test_quantize(void)
     undo_redo();
     r = range(10, 10, 1);
     CHECK_EQ(song_job_quantize(&song, &r, 120, 100, 50, 0), -1); /* an empty range */
+    /* In the clip editor the clip's end is its top (0.5.1): a note that
+     * lands there goes round, with its gate kept. The song's don't. */
+    fresh(4);
+    note(1, 1900, 66, 100, 50);
+    CHECK_EQ(song_clip_open(&song, song_cell(0, 0)), 0);  /* an empty cell: a bar long */
+    note(0, 1900, 64, 100, 50);
+    note(0, 1000, 65, 100, 50);
+    r = range(0, 1920, 3);
+    CHECK_EQ(JOB(song_job_quantize(&song, &r, 120, 100, 50, 1)), 3);
+    CHECK(has_note(0, 0, 64) && has_note(0, 960, 65));
+    CHECK_EQ(nth_note(0, 0)->length, 120);
+    CHECK(has_note(1, 1920, 66));
+    undo_redo();
+    song_clip_close(&song);
 }
 
 static void test_velocity_gate(void)

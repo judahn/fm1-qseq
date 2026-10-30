@@ -54,15 +54,18 @@ SONG_SMALL static uint32_t snap(const struct song *s, uint32_t clock, const stru
     int64_t move = ((int64_t)best - (int64_t)clock) * (int64_t)q->strength;
     return (uint32_t)((int64_t)clock + (move >= 0 ? (move + 50) / 100 : -((-move + 50) / 100)));
 }
+/* In the clip editor a note that lands on the clip's end goes round to its
+ * top, where the clip plays it next (0.5.1). */
 SONG_SMALL static void quantized(const struct song *s, unsigned t, struct song_event *e, const void *ctx)
 {
     const struct quantize *q = ctx;
-    (void)t;
     uint32_t start = song_event_start(e), at = snap(s, start, q);
     if (q->gate) {
         uint32_t end = snap(s, start + e->length, q);
         e->length = (uint16_t)(end > at ? (end - at > 0xffffU ? 0xffffU : end - at) : q->grid);
     }
+    uint32_t clip = t == song_editing(s) ? s->clip_length[s->open - SONG_TRACKS] : 0;
+    if (clip && start < clip && at >= clip) at -= clip;
     start_at(e, at > SONG_MAX_CLOCK ? SONG_MAX_CLOCK : at);
 }
 SONG_SMALL int song_job_quantize(struct song *s, const struct song_range *r, unsigned grid, unsigned strength, unsigned swing,

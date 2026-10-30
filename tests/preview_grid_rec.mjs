@@ -9,7 +9,11 @@
 // (0.4.0), REC empties the clip first, keeping its length, and records into
 // it. PLAY in a count-in calls the take off and stops. Each take is one undo
 // step, and undo takes a new clip away with it, or gives a replaced clip
-// back. Saves docs/grid-rec-*.png.
+// back. The catch (0.5.1), on a fresh FM-1: a key in the count-in's last
+// 94 ms lands on the first beat, as long as it was held if let go before
+// it, one just before the clip's end on the next pass's first beat, and one
+// just before a cell's launch on its first beat.
+// Saves docs/grid-rec-*.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
 
 export async function phaseGridRec(browser, root) {
@@ -135,6 +139,40 @@ export async function phaseGridRec(browser, root) {
     undo();
     o.undoFirst = [info(39, 0, cell(0, 0)), info(40, 0, cell(0, 0))];
     o.page = r.page();
+
+    // 6. The catch (0.5.1), on a fresh FM-1. From a stop, REC on an empty
+    // cell, 1 bar: a key as the catch opens, in the count-in, goes on the
+    // first beat, and one just before the bar's end on the next pass's.
+    // Then, playing, REC on track 2's empty cell waits for the next bar: a
+    // key just before it, held over it, goes on that clip's first beat.
+    const g = previewRig(), gi = g.info, gr = n => g.render(n), k = o.catch = {};
+    const gUntil = (test, most = 4000) => { let n = 0; while (!test() && n < most) { gr(1); n++; } return n; };
+    const gHold = (key, blocks) => { g.c.sim_control(1, key, 1); gr(blocks); g.c.sim_control(1, key, 0); };
+    const gNotes = (t, row) => Array.from({ length: gi(40, 0, cell(t, row)) }, (_, i) =>
+      ({ clock: gi(1, 8 + cell(t, row), i), pitch: gi(2, 8 + cell(t, row), i), length: gi(3, 8 + cell(t, row), i) }))
+      .filter((n, i) => !gi(30, 8 + cell(t, row), i));
+    gr(32);
+    g.tap(B.SEQ); g.tap(B.SEQ);
+    g.turn(3, -2);                                  // K2: REC LENGTH 1 bar
+    g.tap(B.REC);
+    gUntil(() => (gi(28) | 0) >= 0);                // the catch opens
+    gHold(5, 10);                                   // A#3, let go before the beat: as long as it was held
+    g.c.sim_control(1, 7, 1);                       // C4 down
+    k.early = 10 + gUntil(() => gi(8) > 0);         // blocks to the first beat
+    gr(30);
+    g.c.sim_control(1, 7, 0);
+    gUntil(() => (gi(28) | 0) >= 1880);             // 40 clocks before the clip's end
+    gHold(9, 10);                                   // D4, let go before the end
+    gUntil(() => !(gi(36) & 255));                  // the take ends with the bar
+    k.first = gNotes(0, 0).map(n => ({ clock: n.clock, pitch: n.pitch }));
+    k.tapped = (gNotes(0, 0).find(n => n.pitch === 58) || {}).length;
+    g.turn(0, 1);                                   // track 2
+    g.tap(B.REC);                                   // its launch waits for the next bar
+    k.waiting = gi(36) & 3;                         // armed
+    gUntil(() => gi(45, 1) > gi(43) && gi(45, 1) - gi(43) <= 40);
+    gHold(14, 30);                                  // G4, held over the launch
+    gUntil(() => !(gi(36) & 255));                  // its take ends with the bar
+    k.launched = gNotes(1, 0).map(n => ({ clock: n.clock, pitch: n.pitch }));
     return o;
   });
   savePng(root, 'grid-rec-armed', out.fromStop, 'armedPng');
@@ -176,5 +214,12 @@ export async function phaseGridRec(browser, root) {
   t.eq('undo: the FREE clip goes', out.undoFree, 0);
   t.eq('undo: the first clip goes, notes and all', out.undoFirst, [0, 0]);
   t.eq('still on the grid', out.page, 27);
+  const k = out.catch;
+  t.yes('the catch: a key about 94 ms before the first beat, 30 to 35 blocks', k.early >= 30 && k.early <= 35, k.early);
+  t.eq('the catch: those keys and one just before the clip\'s end, all on its first beat', k.first,
+    [{ clock: 0, pitch: 58 }, { clock: 0, pitch: 60 }, { clock: 0, pitch: 62 }]);
+  t.yes('the catch: the key let go before the beat keeps its length, 10 blocks, about 28 clocks', k.tapped >= 25 && k.tapped <= 31, k.tapped);
+  t.eq('the catch: REC while playing waits for the launch', k.waiting, 1);
+  t.eq('the catch: a key just before the launch, held over it, on the new clip\'s first beat', k.launched, [{ clock: 0, pitch: 67 }]);
   return { phase: 'grid rec', checks: t.list, out };
 }

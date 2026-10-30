@@ -97,6 +97,18 @@ SONG_SMALL void song_deliver_note(const uint8_t message[3])
 #endif
 }
 #if SONG_UI
+/* The player's notes are never a live key, sent from the control side too
+ * (a cut, a stop, a chase), so they never reach a take (0.5.1). */
+SONG_SMALL void song_deliver_played(const uint8_t message[3])
+{
+    uint8_t was = emitting;
+    emitting = 1;
+    (void)song_midi_post(message, 3);
+    emitting = was;
+#if SONG_HW_TEST
+    if (was) song_diag_late(song_port_blocks(), due_block);
+#endif
+}
 SONG_SMALL void song_deliver_message(const uint8_t *message, size_t bytes) { (void)song_midi_post(message, bytes); }
 #endif
 

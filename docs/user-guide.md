@@ -175,6 +175,17 @@ The record settings:
 A live mode picked with K1 becomes the song's mode, the one shown in red in the list. STEP never does: picking
 it and leaving keeps the last live mode. In the grid PUNCH and LOOP record as OVERDUB.
 
+**Early keys land on the beat.** A key played just before a take's first beat goes on that beat: in the
+count-in, or before a grid cell's launch, or as a playing clip comes round to start its take. In a LOOP take,
+and in every take into a grid cell, a key just before the loop's end goes on its first beat, where the next
+pass starts. The note ends where you let go, or if you let go before the beat, it keeps the length you held
+it. "Just before" is 100 ms, kept under a 16th note at fast
+tempos so a 16th pickup stays where you played it: at 120 BPM that comes to about 94 ms. With input quantize
+on it is half the grid when that is wider, so anything that would quantize onto the loop's end goes to its
+start instead. Earlier than that, a key in the count-in isn't recorded, and one in a loop ends where the
+loop goes round. In the clip editor the QUANTIZE job sends a note that lands on the clip's end round to its
+start the same way.
+
 During a take:
 
 | Control | Action |

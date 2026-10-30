@@ -135,6 +135,7 @@ export async function phaseRoll(browser, root) {
     sw.c4 = swept();
     key(11);
     sw.both = swept();
+    render(2);                                      // a poll between two taps of one key
     key(11);
     sw.again = swept();
     render(4);

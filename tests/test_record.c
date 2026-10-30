@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* Real-time recording: quantize, replace, overdub, punch, loop passes,
- * requantizing from raw timing, undoing a take, the metronome and the
- * count-in. */
+ * requantizing from raw timing, undoing a take, the catch for early keys,
+ * the metronome and the count-in. */
 #include "harness.h"
 #include "record.h"
 #include "undo.h"
@@ -13,6 +13,14 @@ static struct song_undo undo;
 
 static unsigned count(unsigned track) { unsigned n; song_track(&song, track, &n); return n; }
 static const struct song_event *at(unsigned track, unsigned i) { unsigned n; return song_track(&song, track, &n) + i; }
+static int length_at(unsigned track, uint32_t clock, unsigned pitch)
+{
+    unsigned n;
+    const struct song_event *e = song_track(&song, track, &n);
+    for (unsigned i = 0; i < n; ++i)
+        if (song_is_note(&e[i]) && song_event_start(&e[i]) == clock && e[i].a == pitch) return e[i].length;
+    return -1;
+}
 static void tap(unsigned pitch, uint32_t on, uint32_t off)
 {
     song_rec_note(&rec, pitch, 100, on);
@@ -145,6 +153,61 @@ static void test_requantize_and_undo(void)
     CHECK_EQ(at(2, 0)->a, 50);
 }
 
+/* The catch (0.5.1): how early a key may be, at three tempos and with
+ * input quantize. In a loop take a key that early before the seam goes on
+ * the next pass's first beat, as long as it was held, a key let go first
+ * too. Earlier ones still end at the seam. Requantized onto the seam
+ * afterwards, a note goes round too. And keys from before a take began. */
+static void test_catch(void)
+{
+    with_notes();
+    song.quantize = 0;
+    CHECK_EQ(song_rec_window(&song, 0), 90);   /* 100 ms is 96 clocks at 120, kept under a 16th */
+    song.tempo[0].bpm100 = 9000;
+    CHECK_EQ(song_rec_window(&song, 0), 72);   /* 100 ms at 90 */
+    song.tempo[0].bpm100 = 20000;
+    CHECK_EQ(song_rec_window(&song, 0), 90);
+    song.tempo[0].bpm100 = 12000;
+    song.quantize = 7;                          /* 8ths: half the grid is wider */
+    CHECK_EQ(song_rec_window(&song, 0), 120);
+    song.quantize = 0;
+    song.loop_start = 0; song.loop_end = 1920;
+    song_rec_start(&rec, &song, 5, SONG_REC_LOOP, 0);
+    tap(60, 1880, 1900);                        /* 40 early, let go before the seam */
+    song_rec_note(&rec, 62, 100, 1850);         /* 70 early, held over it */
+    song_rec_note(&rec, 64, 100, 1820);         /* 100 early: too early */
+    song_rec_follow(&rec, 1910);
+    song_rec_follow(&rec, 30);                  /* wrapped */
+    CHECK_EQ(rec.held_count, 1);
+    song_rec_note(&rec, 62, 0, 400);
+    song_rec_stop(&rec, 500);
+    CHECK_EQ(count(5), 3);
+    CHECK_EQ(length_at(5, 0, 60), 20);
+    CHECK_EQ(length_at(5, 0, 62), 400);
+    CHECK_EQ(length_at(5, 1820, 64), 100);
+    /* Played 125 early, then requantized to 4ths: onto the seam, so round. */
+    song_rec_start(&rec, &song, 6, SONG_REC_LOOP, 0);
+    tap(65, 1795, 1850);
+    song_rec_stop(&rec, 1900);
+    CHECK_EQ(length_at(6, 1795, 65), 55);
+    song.quantize = 9; song.strength = 100;
+    song_undo_begin(&undo, &song);
+    CHECK_EQ(song_rec_requantize(&rec), 1);
+    song_undo_end(&undo, &song);
+    CHECK_EQ(length_at(6, 0, 65), 55);
+    /* Keys from just before the take: on its first beat, held or let go. */
+    song.quantize = 0;
+    song_rec_start(&rec, &song, 7, SONG_REC_LOOP, 0);
+    song_rec_early(&rec, 67, 100, 0, 0);
+    song_rec_early(&rec, 69, 100, 0, 30);
+    CHECK_EQ(rec.last, 0);
+    song_rec_follow(&rec, 200);
+    song_rec_note(&rec, 67, 0, 300);
+    song_rec_stop(&rec, 400);
+    CHECK_EQ(length_at(7, 0, 67), 300);
+    CHECK_EQ(length_at(7, 0, 69), 30);
+}
+
 /* The player keeps older notes quiet in the take window, clicks on every
  * beat, and counts in before the song starts, all at exact frames. */
 static void test_player_side(void)
@@ -207,6 +270,7 @@ int main(void)
     test_quantize();
     test_modes();
     test_requantize_and_undo();
+    test_catch();
     test_player_side();
     return report("test_record");
 }

@@ -42,7 +42,11 @@ SONG_SMALL static void deliver(void *context, unsigned track, unsigned pitch, un
     if (channel > 15 || (velocity && groove_track_role(track) != GROOVE_TRACK_NORMAL)) return;
     const uint8_t message[3] = {(uint8_t)((velocity ? 0x90U : 0x80U) | channel), (uint8_t)pitch,
                                 (uint8_t)velocity};
+#if SONG_UI
+    song_deliver_played(message);
+#else
     song_deliver_note(message);
+#endif
 #ifdef FM1_OPEN_WEB
     capture(track, pitch, velocity, 0);
 #endif

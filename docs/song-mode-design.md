@@ -117,6 +117,11 @@ dashes following, and lines mark bars, beats and 16ths (below).
 - **Modes:** replace, overdub, punch (records only between the loop points) and loop recording (each pass
   overdubs while the loop repeats).
 - **Count-in:** off, 1 or 2 bars. Metronome on, off or record only.
+- **The catch (0.5.1):** a key just before a take's first beat goes on it (in the count-in, before a cell's
+  launch, or as a clip comes round), and in a loop take one just before the seam goes on the next pass's first
+  beat. It ends where it is let go, or let go before the beat, as long as it was held. The window is 100 ms but under a 16th (90 clocks), or half the input quantize
+  grid when wider, and at most half the loop. Quantize that lands on a loop's or an open clip's end goes round
+  to its start. The keys before a cell's launch wait in a list of 8 and go in as its take begins.
 - **REC (0.4.0):** a tap records at once in the song's mode, one of the four live modes (OVERDUB in a new
   song), SHIFT+REC is step entry, and a hold opens the record settings. There STEP is listed after the live
   modes and is never kept as the song's mode. SHIFT+SEL switches REPLACE and OVERDUB. Since 0.5.0 a take into

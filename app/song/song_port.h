@@ -34,6 +34,7 @@ uint32_t song_port_ticks(void);                      /* 24 MHz */
 uint32_t song_port_blocks(void);                     /* blocks rendered so far */
 int song_midi_post(const uint8_t *message, size_t bytes); /* live keys */
 void song_deliver_note(const uint8_t message[3]);
+void song_deliver_played(const uint8_t message[3]); /* the player's: never a live key (0.5.1) */
 void song_deliver_poll(void);                        /* through the block about to render */
 void song_deliver_start(unsigned count_in);
 void song_deliver_render(uint32_t block);            /* browser preview only */

@@ -8,6 +8,19 @@ The version is `FM1_QY_VERSION` in `app/version.h` (semver), and each release is
   1/64. It used to lengthen turning right. Now it runs the same way as SHIFT+F to E and as ALGO's zoom.
 - LOAD on the song list opens the loaded song in the song view, and so does restoring the unsaved copy. NEW
   and the other actions still stay on the list.
+- Early keys land on the beat. A key up to 100 ms before a take's first beat goes on it, in the count-in, before
+  a grid cell's launch (new), or as a playing clip comes round (new). In a LOOP take and every take into a
+  grid cell, a key that early before the loop's end goes on the loop's first beat, where the next pass
+  starts. It ends where it is let go, or let go before the beat, it keeps the length it was held. It used to
+  be cut to a sliver at the loop's end. The window
+  stays under a 16th at fast tempos, about 94 ms at 120 BPM, and with input quantize on it is half the grid
+  when wider. The count-in's window was 50 ms, and earlier keys there were lost.
+- Quantize goes round the loop: input quantize and requantizing a LOOP take send a note that lands on the
+  loop's end to its start, and so does the QUANTIZE job in the clip editor. It used to land just past the
+  end, where the loop never plays it.
+- Fixed: REC on a playing clip in the grid, with REPLACE, while its notes sounded, could leave the take
+  half started, so later REC presses and undo went wrong. The player's own notes, cut as the clip emptied,
+  counted as live keys. They never reach a take now.
 - PLAY's light blinks with the beat while the song plays, lit for the first half of each beat, on every page
   and through a take's count-in, whether or not the metronome is on. Stopped, it is lit as before.
 

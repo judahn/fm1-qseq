@@ -22,6 +22,23 @@ SONG_SMALL uint32_t song_quantize(const struct song *s, uint32_t clock)
     int64_t target = start + (clock - start + grid / 2U) / grid * grid, move = (target - clock) * s->strength;
     return (uint32_t)((int64_t)clock + (move >= 0 ? move + 50 : move - 50) / 100);
 }
+/* The catch: 100 ms at the tempo at `clock` (480 clocks a beat), but less
+ * than a 16th, so a 16th pickup stays a pickup at any tempo, or with input
+ * quantize on half its grid when that is wider. */
+SONG_SMALL uint32_t song_rec_window(const struct song *s, uint32_t clock)
+{
+    uint32_t w = s->tempo[song_tempo_at(s, clock)].bpm100 / 125U, half = song_quantize_grid(s) / 2U;
+    if (w > 90U) w = 90U;
+    return half > w ? half : w;
+}
+/* A loop take's key this close before the seam is the next pass's. At
+ * most half the loop is caught. */
+SONG_SMALL static int at_seam(const struct song *s, uint32_t first)
+{
+    if (s->loop_end <= s->loop_start || first < s->loop_start || first >= s->loop_end) return 0;
+    uint32_t w = song_rec_window(s, s->loop_end - 1U), half = (s->loop_end - s->loop_start) / 2U;
+    return first + (w < half ? w : half) >= s->loop_end;
+}
 
 SONG_SMALL void song_rec_start(struct song_recorder *r, struct song *s, unsigned track, unsigned mode, uint32_t from)
 {
@@ -47,14 +64,22 @@ SONG_SMALL static int at_pitch(const struct song *s, unsigned track, uint32_t cl
         if (song_is_note(&e[i]) && e[i].a == pitch) return (int)i;
     return -1;
 }
-/* A held note becomes a song note, ending at `off`. */
+/* A held note becomes a song note, ending at `off`. One caught before the
+ * seam goes on the loop's first beat, as long as it was held. A note that
+ * quantizes onto the seam goes round to the loop's start too. */
 SONG_SMALL static void commit(struct song_recorder *r, unsigned held, uint32_t off)
 {
     struct song *s = r->song;
-    uint32_t on = r->held[held].at, length, lead = r->held[held].lead;
-    if (off >= on) length = off - on;
-    else length = s->loop_end > on ? s->loop_end - on : 1; /* past a loop seam */
-    uint32_t at = song_quantize(s, on - lead) + lead; /* a chord moves as a whole, by its first note */
+    uint32_t on = r->held[held].at, length, lead = r->held[held].lead, at;
+    if (r->held[held].caught) {
+        length = off >= on ? off - on : off > s->loop_start ? off - s->loop_start : 1;
+        at = on = s->loop_start + lead;
+    } else {
+        if (off >= on) length = off - on;
+        else length = s->loop_end > on ? s->loop_end - on : 1; /* past a loop seam */
+        at = song_quantize(s, on - lead) + lead; /* a chord moves as a whole, by its first note */
+        if (r->mode == SONG_REC_LOOP && on - lead < s->loop_end && at - lead >= s->loop_end) at = s->loop_start + lead;
+    }
     if (r->mode == SONG_REC_PUNCH && at + length > s->loop_end) length = s->loop_end > at ? s->loop_end - at : 1;
     length = length < 1 ? 1 : length > 0xffff ? 0xffff : length;
     int same = at_pitch(s, r->track, at, r->held[held].pitch); /* the same note again replaces it */
@@ -91,18 +116,36 @@ SONG_SMALL void song_rec_lead(struct song_recorder *r, unsigned pitch, unsigned 
                (r->mode != SONG_REC_PUNCH || (clock >= s->loop_start && clock < s->loop_end))) {
         r->held[r->held_count].at = clock;
         r->held[r->held_count].lead = (uint8_t)(lead < clock ? lead : clock);
+        r->held[r->held_count].caught = (uint8_t)(r->mode == SONG_REC_LOOP && at_seam(s, clock - r->held[r->held_count].lead));
         r->held[r->held_count].pitch = (uint8_t)pitch;
         r->held[r->held_count++].velocity = (uint8_t)velocity;
     }
     reach(r, clock);
 }
+SONG_SMALL void song_rec_let_go(struct song_recorder *r, unsigned pitch, uint32_t length)
+{
+    for (unsigned i = 0; r->active && i < r->held_count; ++i)
+        if (r->held[i].pitch == pitch) { commit(r, i, r->held[i].at + length); return; }
+}
+SONG_SMALL void song_rec_early(struct song_recorder *r, unsigned pitch, unsigned velocity, unsigned lead, uint32_t length)
+{
+    uint32_t last = r->last, furthest = r->reach; /* not a clock the take has reached */
+    song_rec_lead(r, pitch, velocity, r->from + lead, lead);
+    r->last = last; r->reach = furthest;
+    if (length) song_rec_let_go(r, pitch, length);
+}
 /* A loop pass ends when the clock goes back. Keys still down end at the
- * seam, and the new pass keeps its own raw timing. */
+ * seam, but caught ones carry on from the new pass's first beat, and the
+ * new pass keeps its own raw timing. */
 SONG_SMALL void song_rec_follow(struct song_recorder *r, uint32_t clock)
 {
     if (!r->active) return;
     if (r->mode == SONG_REC_LOOP && clock < r->last) {
-        while (r->held_count) commit(r, r->held_count - 1U, r->song->loop_end);
+        for (unsigned i = r->held_count; i-- > 0;) {
+            if (!r->held[i].caught) { commit(r, i, r->song->loop_end); continue; }
+            r->held[i].caught = 0;
+            r->held[i].at = r->song->loop_start + r->held[i].lead;
+        }
         r->taken = 0;
         ++r->passes;
     }
@@ -125,6 +168,7 @@ SONG_SMALL void song_rec_stop(struct song_recorder *r, uint32_t clock)
     unsigned count;
     song_track(s, r->track, &count);
     for (unsigned i = 0; i < count; ++i) s->event[s->first[r->track] + i].at &= ~SONG_FRESH;
+    r->seam_start = s->loop_start; r->seam_end = s->loop_end;
     r->active = 0;
 }
 SONG_SMALL int song_rec_requantize(struct song_recorder *r)
@@ -134,6 +178,7 @@ SONG_SMALL int song_rec_requantize(struct song_recorder *r)
     for (unsigned k = 0; s && !r->active && k < r->taken; ++k) {
         struct song_take_note *n = &r->take[k];
         uint32_t raw = n->raw & 0xffffffU, lead = n->raw >> 24, at = song_quantize(s, raw - lead) + lead;
+        if (r->mode == SONG_REC_LOOP && raw - lead < r->seam_end && at - lead >= r->seam_end) at = r->seam_start + lead; /* round the loop */
         int i = at_pitch(s, r->track, n->at, n->pitch);
         if (at == n->at || i < 0 || at_pitch(s, r->track, at, n->pitch) >= 0) continue;
         struct song_event e = s->event[s->first[r->track] + (unsigned)i];
