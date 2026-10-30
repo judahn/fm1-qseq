@@ -1368,7 +1368,7 @@ static __attribute__((noinline, cold, minsize)) void boot_draw(void)
 }
 static void draw_page_body(const struct fm1_ble_status *ble)
 {
-    unsigned visible = boot_active ? STARTUP : glo_down && glo_used ? MIX : page;
+    unsigned visible = boot_active ? STARTUP : glo_down && glo_used ? MIX : song_shown(page); /* song-mode: a take shows the roll */
     if (visible != cache->shown_page) {
         cache->shown_page = visible;
         paint_fill(0, 0, 240, 240, BACK);

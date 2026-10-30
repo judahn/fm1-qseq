@@ -30,8 +30,8 @@ export async function phase4b(browser, root) {
     r.key(9);
     r.render(4);
     st.png = r.png();
-    r.tap(B.ARP);
-    r.tap(B.REC);
+    r.tap(B.ARP); r.tap(B.ARP); r.tap(B.ARP);      // pages 2 and 3, then off (0.5.0)
+    r.step();                                      // SHIFT+REC leaves
     st.entered = notes(0).filter(n => n.clock >= at);
     st.repeats = st.entered.map(n => [3, 2].indexOf(n.glitch & 7) >= 0 ? (n.glitch & 7) === 3 ? 4 : 3 : 0);
     r.turn(2, -1);                                 // back to the bar line where they start

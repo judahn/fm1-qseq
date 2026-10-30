@@ -20,12 +20,12 @@ show which page or mode is active. The key lights work as described below.
 | | EDIT | Sound editing, as in the stock firmware. SHIFT+EDIT opens the edit jobs |
 | | GLO | Song settings. A hold is still the stock mixer |
 | | HOME, SAVE | Leave to the stock overview, and the song list |
-| | ARP | The arpeggiator, as on the stock pages: a tap turns it on or off, a hold opens its settings. In step entry, the glitch layer |
+| | ARP | The arpeggiator, as on the stock pages: a tap turns it on or off, a hold opens its settings. In step entry, the glitch layer's pages |
 | | SEQ | The song view, and from there the clip grid |
-| | PLAY, REC | Transport and recording. A tap of REC records, SHIFT+REC is step entry, and a hold opens the record settings |
+| | PLAY, REC | Transport and recording. PLAY starts from the start point and a stop comes back to it. A tap of REC records, SHIFT+REC is step entry (and leaves it), and a hold opens the record settings |
 | | OCT- / OCT+ | Move the keys an octave, two at most each way. On the song list, the edit jobs and while naming they are NO and YES |
 | Encoders | SELECT | The track |
-| | ALGO (ALGORITHM) | Turns pages on pages that have them |
+| | ALGO (ALGORITHM) | Turns pages on pages that have them. Zooms the song view, the automation view and the roll |
 | | K1 to K4 | The four knobs above the screen. Their labels sit at the bottom of the screen |
 | | PRESETS | The pitch knob in step entry, the lane in the automation view |
 | Keys | F3 to G5 | 27 keys: 16 white, 11 black |
@@ -48,8 +48,8 @@ OCT- and OCT+ still move the keyboard's octave.
 | Song view | SEQ from any stock page, or from the grid | SEQ to the grid, HOME to the stock overview |
 | Clip grid | SEQ in the song view | SEQ back to the song view |
 | A clip in the editor | SEL on a grid cell | SEQ closes it and goes back to the grid |
-| Record settings | Hold REC in the song view, the automation view or the grid | HOME goes back. REC or PLAY goes back and records there |
-| Step entry | SHIFT+REC in the song view, or on a row of the grid | REC leaves, PLAY leaves and plays from the pointer's bar. Both go back to the view it was opened from: from the grid, PLAY also launches the clip and plays |
+| Record settings | Hold REC in the song view, the automation view, the grid or step entry | HOME goes back. REC or PLAY goes back and records there |
+| Step entry | SHIFT+REC in the song view, or on a row of the grid | SHIFT+REC or SEQ, back to the view it was opened from. Playing goes on |
 | Song settings | Tap GLO on a song page | Tap GLO again |
 | Device settings | SHIFT+GLO on a song page (or HOME+GLO anywhere) | HOME, or SEQ |
 | Automation view | SHIFT+LFO in the song view | SHIFT+LFO again |
@@ -83,13 +83,14 @@ once when stopped or with the launch quantize off.
 
 | Control | Action |
 |---|---|
-| PLAY | Play and stop. During a take, end the recording and play on |
-| SHIFT+PLAY | Back to the loop start, or the song start when the loop is off |
+| PLAY | Play from the start point, and stop back there (below). During a take, end the recording and play on |
+| SHIFT+PLAY | Back to the loop start, or the song start when the loop is off. It becomes the start point |
 | REC | A tap, stopped: a take in the song's mode (see Recording). Playing with a clip open: record into the clip (below). During a take, end the recording and play on |
 | SHIFT+REC | Step entry at the playhead, stopped |
 | Hold REC | The record settings |
-| K1 | Move the playhead one snap step. While playing, a jump waits for the next bar line |
+| K1 | Move the playhead one snap step, and the start point with it. While playing, a jump waits for the next bar line |
 | SHIFT+K1 | Marker to marker |
+| ALGO | Zoom, as K4 does. During a take, the roll's zoom (see Recording) |
 | K2 | Loop start |
 | SHIFT+K2 | Select the marker section around the playhead. Turning on adds the next sections |
 | K3 | Loop end |
@@ -106,6 +107,15 @@ once when stopped or with the launch quantize off.
 New markers are named M1, M2 and so on, taking the first free number, 16 at most. To remove one, go to it
 with SHIFT+K1, which lands on it exactly, and press SEL. Removing only happens while stopped. HOME+SAVE brings
 a removed marker back.
+
+**The start point.** PLAY starts from the start point, and every stop comes back to it: PLAY again, a take
+ending with a stop, or the song playing out at its end. So PLAY, listen, PLAY plays the same passage again.
+Whatever puts the playhead somewhere on purpose sets it: K1, SHIFT+K1 marker to marker, SHIFT+F4 to G5 to a
+marker, SHIFT+PLAY, SHIFT+K1 in the automation view, and step entry (its PLAY sets the pointer's bar, and
+leaving puts the playhead at the pointer). While playing, K1's waiting jump is the start point. A loaded or
+new song starts at the top. The start point isn't saved with the song. While the playhead is elsewhere, a
+small white mark on the ruler shows it. The grid, the automation view and a clip in the editor use it too,
+the clip with one of its own that starts at its top.
 
 The selection starts as the current track and follows SELECT until tracks are picked by hand.
 
@@ -131,14 +141,14 @@ song).
 
 ## Recording
 
-REC works the same way in the song view, the automation view and the grid:
+REC works the same way in the song view, the automation view, the grid and step entry:
 
 - **A tap** (REC let go within 600 ms) records live, in the song's mode. It acts as REC comes up. In the song
   view and the automation view, stopped, the take starts at once with its count-in. Playing, it says to stop
   first, unless a clip is open in the editor (A clip in the editor). The grid records into the cell at the
-  cursor (Recording into a cell).
+  cursor (Recording into a cell). Step entry records from the start of the pointer's bar (Step entry).
 - **SHIFT+REC** is step entry, stopped: at the playhead in the song view, in the clip with one open, and on a
-  row of the grid in the cell's clip.
+  row of the grid in the cell's clip. In step entry SHIFT+REC leaves it.
 - **A hold** of 600 ms opens the record settings. HOME goes back to the page it was opened from.
 - A REC that ends something acts as it goes down: it ends a take, calls off a count-in, or ends or disarms a
   performance.
@@ -157,7 +167,7 @@ The record settings:
 | K2 | Count-in: off, 1 or 2 bars |
 | K3 | Input quantize: off, or 1/64 to 1/1, each with a triplet |
 | K4 | Quantize strength, 0 to 100% |
-| REC or PLAY | Go back to the page and do what a tap of REC does there, or with STEP what SHIFT+REC does |
+| REC or PLAY | Go back to the page and do what a tap of REC does there, or with STEP what SHIFT+REC does (from step entry, just go back) |
 | HOME | Go back to the page |
 
 A live mode picked with K1 becomes the song's mode, the one shown in red in the list. STEP never does: picking
@@ -169,12 +179,25 @@ During a take:
 |---|---|
 | PLAY or REC | End the take. Playing goes on, and PLAY again stops. In the count-in, before anything is recorded, they call the take off and stop |
 | K1 to K4 | Record their parameters on the take track. Which parameter each knob drives is on settings page 3 |
+| ALGO | Zoom the roll |
+
+**A take shows the roll.** A take into one track, from the song view, the clip editor, a grid cell or step
+entry, shows that track (the clip, for a clip) as step entry's roll while it is armed or running: the count-in,
+the playhead, which the roll follows, and the recording knobs in the footer, with no pointer. ALGO zooms it as
+in step entry, and the zoom stays. The header says REC and the bottom line what the take is doing. A note
+shows as its key comes up, when the take writes it. When the take ends the view it started from comes back,
+still playing if it plays on. A performance stays on the grid, so you can see what you launch, and a take in
+the automation view stays there.
 
 Recorded notes are stored already quantized. The take keeps its raw timing, so turning K3 or K4 in the
 record settings afterwards requantizes the last take. Undo takes the whole take back. If the song's memory
 fills during a take, the take ends there and says so.
 
 ## Step entry
+
+The screen shows the track as a small piano roll: the notes at their real lengths, the pointer in amber, and
+under the roll a row of dashes, one per cell, the pointer's lit. The header has the pointer's position, the
+time signature and, at the right, the span ALGO has zoomed to.
 
 | Control | Action |
 |---|---|
@@ -189,11 +212,16 @@ fills during a take, the take ends there and says so.
 | K2 | Velocity, 1 to 127, named by the nearest of PPP to FFFF. Past the top: random R1 to R4 |
 | K3 | Gate: 50, 90, 99 or 100% |
 | K4 | Move the pointer one step. SHIFT+K4 jumps note to note |
+| Hold LFO, turn K4 | Sweep a selection (below) |
 | PRESETS | Move the selected notes by scale step, by octave with SHIFT. On drum tracks, from pad to pad |
-| SEL | Delete the notes at the pointer |
+| SEL | Delete the selected notes |
 | ENV | Back-delete: move back one step and delete there |
-| Hold LFO, tap keys | Pick which notes at the pointer K1 to K3 and delete act on |
-| ARP | The glitch layer (below), and ARP again to leave it |
+| Hold LFO, tap keys | Pick which notes at the pointer K1 to K3 and delete act on. In a sweep, pick pitches in it |
+| ALGO | Zoom the roll: 4 bars, 2 bars, 1 bar or half a bar |
+| ARP | The glitch layer's pages: 1, 2, 3, then off (below) |
+| PLAY | Play from the start of the pointer's bar, staying here. PLAY again stops back at that bar |
+| REC | A tap: a take on the track (below). A hold: the record settings, where HOME or REC comes back here |
+| SHIFT+REC or SEQ | Leave, back to the view step entry was opened from |
 | SELECT | The track |
 
 With SHIFT held a key works by its note name, in any octave, so SHIFT+F3, SHIFT+F4 and SHIFT+F5 all pick 1/1. It
@@ -202,7 +230,52 @@ enters no note.
 When the pointer lands on notes they're selected and play, and K1 to K3 change them in place. On an empty spot
 the knobs set the next entry.
 
-The glitch layer gives each new or selected note glitch attributes. ALGO turns its three pages:
+**Zoom.** ALGO zooms the roll to 4 bars, 2 bars, 1 bar or half a bar across. It starts at 1 bar and keeps the
+zoom while the FM-1 is on. The roll shows a span that starts on a bar line, the spans counted from the start of
+the song or the clip, and at half a bar the half holding the pointer. The pitch range comes from the notes in
+the span. Bar lines are the brightest, beat lines a step dimmer, and at 1 bar or closer faint lines mark the
+16ths, and at half a bar the 32nds too. A kind of line shows only where its lines are 4 px apart or more, so at
+4 bars a bar of many short beats, 16/16 say, keeps its bar lines and drops the beats. At 2 and 4 bars the bar
+numbers are over the roll. The dashes follow the zoom: 8ths at 4 bars, 16ths at 2 bars, 32nds at 1 bar and half
+a bar, or 64ths there when the notes or the pointer need them, never narrower than 2 px. Every note ends 1 px
+short, so two in a row on one pitch read as two.
+
+**Playing.** PLAY plays from the start of the pointer's bar and stays in step entry: the song, or in a clip
+the clip with the grid's launched clips, as the clip editor plays it. A green playhead runs across the roll,
+which turns its pages to follow it, and the header says PLAY. While it plays the keys only sound: nothing is
+entered, SHIFT still sets the length, triplet and dots, and rest, tie and repeat wait for a stop. SEL, the
+knobs and the pitch knob still edit. PLAY again stops, back at the pointer's bar, the start point (Song view),
+with the pointer where it was.
+
+**Recording here.** A tap of REC records a take on the track, as a tap does in the song view, in the song's
+mode: from the start of the pointer's bar with the count-in, or playing in a clip, from its next pass. The
+roll shows the take (Recording): no pointer, the recording knobs in the footer, ALGO still zooming. The take
+stays in step entry when it ends.
+
+**Leaving.** SHIFT+REC or SEQ goes back to the view step entry was opened from: the song view, the
+automation view, the clip editor or the grid. Stopped, the playhead follows the pointer out and starts there
+next. Playing goes on: in the song view the song plays on, and in the grid the clip stays launched. Leaving
+ends a sweep.
+
+**Sweeping a selection.** Hold LFO and turn K4: the pointer moves as usual, and the selection becomes every
+note that starts from where the sweep began to the pointer, both included, at every pitch. A lighter band
+shows the range, the selected notes are white, and the SEL line counts them, for example `16 NOTES`. With LFO
+still held, a key picks its pitch alone, and later keys toggle theirs in or out, across the whole range. On
+a drum track that picks one pad, every hi-hat in two bars, say. Then:
+
+| Control | On a sweep |
+|---|---|
+| SEL | Delete every selected note |
+| K2 | Velocity, by the same amount for every note, so accents stay |
+| K1, K3 | Length and gate: each note's length scales as the entry's does, 1/16 to 1/8 doubling them |
+| Glitch layer K1 to K3 | That field on every note |
+| PRESETS | Move every note, by scale step, octave or pad. A note whose new pitch is taken at its clock stays |
+
+Each is one undo step. A change undo couldn't hold (about 630 notes on the device) is refused with a notice,
+and nothing changes. The sweep ends when the pointer moves without LFO, a note goes in, or step entry is left.
+
+The glitch layer gives each new or selected note glitch attributes. ARP steps through its three pages and
+back off, and ALGO still zooms:
 
 | Page | K1 | K2 | K3 |
 |---|---|---|---|
@@ -251,20 +324,22 @@ SHIFT+LFO in the song view. The conductor row sits above track 1. Turning SELECT
 |---|---|
 | SELECT | The row: a track, or the conductor |
 | PRESETS | The lane shown: one of the track engine's parameters, or programs. On the conductor: tempo or time signature |
-| ALGO | Stopped: set a change at the playhead. Tempo (SHIFT: hundredths), the time signature from that bar, or a program change |
+| ALGO | Zoom, as K4 does |
+| SHIFT+ALGO | Stopped: set a change at the playhead. Tempo in whole BPM, the time signature from that bar, or a program change |
 | SEL | Delete the change at the playhead |
 | SHIFT+SEL | Clear the shown lanes in the selection |
 | SHIFT+K1 | Move to the next or previous change on the row |
 
 Everything else works as in the song view, REC included, but SHIFT+SEL clears lanes here, and the bottom
-line doesn't show REC's mode. Controller lanes are recorded with K1 to K4 during a take.
-Tempo runs 20 to 300 BPM. Time signatures run 1/4 to 8/4, 1/8 to 16/8 and 1/16 to 16/16.
+line doesn't show REC's mode. A take here stays in this view instead of showing the roll, and controller lanes
+are recorded with K1 to K4 during it. ALGO alone set changes until 0.5.0. Tempo runs 20 to 300 BPM, in
+hundredths on settings page 1 (SHIFT+K1). Time signatures run 1/4 to 8/4, 1/8 to 16/8 and 1/16 to 16/16.
 
 ## Glitch
 
-Per-note glitch is in step entry: ARP there turns on the glitch layer (see Step entry). Mangle is SHIFT+F#3,
-G#3 and A#3 in the song view: scramble the 16ths, reverse the note order, or shuffle notes between the selected
-tracks. Humanize per track is on settings page 4. Swing is on page 1.
+Per-note glitch is in step entry: ARP there steps through the glitch layer's pages (see Step entry). Mangle is
+SHIFT+F#3, G#3 and A#3 in the song view: scramble the 16ths, reverse the note order, or shuffle notes between
+the selected tracks. Humanize per track is on settings page 4. Swing is on page 1.
 
 The live stutter and the FX lane are gone since 0.3.0. A song saved with FX lane events still loads, without
 them.
@@ -363,7 +438,7 @@ round at its end instead of stopping, so the transport keeps running until PLAY.
 | SHIFT+SEL | REC's mode: REPLACE or OVERDUB (Recording) |
 | ENV | Name the row: K1 picks the letter, K2 changes it, YES (OCT+) keeps the name, NO (OCT-) leaves the old one. SAVE does nothing while naming |
 | SHIFT + F3, G3, A3 or B3, E4 | Copy, cut, paste, paste, delete the cell |
-| PLAY | Play and stop. Launching a clip while stopped starts playback. Stopping leaves every track stopped. During a take, end the recording and play on |
+| PLAY | Play and stop. Launching a clip while stopped starts playback. Stopping leaves every track stopped and the playhead back at the start point (Song view). During a take, end the recording and play on |
 | REC | A tap: record into the cell at the cursor (below), and on the SONG row record a performance (Clips in the song). REC again ends it |
 | SHIFT+REC | Step entry in the cell's clip from its start, stopped. An empty cell first gets a clip of the REC length, 4 bars when it's FREE. On the SONG row it says step entry needs a row |
 | Hold REC | The record settings. HOME comes back to the grid |
@@ -376,8 +451,10 @@ Pasting copied song bars into a cell turns them into a clip. Several copied trac
 
 ### Recording into a cell
 
-A tap of REC records into the cell at the cursor, on the cursor's track. The cell blinks red while it's armed
-and is red while it records, with how far it has got. The bottom line says what is happening.
+A tap of REC records into the cell at the cursor, on the cursor's track. From the tap until the take ends the
+screen shows the cell's clip on the roll (Recording): the count-in or the wait for the launch, then the
+playhead and the notes as they go in, and the bottom line says what is happening. The grid comes back as the
+take ends.
 
 - **An empty cell** becomes a clip of the REC length. Playing, it launches on its track at the launch quantize
   (with the launch quantize off, at the next beat), and recording starts there. The track leaves the song or
@@ -393,7 +470,8 @@ and is red while it records, with how far it has got. The bottom line says what 
   off.
 - While a cell is armed or recording, the keys play its track (at the keyboard's octave, with chord mode when
   the track has it) and go into the take, instead of launching. OCT- and OCT+ move the octave. SELECT stays on
-  the track, and the SHIFT keys, SEL and ENV wait. The keys launch again when the take ends.
+  the track, and the SHIFT keys, SEL and ENV wait. K1 to K4 record their lanes, as in the song view, and ALGO
+  zooms the roll. The keys launch again when the take ends.
 - PLAY or REC ends the take, and playing goes on. In the count-in, before anything is recorded, PLAY or REC
   calls it off, stops, and an empty cell stays empty.
 
@@ -404,10 +482,10 @@ take, and a new clip with it, is one undo step. SEQ waits until the take is over
 
 SEL on a cell opens the clip in the song view's editor, looped to its own length. K3, labelled CLIP END,
 sets that length. Step entry (SHIFT+REC), recording, automation, glitch and the jobs that stay inside the
-track all work on the clip. SELECT stays on the clip's track, and the markers are hidden. SEQ closes it and
-goes back to the grid. SHIFT+REC on a row of the grid opens the cell's clip straight into step entry, and REC
-or PLAY there go back to the grid, PLAY launching the clip and playing, so you can enter and listen without
-leaving the grid.
+track all work on the clip. SELECT stays on the clip's track, and the markers are hidden. ALGO zooms, as K4
+does. SEQ closes it and goes back to the grid. SHIFT+REC on a row of the grid opens the cell's clip straight
+into step entry, where PLAY plays the clip without leaving, and SHIFT+REC or SEQ goes back to the grid, the
+clip staying launched if it plays, so you can enter and listen without leaving the grid.
 
 The open clip plays with the grid's other launched clips while it is open, not with the song, so a part can
 be written against them. REC while playing records into the clip as loop recording from its next pass, and

@@ -73,6 +73,10 @@ struct song_player {
      * target are in it, and the song's own place while stopped is song_at.
      * A jump while playing moves the clip's pass at the next bar line. */
     uint32_t edit_base, song_at;
+    /* The start point (0.5.0): where PLAY starts and every stop comes back
+     * to, in the editor's time, and the song's own while a clip is open.
+     * Every jump made on purpose sets it (song_port_jump). */
+    uint32_t start_at, start_song;
     /* Recording a performance (design 8f): perf is 1 while armed and 2 once
      * the take runs, when the song's loop and end are ignored. Every launch
      * that takes effect meanwhile is logged, at its song clock, and what
@@ -141,10 +145,14 @@ uint32_t song_player_transport(const struct song_player *p);
  * closing the track goes back to what it played. A clip the track plays as
  * launched keeps its pass going as it opens, and a track left on the open
  * clip's pass (from and base set to it) plays on through the close.
- * Stopped, the playhead moves between the clip's time and the song's. */
+ * Stopped, the playhead moves between the clip's time and the song's, and
+ * the start point does too, the clip's beginning at its top. */
 void song_player_edit(struct song_player *p, unsigned track, unsigned opening);
 /* A track's notes, repeats and waiting swung notes end now. */
 void song_player_cut(struct song_player *p, unsigned track);
+/* Stopped: the playhead back at the start point, kept inside the song (or
+ * the open clip's timeline). Playing to the song's end does it too. */
+void song_player_rewind(struct song_player *p);
 #endif
 void song_player_hold(const struct song_player *p, struct song_place *place);
 void song_player_resume(struct song_player *p, const struct song_place *place);

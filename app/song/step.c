@@ -26,7 +26,7 @@ SONG_SMALL void step_begin(struct song_step *st, unsigned track, uint32_t pointe
     step_preview_stop(st);
     st->track = (uint8_t)(track < SONG_TRACKS ? track : 0);
     st->pointer = pointer;
-    st->chord_count = st->last_count = st->tie_ok = st->picked = 0;
+    st->chord_count = st->last_count = st->tie_ok = st->picked = st->ranged = 0;
 }
 SONG_SMALL uint32_t step_clocks(const struct song_step *st)
 {
@@ -81,7 +81,7 @@ static void advance(struct song_step *st, uint32_t clocks)
 {
     struct song *s = st->song;
     st->pointer += clocks;
-    st->picked = 0;
+    st->picked = st->ranged = 0;
     /* Entering past the end makes the song longer. */
     while (st->pointer >= song_end(s) && s->bars < SONG_MAX_BARS) ++s->bars;
     if (st->pointer > song_end(s)) st->pointer = song_end(s);
@@ -168,6 +168,8 @@ SONG_SMALL int step_tie(struct song_step *st)
 }
 SONG_SMALL int step_delete(struct song_step *st)
 {
+    uint32_t from, to;
+    if (step_range(st, &from, &to)) return step_range_delete(st);
     unsigned index[STEP_CHORD], n = step_selection(st, index);
     while (n--) (void)song_remove(st->song, st->track, index[n] - st->song->first[st->track]);
     st->tie_ok = st->picked = 0;
@@ -181,28 +183,46 @@ SONG_SMALL int step_back_delete(struct song_step *st)
     while (end-- > from)
         if (song_is_note(&st->song->event[st->song->first[st->track] + end])) (void)song_remove(st->song, st->track, end);
     st->pointer = to;
-    st->tie_ok = st->picked = 0;
+    st->tie_ok = st->picked = st->ranged = 0;
     return 0;
 }
-SONG_SMALL void step_move(struct song_step *st, int steps)
-{
-    int64_t to = (int64_t)st->pointer + (int64_t)steps * step_clocks(st);
-    uint32_t end = song_end(st->song);
-    st->pointer = to < 0 ? 0 : to > end ? end : (uint32_t)to;
-    step_land(st);
-}
-SONG_SMALL void step_jump(struct song_step *st, int direction)
+/* The pointer by steps, or note to note (`jump`, by the direction). */
+SONG_SMALL static void slide(struct song_step *st, int steps, unsigned jump)
 {
     unsigned count, i;
     const struct song_event *e = song_track(st->song, st->track, &count);
-    if (direction > 0)
+    if (!jump) {
+        int64_t to = (int64_t)st->pointer + (int64_t)steps * step_clocks(st);
+        uint32_t end = song_end(st->song);
+        st->pointer = to < 0 ? 0 : to > end ? end : (uint32_t)to;
+    } else if (steps > 0)
         for (i = song_find(st->song, st->track, st->pointer + 1); i < count; ++i) {
             if (song_is_note(&e[i])) { st->pointer = song_event_start(&e[i]); break; }
         }
     else
         for (i = song_find(st->song, st->track, st->pointer); i-- > 0;)
             if (song_is_note(&e[i])) { st->pointer = song_event_start(&e[i]); break; }
+}
+SONG_SMALL void step_move(struct song_step *st, int steps)
+{
+    st->ranged = 0;
+    slide(st, steps, 0);
     step_land(st);
+}
+SONG_SMALL void step_jump(struct song_step *st, int direction)
+{
+    st->ranged = 0;
+    slide(st, direction, 1);
+    step_land(st);
+}
+/* A sweep starts at the pointer with every pitch in it, and the pointer
+ * moves on without landing, so the knobs keep what they show. */
+SONG_SMALL void step_sweep(struct song_step *st, int steps, unsigned jump)
+{
+    if (!st->ranged) { st->ranged = 1; st->anchor = st->pointer; st->picked = 0; }
+    step_preview_stop(st);
+    slide(st, steps, jump);
+    st->tie_ok = 0;
 }
 SONG_SMALL void step_preview_stop(struct song_step *st)
 {

@@ -13,7 +13,7 @@ struct song_player *song_port_player(void);
 struct song_step *song_port_step(void); /* step entry, previewing through the engine */
 int song_port_start(void);  /* 0 */
 void song_port_stop(void);
-void song_port_jump(uint32_t clock);
+void song_port_jump(uint32_t clock); /* on purpose: it becomes the start point (0.5.0, player.h) */
 int song_port_set_tempo(uint32_t clock, unsigned bpm100);
 /* Browser preview: called from sim_render() before the queued MIDI drains,
  * with the first frame of the block about to render. */
@@ -60,6 +60,7 @@ void song_deliver_message(const uint8_t *message, size_t bytes); /* automation, 
 void song_port_launch(unsigned track, unsigned to);
 int song_port_clip_open(unsigned cell);
 void song_port_clip_close(void);
+void song_port_clip_launched(void); /* playing: the open clip plays on, launched, once it closes */
 /* REC while playing in an open clip: loop recording into it from its next
  * pass (or at once with `now`), the rest playing on. Armed until then.
  * Ending it with keep_playing leaves playback going. */

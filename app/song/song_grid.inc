@@ -13,7 +13,8 @@
  * recording the keys play its track instead of launching. On the SONG row
  * REC records a performance (song_perf.c). SHIFT+REC opens the cell's clip
  * in step entry. A held REC opens the record settings (song_rec.inc).
- * Drawing is in song_grid_draw.inc. */
+ * A cell's take shows the roll (0.5.0), where K1 to K4 record their lanes
+ * and ALGO zooms. Drawing is in song_grid_draw.inc. */
 #include "clips.h"
 
 enum { GRID_X = 46, GRID_W = 24, GRID_SONG = 34, GRID_Y = 52, GRID_H = 16, GRID_EMPTY = 0x2104 };
@@ -122,14 +123,17 @@ static int song_grid_input(const struct fm1_controls *c, uint32_t *pressed, uint
         else if (answer < 0) song_ask_close();
         return 1;
     }
-    grid_row = (uint8_t)clamp(grid_row + c->encoders[2], 0, SONG_GRID_ROWS);
-    if (grid_row) grid_page = (uint8_t)((grid_row - 1U) / 8U);
-    s->launch_q = (uint8_t)clamp(s->launch_q + c->encoders[5], 0, 4);
-    if (taking) { /* the track stays, and the keys play it at the keyboard's octave */
+    if (taking) { /* the track stays, the keys play it at the keyboard's octave, ALGO zooms the roll, K1 to K4 record */
         octave = clamp(octave + !!(*pressed & BUTTON(OCT_UP)) - !!(*pressed & BUTTON(OCT_DOWN)), -2, 2);
+        step_zoom_turn(c->encoders[1]);
+        for (unsigned k = 0; k < 4; ++k)
+            if (c->encoders[2 + k]) song_knob_turn(k, fm_encoder_delta(2 + k, c->encoders[2 + k]), now);
         if (shift && down) { notice = "STOP RECORDING FIRST"; notice_until = now + 1500U; }
         return 1;
     }
+    grid_row = (uint8_t)clamp(grid_row + c->encoders[2], 0, SONG_GRID_ROWS);
+    if (grid_row) grid_page = (uint8_t)((grid_row - 1U) / 8U);
+    s->launch_q = (uint8_t)clamp(s->launch_q + c->encoders[5], 0, 4);
     select_track(c->encoders[0]);
     grid_rec_len = (uint8_t)clamp(grid_rec_len + c->encoders[3], 0, 5);
     if (shift) {

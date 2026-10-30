@@ -1,8 +1,15 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* song-mode: the song view's input, included by song_panel.inc: transport,
- * REC (song_rec.inc), snap and zoom, the loop, markers, the selection and
- * arranging keys, and the knobs recording parameters during a take. The
+ * REC (song_rec.inc), snap and zoom (K4, and ALGO since 0.5.0), the loop,
+ * markers, the selection and arranging keys, and the knobs recording
+ * parameters during a take, when ALGO zooms the roll the take shows. Every
+ * move of the playhead here sets the start point (song_port_jump). The
  * automation view runs its controls through here too (song_auto.inc). */
+static void song_zoom_turn(int delta)
+{
+    unsigned zoom = (unsigned)clamp((int)song_zoom + delta, 0, SONG_ZOOMS - 1);
+    if (zoom != song_zoom) { song_zoom = zoom; song_window = ~0U; }
+}
 static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
 {
     struct song *s = song_port_song();
@@ -56,6 +63,8 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
         return 0;
     octave = clamp(octave + !!(*pressed & BUTTON(OCT_UP)) - !!(*pressed & BUTTON(OCT_DOWN)), -2, 2);
     select_track(c->encoders[0]);
+    if (c->encoders[1] && page == SONG && song_port_recording()) step_zoom_turn(c->encoders[1]); /* the take's roll */
+    else if (c->encoders[1]) song_zoom_turn(c->encoders[1]);
     if (song_port_recorder()->active) { /* K1 to K4 record parameters on the take track */
         for (unsigned k = 0; k < 4; ++k)
             if (c->encoders[2 + k]) song_knob_turn(k, fm_encoder_delta(2 + k, c->encoders[2 + k]), now);
@@ -84,10 +93,7 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
         uint32_t at = song_snap_move(s, s->loop_end, song_zoom, c->encoders[4]);
         if (at > s->loop_start) s->loop_end = at;
     }
-    if (c->encoders[5]) {
-        unsigned zoom = (unsigned)clamp((int)song_zoom + c->encoders[5], 0, SONG_ZOOMS - 1);
-        if (zoom != song_zoom) { song_zoom = zoom; song_window = ~0U; }
-    }
+    if (c->encoders[5]) song_zoom_turn(c->encoders[5]);
     uint32_t down = key_down & ~blocked_keys;
     if (shift) {
         /* SHIFT + the lower white keys, F3 to E4: copy, cut, paste inserting,

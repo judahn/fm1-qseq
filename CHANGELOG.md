@@ -2,6 +2,43 @@
 
 The version is `FM1_QY_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.5.0
+
+- PLAY in step entry plays and stays there, from the start of the pointer's bar: the song, or in a clip the
+  clip with the grid's launched clips, as the clip editor plays it. A playhead runs across the roll, which
+  pages to follow it, and PLAY again stops back at that bar with the pointer where it was. While it plays the
+  keys only sound, SHIFT still sets the length, triplet and dots, and rest, tie and repeat wait for a stop.
+- REC in step entry records a take there, as REC does in the other views: a tap records from the pointer's bar
+  with the count-in, a hold opens the record settings, and HOME or REC there comes back. The take stays in
+  step entry. SHIFT+REC leaves step entry now, and so does SEQ, back to the view it was opened from, the
+  playhead at the pointer. Leaving while playing keeps playing, and from the grid the clip stays launched.
+- ALGO zooms step entry's roll: 4 bars, 2 bars, 1 bar or half a bar, 1 bar to start, kept while the FM-1 is
+  on. The span shows at the right of the header, and at 2 and 4 bars the bars are numbered over the roll. The
+  dashes under the roll follow the zoom, 8ths at 4 bars down to 64ths.
+- The roll has lines: bar lines brightest, beat lines dimmer, and at 1 bar or closer faint 16ths, with 32nds
+  at half a bar. A level shows only where its lines are 4 px apart or more. Notes end 1 px short, so two in a
+  row on one pitch read as two.
+- Hold LFO and turn K4 to sweep a selection: every note from where the sweep began to the pointer, both ends
+  in, at every pitch, under a lighter band, with the count on the SEL line. With LFO still held a key picks
+  its pitch alone, and later keys toggle theirs, so one pad of a drum part can be picked across bars. SEL
+  deletes the selection, K2 changes its velocity by the same amount for every note, K1 and K3 scale its
+  lengths as the entry's length changes, the glitch knobs and PRESETS act on all of it, each as one undo step.
+  A selection too big to undo is refused with a notice. Moving the pointer without LFO, entering a note or
+  leaving ends it.
+- The glitch layer's pages step with ARP: off, 1, 2, 3 and off again. ALGO zooms there too.
+- A live take into one track shows the roll while it lasts, from the song view, the clip editor, a grid cell
+  and step entry: the take's track, the playhead, the count-in, ALGO's zoom and the recording knobs. A note
+  shows as its key comes up, when the take writes it. When the take ends the view comes back. A performance
+  stays on the grid and a take in the automation view stays there. During a cell's take K1 to K4 record their
+  lanes, as in the song view.
+- PLAY starts from a start point, and every stop comes back to it: PLAY again, a take ending with a stop, or
+  the song playing out. K1, SHIFT+K1, the marker keys, SHIFT+PLAY, the automation view's SHIFT+K1, leaving
+  step entry and step entry's PLAY set it. A song loaded or new starts at the top. The song view's ruler marks
+  it while the playhead is elsewhere. A clip in the editor has its own, from its start. Before, a stop left
+  the playhead where it stopped.
+- ALGO zooms the song view and the clip editor as K4 does, and the automation view too. There SHIFT+ALGO sets
+  a change at the playhead, tempo in whole BPM, and hundredths are on the settings page only.
+
 ## 0.4.1
 
 - Step entry opened from the grid goes back to the grid. REC there closes the clip and returns, and PLAY

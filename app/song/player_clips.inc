@@ -224,6 +224,8 @@ SONG_SMALL void song_player_edit(struct song_player *p, unsigned t, unsigned ope
 {
     const struct song *s = p->song;
     p->jumping = 0;
+    if (opening) { p->start_song = p->start_at; p->start_at = 0; } /* a clip's start point begins at its top (0.5.0) */
+    else p->start_at = p->start_song;
     if (!p->playing) {
         if (opening) { p->song_at = p->playhead; p->playhead = 0; }
         else p->playhead = p->song_at;

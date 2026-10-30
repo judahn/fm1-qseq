@@ -153,13 +153,19 @@ SONG_SMALL void song_port_stop(void)
     song_player_stop(song_port_player());
     wake();
 #if SONG_UI
+    song_player_rewind(song_port_player()); /* back to the start point (0.5.0) */
     song_player_chase(song_port_player(), song_port_player()->playhead); /* stopping: lanes chase too */
 #endif
 }
+/* Every caller moves the playhead on purpose (a knob, a marker, SHIFT+PLAY,
+ * step entry, a song loaded), so the place becomes the start point too
+ * (0.5.0). Playing, it is where the pending jump goes. */
 SONG_SMALL void song_port_jump(uint32_t clock)
 {
 #if SONG_UI
-    if (song_port_player()->perf == 2) return; /* a performance take runs straight on */
+    struct song_player *p = song_port_player();
+    if (p->perf == 2) return; /* a performance take runs straight on */
+    p->start_at = clock < song_end(p->song) ? clock : song_end(p->song);
 #endif
     song_player_jump(song_port_player(), clock);
 #if SONG_UI

@@ -96,7 +96,7 @@ SONG_SMALL void song_grid_take_ended(unsigned began, uint32_t clock)
     unsigned t = grid.cell / SONG_GRID_ROWS, row = grid.cell % SONG_GRID_ROWS;
     if (!grid.state) return;
     if (grid.state == LAUNCHING && p->waiting[t] == row) p->waiting[t] = SONG_FROM_NONE; /* called off */
-    if (s->open && p->playing) { p->from[t] = (uint8_t)row; p->base[t] = p->edit_base; p->waiting[t] = SONG_FROM_NONE; }
+    song_port_clip_launched();
     song_port_clip_close();
     if (grid.fresh) {
         uint32_t bar = song_bar_clock(s, 1), length = s->clip_length[grid.cell];

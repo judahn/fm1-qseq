@@ -82,7 +82,7 @@ export async function phaseButtons(browser, root) {
     r.step();                                       // SHIFT+REC: step entry
     r.tap(B.FX);
     fx.step = r.page();
-    r.tap(B.REC);
+    r.step();                                       // SHIFT+REC leaves (0.5.0)
 
     // 3. The engine's tempo.
     const tp = o.tempo = {};

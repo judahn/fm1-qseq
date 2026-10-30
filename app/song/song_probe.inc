@@ -12,6 +12,7 @@
 #if SONG_UI
 #include "version.h"
 uint32_t song_store_probe(unsigned what); /* song_store_list.inc */
+uint32_t song_panel_probe(unsigned what); /* song_step.inc */
 int sim_song_kit_copy_run(void);
 #endif
 struct song_heard { uint32_t block; uint8_t track, pitch, velocity, kind; };
@@ -92,6 +93,8 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     case 55: return song_port_battery_shown();
     case 56: return groove_arp_enabled(track & 7U);
     case 57: { uint32_t v; memcpy(&v, song.name, 4); return v; } /* the working song's name (0.3.1) */
+    case 58: return song_panel_probe(index); /* 0.5.0: the roll's zoom, the glitch page, what shows, the sweep */
+    case 59: return track ? player.start_song : player.start_at; /* the start point (0.5.0) */
 #endif
     case 18: return index < count ? e[index].b : 0;
     case 19: return song.swing | (uint32_t)song.swing_grid << 8 | (uint32_t)song.swing_tracks << 16;

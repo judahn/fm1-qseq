@@ -46,8 +46,8 @@ export async function phase2(browser, root) {
     r.render(4);
     o.stepPng = r.png();
     r.render(200);                                 // the preview times out
-    // REC leaves at the pointer. Back to the bar line and play the phrase.
-    r.tap(B.REC);
+    // SHIFT+REC leaves at the pointer (0.5.0). Back to the bar line and play the phrase.
+    r.step();
     o.backInSong = r.page();
     r.turn(2, -1);
     o.playhead = r.info(8) - p0;
@@ -88,7 +88,7 @@ export async function phase2(browser, root) {
     o.snapped = { added: r.info(0, 0) - count, at: r.info(1, 0, count) - p1, pitch: r.info(2, 0, count) };
     r.tap(B.ENV);                                  // back-delete removes it again
     o.backDeleted = { added: r.info(0, 0) - count, pointer: r.info(17) - p1 };
-    r.tap(B.REC);
+    r.step();
     r.held(B.FX, () => r.tap(B.GLO));
     o.shiftGlo = r.page();
     return o;
@@ -102,7 +102,7 @@ export async function phase2(browser, root) {
   t.eq('a chord goes in when every key is up (held, then released)', q.chord, [0, 3]);
   t.eq('the bar went in as entered', q.stored, q.want);
   t.eq('landing on the chord previews it', q.previewedChord, '60,64,67');
-  t.eq('REC leaves step entry for the song view', q.backInSong, 19);
+  t.eq('SHIFT+REC leaves step entry for the song view', q.backInSong, 19);
   t.eq('K1 puts the playhead back on the phrase', q.playhead, 0);
   t.yes('the phrase plays on exact blocks, ons and offs', q.playback.ok, q.playback);
   t.eq('playback stopped at the song end', q.playback.playing, 0);

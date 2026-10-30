@@ -13,8 +13,9 @@
  * with the other tracks and the markers out of the way. */
 #include "song_port.h"
 
-enum { SONG = STARTUP + 1, SONG_STEP, SONG_SETUP, SONG_DIAG, SONG_REC, SONG_AUTO, SONG_LIST, SONG_JOB, SONG_GRID };
-/* song view, step entry, settings, diagnostics, REC, automation, songs, edit jobs, the clip grid */
+enum { SONG = STARTUP + 1, SONG_STEP, SONG_SETUP, SONG_DIAG, SONG_REC, SONG_AUTO, SONG_LIST, SONG_JOB, SONG_GRID, SONG_ROLL };
+/* song view, step entry, settings, diagnostics, REC, automation, songs, edit jobs, the clip grid, and what a
+ * take shows (never a page, song_shown) */
 enum {
     SONG_X = 22, SONG_W = 214, SONG_RULER = 32, SONG_ROWS = 48, SONG_ROW = 18,
     SONG_BOTTOM = SONG_ROWS + 8 * SONG_ROW - 2,
@@ -26,11 +27,23 @@ static unsigned song_zoom;
 static uint32_t song_window = ~0U, song_drawn_x = ~0U, song_ranged = ~0U;
 static uint8_t song_low[SONG_TRACKS], song_high[SONG_TRACKS];
 static struct {
-    uint32_t clock, target, ghost_from, ghost_to;
+    uint32_t clock, target, ghost_from, ghost_to, start;
     uint8_t playing, jumping, shift, recording, selected, ghost_tracks;
 } song_now; /* taken by the marking pass, used by every band */
 static void select_track(int delta);
 static void song_start(uint32_t now);
+#if SONG_UI
+/* What a song page shows (0.5.0): a live take into one track, from the song
+ * view, the clip editor or a grid cell, shows the roll (song_step.inc) while
+ * it is armed or running, and the page itself comes back when it ends. A
+ * performance stays on the grid, and the automation view keeps its own. */
+static unsigned song_shown(unsigned visible)
+{
+    return (visible == SONG || visible == SONG_GRID) && song_port_recording() ? SONG_ROLL : visible;
+}
+#else
+#define song_shown(visible) (visible)
+#endif
 #if SONG_UI
 static void song_save_press(void); /* song_buttons.inc */
 /* The bottom line of a song page, drawn only when it changes, and the
@@ -113,12 +126,15 @@ static void song_ranges(const struct song *s)
 }
 #include "song_header.inc"
 
-/* Bar numbers, marker flags, the loop bracket and a pending jump. */
+/* Bar numbers, marker flags, the loop bracket, a pending jump, and the start
+ * point while the playhead is elsewhere (0.5.0). */
 static void song_ruler(const struct song *s)
 {
     if (paint_rendering && (paint_top >= SONG_ROWS || paint_top + PAINT_ROWS <= SONG_RULER)) return;
     uint32_t sig = signature(song_window ^ (song_zoom << 28), &s->revision, sizeof s->revision);
+    unsigned start = song_now.start != song_now.clock && !song_now.jumping && song_visible(song_now.start);
     sig = signature(sig, &s->loop_start, 8) ^ s->loop_on ^ (song_now.jumping ? song_now.target << 1 : 0);
+    sig = signature(sig, &song_now.start, start ? 4 : 0) ^ start << 30;
     if (sig == cache->title_cache) return;
     cache->title_cache = sig;
     paint_fill(0, SONG_RULER, 240, SONG_ROWS - SONG_RULER, BACK);
@@ -141,6 +157,7 @@ static void song_ruler(const struct song *s)
         }
     if (song_now.jumping && song_visible(song_now.target))
         paint_fill(song_x(song_now.target) - 1, SONG_ROWS - 5, 3, 3, GREEN);
+    else if (start) paint_fill(song_x(song_now.start) - 1, SONG_ROWS - 5, 3, 3, TEXT);
 }
 
 /* A block's clip on its row, pass after pass from the block's start up to
@@ -252,28 +269,19 @@ static void song_draw(void)
     song_footer(s, "MARKER");
     song_notice_expire();
     char selection[40], part[12];
-    unsigned idle = 0;
-    if (song_port_clip_armed()) strcpy(selection, "REC FROM THE CLIP'S NEXT PASS");
-    else if (song_now.recording) {
-        strcpy(selection, "REC ");
-        strcat(selection, song_rec_modes[song_port_recorder()->mode]);
-        strcat(selection, "  PLAY OR REC ENDS");
-    } else { /* the selection, with room left for the REC mode */
-        uint32_t length = s->loop_end - s->loop_start;
-        strcpy(selection, "SEL ");
-        decimal(part, (int)(length / SONG_WHOLE), 1); strcat(selection, part); strcat(selection, ".");
-        decimal(part, (int)(length % SONG_WHOLE * 10U / SONG_WHOLE), 1); strcat(selection, part);
-        strcat(selection, " BARS:");
-        unsigned picked = song_selected();
-        if (picked == 0xff) strcat(selection, " ALL");
-        else for (unsigned t = 0; t < SONG_TRACKS && strlen(selection) < 28; ++t)
-            if (picked >> t & 1U) { strcat(selection, " T"); decimal(part, (int)t + 1, 1); strcat(selection, part); }
-        idle = 1;
-    }
+    uint32_t length = s->loop_end - s->loop_start; /* the selection, with room left for the REC mode (a take shows the roll) */
+    strcpy(selection, "SEL ");
+    decimal(part, (int)(length / SONG_WHOLE), 1); strcat(selection, part); strcat(selection, ".");
+    decimal(part, (int)(length % SONG_WHOLE * 10U / SONG_WHOLE), 1); strcat(selection, part);
+    strcat(selection, " BARS:");
+    unsigned picked = song_selected();
+    if (picked == 0xff) strcat(selection, " ALL");
+    else for (unsigned t = 0; t < SONG_TRACKS && strlen(selection) < 28; ++t)
+        if (picked >> t & 1U) { strcat(selection, " T"); decimal(part, (int)t + 1, 1); strcat(selection, part); }
     const char *hint = notice ? notice : song_now.jumping ? "JUMP WAITS FOR THE NEXT BAR"
         : song_now.shift ? "F3-E4 EDIT  F#-A# MANGLE  EDIT JOBS"
         : (previous_buttons & BUTTON(LFO)) ? "LFO + F3-F4 TRACKS  G4 ALL" : selection;
-    if (hint == selection && idle) song_hint_mode(selection);
+    if (hint == selection) song_hint_mode(selection);
     else song_hint(hint);
 }
 
@@ -294,7 +302,7 @@ static void song_page_draw(unsigned visible)
     if (visible == SONG_DIAG) { song_diag_draw(); return; }
 #endif
 #if SONG_UI
-    if (visible == SONG_STEP) song_step_draw();
+    if (visible == SONG_STEP || visible == SONG_ROLL) song_step_draw();
     else if (visible == SONG_SETUP) song_setup_draw();
     else if (visible == SONG_REC) song_rec_draw();
     else if (visible == SONG_AUTO) song_auto_draw();

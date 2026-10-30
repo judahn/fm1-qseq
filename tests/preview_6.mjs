@@ -143,7 +143,7 @@ export async function phase6(browser, root) {
       r.step(); r.tap(B.ARP);
       r.held(B.FX, () => r.key(4));                 // SHIFT+A3: quarters
       r.turn(2, 3); r.key(7); r.turn(2, -1); r.key(9);
-      r.tap(B.ARP); r.tap(B.REC);
+      r.tap(B.ARP); r.tap(B.ARP); r.tap(B.ARP); r.step(); // ARP through the glitch pages to off, SHIFT+REC leaves
     };
     const plain = rig(), baked = rig();
     setup(plain); setup(baked);

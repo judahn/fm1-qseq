@@ -5,9 +5,10 @@
 
 /* Step entry (design section 4). The pointer is the selection: the notes on
  * the track that start exactly at the pointer, all of them unless narrowed
- * by picking pitches. Knob edits change the entry settings and, when the
- * pointer sits on notes, rewrite the selected notes too. Model code only:
- * the panel maps keys to pitches, and previews go out through `out`. */
+ * by picking pitches, or since 0.5.0 a sweep's notes (step_range.c). Knob
+ * edits change the entry settings and, when the selection holds notes,
+ * rewrite them too. Model code only: the panel maps keys to pitches, and
+ * previews go out through `out`. */
 enum { STEP_64TH, STEP_32ND, STEP_16TH, STEP_8TH, STEP_QUARTER, STEP_HALF, STEP_WHOLE, STEP_LENGTHS };
 enum { STEP_GATES = 4, STEP_RANDOMS = 4, STEP_CHORD = 16 };
 struct song_step {
@@ -16,12 +17,13 @@ struct song_step {
     uint32_t pointer, last_at, random;
     uint32_t pick[4];             /* narrowed selection, one bit per pitch */
     uint16_t serial;              /* counts previews, so the panel can time them out */
-    uint8_t track, length, triplet, dots, gate, velocity, random_level, picked;
+    uint8_t track, length, triplet, dots, gate, velocity, random_level, picked, ranged;
     uint8_t chord[STEP_CHORD], chord_count;   /* keys held for the next entry */
     uint8_t strum[STEP_CHORD], last_strum[STEP_CHORD]; /* each note's start after the pointer (chord mode) */
     uint8_t last[STEP_CHORD], last_count, tie_ok;
     uint8_t preview[STEP_CHORD], preview_count, preview_track;
     uint32_t glitch;              /* the entry glitch word (glitch.h) */
+    uint32_t anchor;              /* where a sweep began, while ranged (step_range.c) */
 };
 
 /* step.c: entering, rests, ties, deleting and moving. Entering calls return
@@ -43,27 +45,51 @@ int step_delete(struct song_step *st);
 int step_back_delete(struct song_step *st);
 void step_move(struct song_step *st, int steps);    /* by the step length */
 void step_jump(struct song_step *st, int direction); /* note to note */
+/* K4 with LFO held (0.5.0): the pointer moves, by steps or note to note,
+ * and the selection runs from where the sweep began (step_range.c). */
+void step_sweep(struct song_step *st, int steps, unsigned jump);
 unsigned step_selection(const struct song_step *st, unsigned index[STEP_CHORD]);
 /* Change the note at pool index `at` on the step track, journaled. */
 void step_change(struct song_step *st, unsigned at, const struct song_event *e);
 void step_preview_stop(struct song_step *st);
 
-/* step_edit.c: knobs, length keys, picking and the pitch knob. */
+/* step_edit.c: knobs, length keys and picking. The edits return 0, or
+ * STEP_TOO_BIG when a swept selection is more than undo could take back,
+ * and then nothing changed, the entry settings included. */
+enum { STEP_TOO_BIG = -2 };
 void step_land(struct song_step *st);               /* select and preview at the pointer */
-void step_set_length(struct song_step *st, int delta);
-void step_pick_length(struct song_step *st, unsigned length);
-void step_toggle_triplet(struct song_step *st);
-void step_cycle_dots(struct song_step *st);
-void step_set_velocity(struct song_step *st, int delta);
-void step_set_gate(struct song_step *st, int delta);
+void step_preview(struct song_step *st);            /* sound the notes selected at the pointer */
+int step_set_length(struct song_step *st, int delta);
+int step_pick_length(struct song_step *st, unsigned length);
+int step_toggle_triplet(struct song_step *st);
+int step_cycle_dots(struct song_step *st);
+int step_set_velocity(struct song_step *st, int delta);
+int step_set_gate(struct song_step *st, int delta);
+/* At the pointer a key adds its pitch to the picked notes. In a sweep the
+ * first key picks only its pitch, and later ones toggle theirs. */
 void step_pick(struct song_step *st, unsigned pitch);
 /* One glitch field on the selected notes, or the entry setting. -1 when
  * the song's glitch table is full. */
 int step_set_glitch(struct song_step *st, unsigned field, int delta);
-/* By scale steps (semitones when chromatic), or octaves. Drum tracks move
- * along their pad notes instead. Returns how many notes moved. */
-unsigned step_transpose(struct song_step *st, int steps, unsigned octaves);
-unsigned step_transpose_pads(struct song_step *st, const uint8_t *pads, unsigned count, int steps);
+/* step_pitch.c: by scale steps (semitones when chromatic), or octaves.
+ * Drum tracks move along their pad notes instead. Returns how many notes
+ * moved, or STEP_TOO_BIG. */
+int step_transpose(struct song_step *st, int steps, unsigned octaves);
+int step_transpose_pads(struct song_step *st, const uint8_t *pads, unsigned count, int steps);
+/* step_range.c (0.5.0): the swept selection, every note that starts from
+ * the anchor to the pointer, both included, at the pitches picked in it if
+ * any. The clocks [from, to) and 1 while the pointer is off the anchor, and
+ * how many notes are selected, swept or at the pointer. Too big: undo couldn't hold a
+ * change to every one (the edit jobs' reckoning, with room for the maps). */
+int step_range(const struct song_step *st, uint32_t *from, uint32_t *to);
+unsigned step_count(const struct song_step *st);
+int step_too_big(const struct song_step *st);
+int step_chosen(const struct song_step *st, const struct song_event *e); /* a note the pick lets in */
+/* The swept selection's edits, for step.c and step_edit.c. */
+int step_range_delete(struct song_step *st);
+void step_range_velocity(struct song_step *st, int delta);
+void step_range_scale(struct song_step *st, uint32_t before, uint32_t after); /* lengths times after / before */
+int step_range_glitch(struct song_step *st, unsigned field, int delta);
 unsigned step_entry_velocity(struct song_step *st); /* draws a random one for R1..R4 */
 const char *step_velocity_name(unsigned velocity);
 void step_length_name(const struct song_step *st, char out[8]);

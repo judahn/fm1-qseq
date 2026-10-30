@@ -58,7 +58,7 @@ export async function phaseKeys(browser, root) {
     o.shiftNotes = notes().length - before;
 
     // 6. A minor on the settings page: in step entry all 27 key lights show it.
-    r.tap(B.REC);
+    r.step();                                      // SHIFT+REC leaves (0.5.0)
     r.tap(B.GLO); r.turn(1, 1); r.turn(2, 9); r.turn(3, 2); r.turn(1, -1); r.tap(B.GLO);
     r.step();
     r.render(4);

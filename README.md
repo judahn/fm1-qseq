@@ -23,7 +23,7 @@ There are two device builds, and the browser preview:
 | Build | What's in it | App size |
 |---|---|---|
 | Default (`./build.sh`) | The hardware test build: FM1 Open V14 plus a diagnostics page that plays a built-in test song and measures its timing. To fit, it leaves out the 16 factory preset projects and the workbench's project, sample and voice transfers. Firmware updates still work | 453,608 bytes of 453,921 |
-| Full (`FM1_SONG_DEVICE_FULL=1`) | The whole song mode, without the diagnostics page. It leaves out the stock step and pattern pages (their sync and MIDI pages move to the device settings), the stock project pages, the demo projects, the factory sound sets and the built-in FM factory voices (the workbench can send those to the DX7 library) | 523,400 bytes of 548,129 |
+| Full (`FM1_SONG_DEVICE_FULL=1`) | The whole song mode, without the diagnostics page. It leaves out the stock step and pattern pages (their sync and MIDI pages move to the device settings), the stock project pages, the demo projects, the factory sound sets and the built-in FM factory voices (the workbench can send those to the DX7 library) | 527,816 bytes of 548,129 |
 | Browser preview | The whole song mode on FM1 Open's simulator, in one HTML file | |
 
 ### What installing the full build costs
@@ -34,8 +34,8 @@ slots and the first 8 sectors of the stock sample area. On the device that means
 - The settings sector moves, so the MIDI, clock and Bluetooth settings start from their defaults.
 - The stock projects are overwritten and the stock sample bank is lost. Kits come from the workbench, which
   can send FM1 Open's 8 built-in sounds as a kit.
-- The SDK's settings area (VM) takes the space between the code and the Bluetooth sector, 56 KB at the
-  current size, and the Bluetooth sector moves. Neither has been tried on hardware.
+- The SDK's settings area (VM) takes the space between the code and the Bluetooth sector, 48 KB at the
+  current size (32 KB at least), and the Bluetooth sector moves. Neither has been tried on hardware.
 - The DX7 voice banks and the tuning sector keep their places. Songs and kits share the remaining 101 sectors
   (404 KB).
 
@@ -58,6 +58,10 @@ The full build and the preview have all of these. The [user guide](docs/user-gui
 - Lengths from a 64th to a whole note, with triplets, dots and double dots.
 - Velocity, gate, rest, repeat and tie on keys, chords built key by key, and editing notes in place at the
   pointer.
+- A piano roll zoomed from 4 bars to half a bar, with bar, beat and 16th lines, that plays in place: PLAY
+  hears it without leaving, and REC records a take there.
+- A swept selection across bars, narrowed to pitches (every hi-hat, say), to delete, change velocity, length,
+  gate or glitch, or transpose.
 
 **Real-time recording and arranging**
 - Replace, overdub, punch and loop recording, count-in, metronome, and input quantize with a strength that
@@ -153,7 +157,7 @@ FM1_SONG_DEVICE_FULL=1 FM1_SOURCE_URL=https://github.com/judahn/fm1-qy/archive/C
 ```
 
 A firmware build prints its size and checks it fits. A package build also prints the flash layout, for example
-`Offline package fits 1 MiB: image 540672, VM 57344, user 442368 bytes`.
+`Offline package fits 1 MiB: image 548864, VM 49152, user 442368 bytes`.
 
 Every firmware build of a kind (default or full) first clears that kind's update image and replaces its
 workbench page with a "Build incomplete" stub. So after a plain `./build.sh`, run `--package` again before
@@ -192,9 +196,12 @@ power-on to force the update mode isn't documented in this tree or upstream, so 
 
 With the full build or the preview:
 
-- **SEQ** opens the song view. **PLAY** plays and stops.
-- A tap of **REC** (stopped) records in the song's mode, OVERDUB to begin with, and **SHIFT+REC** is step entry.
-  A held **REC** opens the record settings. **SHIFT+SEL** switches REPLACE and OVERDUB.
+- **SEQ** opens the song view. **PLAY** plays and stops, and a stop comes back to where it started (the start
+  point, which K1, the markers and SHIFT+PLAY set).
+- A tap of **REC** (stopped) records in the song's mode, OVERDUB to begin with, and the take shows on a piano
+  roll. **SHIFT+REC** is step entry, and leaves it. A held **REC** opens the record settings. **SHIFT+SEL**
+  switches REPLACE and OVERDUB.
+- **ALGO** zooms the song view, the automation view and step entry's roll.
 - **SEQ** again opens the clip grid, which plays only launched clips, while the song view plays only the song.
 - A tap of **GLO** opens the song settings, with chord mode on the fifth page.
 - **SAVE** opens the song list, and **SAVE** there saves. On the list K2 picks the action, **OCT+** (YES) does it,

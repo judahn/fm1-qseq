@@ -3,8 +3,9 @@
  * Setting and deleting changes at the playhead, clearing the shown lanes in
  * the selection, and stepping from change to change. */
 
-/* ALGO on the conductor row or a program lane, while stopped. */
-static void song_auto_set(struct song *s, int delta, unsigned shift, uint32_t now)
+/* SHIFT+ALGO on the conductor row or a program lane, while stopped. Tempo
+ * goes in whole BPM (0.5.0: no hundredths here). */
+static void song_auto_set(struct song *s, int delta, uint32_t now)
 {
     struct song_player *p = song_port_player();
     uint32_t at = p->playhead, start;
@@ -12,7 +13,7 @@ static void song_auto_set(struct song *s, int delta, unsigned shift, uint32_t no
     notice_until = now + 1500U;
     if (p->playing) { notice = "STOP TO EDIT CHANGES"; return; }
     if (song_auto_conductor && !song_auto_mode) {
-        int bpm = s->tempo[song_tempo_at(s, at)].bpm100 + delta * (shift ? 1 : 100);
+        int bpm = s->tempo[song_tempo_at(s, at)].bpm100 + delta * 100;
         notice = song_port_set_tempo(at, (unsigned)clamp(bpm, SONG_TEMPO_MIN, SONG_TEMPO_MAX)) ? "TEMPO CHANGES FULL" : NULL;
     } else if (song_auto_conductor) { /* QY70 range, listed x/4, x/8, x/16 */
         const struct song_meter *m = song_meter_at(s, bar);

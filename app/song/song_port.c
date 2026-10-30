@@ -164,6 +164,17 @@ SONG_SMALL int song_port_clip_open(unsigned cell)
     }
     return r;
 }
+/* Playing, the open clip goes on as its track's launched clip once it
+ * closes, in its pass: after a cell's take, and leaving step entry for the
+ * grid (0.5.0). */
+SONG_SMALL void song_port_clip_launched(void)
+{
+    if (!song.open || !player.playing) return;
+    unsigned cell = song.open - SONG_TRACKS, t = cell / SONG_GRID_ROWS;
+    player.from[t] = (uint8_t)(cell % SONG_GRID_ROWS);
+    player.base[t] = player.edit_base;
+    player.waiting[t] = SONG_FROM_NONE;
+}
 SONG_SMALL void song_port_clip_close(void)
 {
     if (!song.open) return;

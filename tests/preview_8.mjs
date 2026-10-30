@@ -93,6 +93,7 @@ export async function phase8(browser, root) {
     // the pointer, then A4 (minor) and D4 enter D minor after it. F5 enters
     // D minor again, once. With SHIFT held a root and a type key do neither.
     tap(B.GLO); turn(4, -1); tap(B.GLO);
+    turn(2, 20);                                    // K1 to the song's end: the stop went back to the take's chord (0.5.0)
     r.long(B.REC); turn(2, 3); tap(B.REC);          // the record settings on STEP, and REC: step entry
     o.stepPage = pageNow();
     const fresh = (before, from) => { /* the notes added since `before`, from clock `from` */
@@ -117,7 +118,7 @@ export async function phase8(browser, root) {
     o.shifted = { entered: fresh(step2, 0).length, heard: heard().length, sameType: (setting(0) >> 8) === type };
     render(2);
     o.stepPng = png();
-    tap(B.REC);
+    r.step();                                       // SHIFT+REC leaves (0.5.0)
 
     // 9. Track 8, the 808, with chord mode set on: it shows DRUMS, a type key
     // changes nothing, and a key plays its pad, no chord.

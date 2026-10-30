@@ -3,11 +3,12 @@
  * The conductor row on top holds tempo and time signature changes, and
  * each track row shows one lane's curve. SELECT picks a row, past track 1
  * up to the conductor, and PRESETS the lane shown, or on the conductor
- * tempo or time signature. While stopped, ALGO sets the change at the
- * playhead: tempo there, the time signature from that bar, or a program
- * change. SCL deletes the change at the playhead and SHIFT+SCL clears the
- * shown lanes in the selection. Everything else works as in the song view,
- * and SHIFT+K1 goes from change to change on the row. */
+ * tempo or time signature. While stopped, SHIFT+ALGO sets the change at the
+ * playhead: tempo there in whole BPM, the time signature from that bar, or
+ * a program change (0.5.0, ALGO alone before). SCL deletes the change at
+ * the playhead and SHIFT+SCL clears the shown lanes in the selection.
+ * Everything else works as in the song view, ALGO zooming as K4 does, and
+ * SHIFT+K1 goes from change to change on the row. A take here stays here. */
 
 enum { AUTO_C = SONG_ROWS, AUTO_CH = 13, AUTO_Y = SONG_ROWS + 15, AUTO_ROW = 16 };
 static uint8_t song_auto_lanes[SONG_TRACKS]; /* lane shown per track, 0 for the first knob's */
@@ -123,11 +124,11 @@ static void song_auto_draw(void)
         unsigned bpm = s->tempo[song_tempo_at(s, song_now.clock)].bpm100;
         strcpy(hint, "TEMPO "); decimal(part, (int)(bpm / 100), 1); strcat(hint, part);
         strcat(hint, "."); decimal(part, (int)(bpm % 100), 2); strcat(hint, part);
-        strcat(hint, "  ALGO SET  SEL DEL");
+        strcat(hint, "  SHIFT+ALGO SET  SEL DEL");
     } else if (song_auto_conductor) {
         const struct song_meter *m = song_meter_at(s, song_bar_at(s, song_now.clock, NULL, NULL));
-        strcpy(hint, "TIME SIG "); decimal(part, m->beats, 1); strcat(hint, part); strcat(hint, "/");
-        decimal(part, m->unit, 1); strcat(hint, part); strcat(hint, "  ALGO SET  SEL DEL");
+        strcpy(hint, "TIME "); decimal(part, m->beats, 1); strcat(hint, part); strcat(hint, "/");
+        decimal(part, m->unit, 1); strcat(hint, part); strcat(hint, "  SHIFT+ALGO SET  SEL DEL");
     } else {
         unsigned lane = song_auto_lane(track);
         int value = song_lane_at(s, track, lane, song_now.clock);
@@ -168,7 +169,7 @@ static int song_auto_input(const struct fm1_controls *c, uint32_t *pressed, uint
             song_auto_lanes[track] = (uint8_t)(at < n ? song_param(index[at])->cc : SONG_LANE_PROGRAM);
         }
     }
-    if (c->encoders[1]) song_auto_set(s, c->encoders[1], shift, now);
+    if (c->encoders[1] && shift) { song_auto_set(s, c->encoders[1], now); k.encoders[1] = 0; } /* ALGO alone zooms */
     if (shift && k.encoders[2] && !song_port_recorder()->active) { song_auto_step(s, k.encoders[2]); k.encoders[2] = 0; }
     return song_view_input(&k, pressed, key_down, now);
 }

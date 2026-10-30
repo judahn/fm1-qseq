@@ -10,9 +10,11 @@
  * stress song (8 tracks, chords, 1-clock notes, odd tempo changes, 20 to
  * 300 BPM). A wake the control loop misses makes notes one block late,
  * never lost. Without the wake the same model shows late notes, so the
- * check can fail. Built with -DSONG_DEVICE_FULL=1 (run_host.sh). */
+ * check can fail. The start point (0.5.0) lives here too, in the port's
+ * jumps and stops. Built with -DSONG_DEVICE_FULL=1 (run_host.sh). */
 #include "harness.h"
 #include "song_port.h"
+#include "clips.h"
 #include <stdlib.h>
 #if SONG_HW_TEST || !SONG_UI
 #error "test_deliver is built in the full build's configuration (run_host.sh)"
@@ -264,6 +266,69 @@ static void test_wake_flag(void)
     CHECK_EQ(song_isr_mode, 0);
 }
 
+/* The start point (0.5.0): a jump while stopped moves the playhead there
+ * and makes it where PLAY starts and every stop comes back to. A jump while
+ * playing makes the pending jump's target the start point. Playing out at
+ * the song's end comes back to it too, and it stays inside a song that got
+ * shorter. A clip in the editor has its own, from its top, and the song's
+ * waits. A performance take runs on through jumps and keeps it. */
+static void test_start_point(void)
+{
+    const uint32_t bar = 1920;
+    song_build_test(&song);
+    song.loop_on = 0;
+    start(0);
+    song_port_stop();
+    CHECK_EQ(player.playhead, 0);
+    song_port_jump(3 * bar);
+    CHECK_EQ(player.start_at, 3 * bar);
+    CHECK_EQ(player.playhead, 3 * bar);
+    song_deliver_start(0);
+    play((struct run){1, 4, 0, 0}, 500);
+    CHECK(song_player_clock(&player) > 3 * bar);
+    song_port_stop();
+    CHECK_EQ(player.playhead, 3 * bar);
+    song_deliver_start(0);
+    play((struct run){1, 4, 0, 0}, 100);
+    song_port_jump(5 * bar);
+    CHECK(player.jumping);
+    CHECK_EQ(player.start_at, 5 * bar);
+    play((struct run){1, 4, 0, 0}, 1500);
+    CHECK(!player.jumping);
+    CHECK(song_player_clock(&player) > 5 * bar);
+    song_port_stop();
+    CHECK_EQ(player.playhead, 5 * bar);
+    song_deliver_start(0);
+    play((struct run){1, 4, 0, 0}, 200000);
+    CHECK(!player.playing);                      /* out at the end, and back */
+    CHECK_EQ(player.playhead, 5 * bar);
+    song.bars = 4;
+    song_port_stop();
+    CHECK_EQ(player.playhead, 4 * bar);
+    CHECK_EQ(player.start_at, 4 * bar);
+    song.bars = 12;
+    song_port_jump(2 * bar);
+    CHECK_EQ(song_clip_open(&song, song_cell(0, 0)), 0);
+    song_player_edit(&player, 0, 1);
+    CHECK_EQ(player.start_at, 0);
+    CHECK_EQ(player.start_song, 2 * bar);
+    song_port_jump(480);                         /* in the clip's time */
+    song_deliver_start(0);
+    play((struct run){1, 4, 0, 0}, 300);
+    song_port_stop();
+    CHECK_EQ(player.playhead, 480);
+    CHECK_EQ(player.song_at, 2 * bar);
+    song_clip_close(&song);
+    song_player_edit(&player, 0, 0);
+    CHECK_EQ(player.playhead, 2 * bar);
+    CHECK_EQ(player.start_at, 2 * bar);
+    player.perf = 2;
+    song_port_jump(7 * bar);
+    CHECK_EQ(player.start_at, 2 * bar);
+    CHECK_EQ(player.playhead, 2 * bar);
+    player.perf = 0;
+}
+
 int main(void)
 {
     test_song_on_time();
@@ -271,5 +336,6 @@ int main(void)
     test_missed_wake();
     test_without_wake();
     test_wake_flag();
+    test_start_point();
     return report("test_deliver");
 }

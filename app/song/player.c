@@ -250,6 +250,18 @@ SONG_SMALL void song_player_stop(struct song_player *p)
     memset(p->base, 0, sizeof p->base);
 #endif
 }
+#if SONG_UI
+SONG_SMALL void song_player_rewind(struct song_player *p)
+{
+    const struct song *s = p->song;
+    uint32_t end = song_end(s), whole = song_bar_clock(s, s->bars);
+    if (p->playing) return;
+    if (p->start_at > end) p->start_at = end;
+    if (p->start_song > whole) p->start_song = whole;
+    p->playhead = p->start_at;
+    if (s->open) p->song_at = p->start_song;
+}
+#endif
 SONG_SMALL void song_player_jump(struct song_player *p, uint32_t clock)
 {
     uint32_t end = song_end(p->song);
@@ -356,7 +368,7 @@ SONG_SMALL void song_player_advance(struct song_player *p, uint64_t frame)
 #if SONG_UI
         if (kind == EDGE_END && !clips_playing(p)) { /* while clips play, the song goes round from the top */
             song_player_stop(p);
-            p->playhead = 0;
+            song_player_rewind(p); /* back to the start point (0.5.0) */
             return;
         }
         for (unsigned t = 0; t < SONG_TRACKS; ++t) if (on_song(p, t)) song_player_cut(p, t);

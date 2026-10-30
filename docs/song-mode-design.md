@@ -96,17 +96,20 @@ kept the top three keys for rest, repeat and tie, and put the lengths on the low
 With SHIFT held no key enters a note or strikes a chord. K1 still lengthens turning right.
 
 **Knobs (step mode):** K1 length, K2 velocity, K3 gate. K4 moves the pointer by the current length. SHIFT plus
-K4 jumps from note to note. SELECT picks the track. Landing on a note plays it, as on the QY70.
+K4 jumps from note to note. SELECT picks the track. Landing on a note plays it, as on the QY70. ALGO zooms the
+roll and ARP steps the glitch layer's pages (0.5.0, below).
 
 **Editing what's there.** The pointer is the selection. When it lands on existing notes, they're selected
 (the whole chord by default), and K1, K2 and K3 change their length, velocity and gate in place. On an empty
 position the same knobs set the values for the next note entered. To narrow a chord, hold SELECT (LFO) and
 press the keys of the notes you want. Delete removes whatever is selected. Range edits across many bars, like
-softening a whole hi-hat part, belong to the edit jobs in phase 6.
+softening a whole hi-hat part, belonged to the edit jobs in phase 6, and since 0.5.0 a sweep does them in
+step entry too (below).
 
 **Screen:** one bar at a time in a grid of 32nd-note cells (the QY70's dash display), widened for 64ths when
 needed. Notes are drawn as bars with their real lengths, so ties and dotted values show. Position, length,
-velocity and gate are shown along the top.
+velocity and gate are shown along the top. Since 0.5.0 ALGO zooms the roll to 4, 2 or 1 bars or half a bar, the
+dashes following, and lines mark bars, beats and 16ths (below).
 
 ## 5. Real-time recording
 
@@ -115,7 +118,8 @@ velocity and gate are shown along the top.
 - **Count-in:** off, 1 or 2 bars. Metronome on, off or record only.
 - **REC (0.4.0):** a tap records at once in the song's mode, one of the four live modes (OVERDUB in a new
   song), SHIFT+REC is step entry, and a hold opens the record settings. There STEP is listed after the live
-  modes and is never kept as the song's mode. SHIFT+SEL switches REPLACE and OVERDUB.
+  modes and is never kept as the song's mode. SHIFT+SEL switches REPLACE and OVERDUB. Since 0.5.0 a take into
+  one track shows step entry's roll while it lasts.
 - **Input quantize:** off, or any length above, including triplets, with a strength setting. Recorded notes
   are stored already quantized. The original timing is kept until the next pass, so quantize can be undone.
 - **Quantize job afterwards,** as on the QY70: grid, strength 0 to 100%, swing, over a range of bars on one
@@ -125,12 +129,12 @@ velocity and gate are shown along the top.
 
 | Control | Action |
 |---|---|
-| PLAY | Play and stop |
-| SHIFT + PLAY | Back to the start, or to the loop start when looping |
+| PLAY | Play from the start point, and stop back there (0.5.0). Until then a stop left the playhead where it was |
+| SHIFT + PLAY | Back to the start, or to the loop start when looping. It becomes the start point |
 | REC | A tap records in the song's mode, SHIFT+REC is step entry, a hold opens the record settings (0.4.0) |
-| K1 | Move the playhead by one snap step. With SHIFT, it moves marker to marker |
+| K1 | Move the playhead by one snap step, and the start point. With SHIFT, it moves marker to marker |
 | K2 / K3 | Loop start / loop end, by snap step |
-| K4 | Zoom the timeline. The snap follows the zoom |
+| K4 | Zoom the timeline. The snap follows the zoom. ALGO zooms too (0.5.0) |
 
 **Snap follows zoom** (an adaptive grid, as in Logic and Ableton). Zoomed out, the snap is 1 bar. Zooming in
 steps it down to a half bar, a beat, then an 8th, which is as fine as song view goes. The current snap is
@@ -531,8 +535,9 @@ Clip events come out of the song's shared event pool, and a block costs a few by
   settings (the REC chooser before), and HOME there goes back. A REC that ends or calls off something still
   acts as it goes down. SHIFT+REC is step entry: at the playhead, in an open clip, or in a grid cell's clip
   from its start, an empty cell first getting a clip of the REC length (4 bars for FREE). It starts only
-  while stopped, as before. REC or PLAY in it goes back to the view it was opened from (0.4.1): from the
-  grid with the clip closed, PLAY launching the clip and playing.
+  while stopped, as before. REC or PLAY in it went back to the view it was opened from (0.4.1): from the
+  grid with the clip closed, PLAY launching the clip and playing. Since 0.5.0 SHIFT+REC leaves, and REC and
+  PLAY stay (below).
 - The record settings list REPLACE, OVERDUB, PUNCH, LOOP and STEP. A live mode picked becomes the song's, and
   STEP never does. REC or PLAY there goes back and does what REC (a live mode) or SHIFT+REC (STEP) does
   there. New songs record in OVERDUB, and a file with STEP, the default before, loads as OVERDUB, so the song
@@ -554,6 +559,37 @@ Clip events come out of the song's shared event pool, and a block costs a few by
   own notes are left out inside them.
 - The full build's song list shows the free heap, the diagnostics' probe run once per opening, stopped, to see
   whether SONG_EVENTS can grow from 4096 to 8192 (32 KB more).
+
+**Step entry, takes and the start point, as built in 0.5.0** (Judah, 10/29):
+- PLAY in step entry plays from the start of the pointer's bar and stays there: the song, or in a clip the
+  clip with the grid's launched clips. A playhead runs across the roll, drawn as the song view draws its own
+  (a snapshot per frame, its old and new columns repainted), and the roll pages to follow it. PLAY again
+  stops back at that bar with the pointer where it was. While it plays the keys only sound: no entry, no rest,
+  tie or repeat, but SHIFT still sets the lengths, and SEL, the knobs and the pitch knob still edit, which the
+  player follows as it does a take's notes.
+- REC in step entry is a take there, with the tap, hold and SHIFT rules of the other views: a tap records from
+  the pointer's bar, a hold opens the record settings, and SHIFT+REC, the gesture that opens step entry, leaves
+  it, as SEQ does. Leaving while playing keeps playing, the clip staying launched in the grid.
+- ALGO zooms the roll: 4 bars, 2 bars, 1 bar (the default) or half a bar, in pages of the span counted in bars
+  from the start of the song or clip. The dashes follow (8ths, 16ths, 32nds or 64ths, at least 2 px), bar
+  numbers sit over the roll at 2 and 4 bars, and lines mark bars, beats and 16ths (32nds at half a bar), each
+  level only where its lines are 4 px apart. Notes are drawn 1 px short.
+- A sweep (LFO held, K4 turned) selects every note from where it began to the pointer, both ends in, at every
+  pitch. Keys with LFO then pick and toggle pitches across it. SEL, velocity (relative), length and gate
+  (scaled as the entry's length is), glitch and the pitch knob act on all of it as one undo step each, and a
+  change too big for undo is refused, reckoned as the edit jobs do (24 bytes a note, 512 to spare) plus the
+  maps. The glitch layer's pages moved from ALGO to ARP.
+- A live take into one track, from the song view, the clip editor, a grid cell or step entry, shows the roll
+  until it ends (song_shown: the page stays, only what is drawn changes), with the recording knobs and ALGO's
+  zoom. A performance and a take in the automation view stay where they are. During a cell's take K1 to K4
+  record their lanes, as in the song view, instead of moving the row cursor and the launch quantize.
+- The start point: PLAY starts there and every stop comes back to it, including a take ending with a stop and
+  the song playing out. Every jump made on purpose sets it (song_port_jump: K1, SHIFT+K1, the marker keys,
+  SHIFT+PLAY, the automation view's SHIFT+K1, step entry's PLAY and leaving, a song loaded or new). It lives in
+  RAM only, and a clip open in the editor has its own from its top. The ruler marks it while the playhead is
+  elsewhere.
+- ALGO zooms the song view, the clip editor and the automation view, where SHIFT+ALGO now sets a change, tempo
+  in whole BPM.
 
 **Later:** Live's follow actions, such as "after 4 bars, play a random clip from this column", next to the
 glitch tools.

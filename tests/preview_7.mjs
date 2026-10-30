@@ -55,7 +55,7 @@ export async function phase7(browser, root) {
     r.step();
     held(B.FX, () => key(2));                       // SHIFT+G3: halves
     for (const k of [0, 7, 4, 11]) key(k);
-    tap(B.REC);                                     // out of step entry, still in the clip
+    r.step();                                       // SHIFT+REC: out of step entry, still in the clip
     o.inClipPage = pageNow();
     o.clipPng = png();
     tap(B.SEQ);
@@ -170,7 +170,7 @@ export async function phase7(browser, root) {
   t.eq('SEQ closes the clip and goes back to the grid', q.backToGrid, 27);
   t.eq('no clip open after', q.closed, 0);
   t.eq('the four quarters are in the clip', q.clip1.map(n => n.clock), [0, 480, 960, 1440]);
-  t.eq('REC leaves step entry, still in the clip', q.inClipPage, 19);
+  t.eq('SHIFT+REC leaves step entry, still in the clip', q.inClipPage, 19);
   t.eq('K3 made the second clip two bars long', q.clip2.length, 3840);
   t.eq('the second clip\'s half notes', q.clip2.notes.map(n => n.clock), [0, 960, 1920, 2880]);
   t.over('the song\'s own track 2 untouched', q.song2, 0);

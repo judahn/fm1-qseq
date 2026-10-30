@@ -10,7 +10,8 @@
  * track, and HOME on its settings comes back. PLAY during a take ends the
  * recording and playing goes on. REC on the song view, the automation view
  * and the grid tells a tap from a hold (0.4.0): a tap records, a hold opens
- * the record settings, and SHIFT+REC is step entry. */
+ * the record settings, and SHIFT+REC is step entry. Step entry's REC does
+ * the same, and its SHIFT+REC leaves (0.5.0). */
 static uint8_t song_save_down, song_fx_from, song_fx_used, song_arp_from, song_arp_back;
 static uint32_t song_fx_ms;
 static int release_keys(void);
@@ -85,7 +86,8 @@ static void song_play_ends_take(uint32_t *pressed)
  * live mode with its count-in, or step entry at the playhead (in the open
  * clip, with one in the editor). Playing, REC arms an open clip's next pass
  * and otherwise says to stop first, and step entry waits for a stop too.
- * The grid has its own (grid_rec_go). */
+ * The grid has its own (grid_rec_go), and step entry too (song_step_rec,
+ * 0.5.0). */
 static void song_rec_go(unsigned from, unsigned step, uint32_t now)
 {
     struct song *s = song_port_song();
@@ -93,6 +95,7 @@ static void song_rec_go(unsigned from, unsigned step, uint32_t now)
     notice = NULL;
     notice_until = now + 2000U;
     if (from == SONG_GRID) grid_rec_go(step, now);
+    else if (from == SONG_STEP) song_step_rec(step, now);
     else if (step && playing) notice = "STOP FIRST FOR STEP ENTRY";
     else if (step) song_step_enter();
     else if (playing) notice = s->open && !song_port_record_clip(0) ? "REC FROM THE CLIP'S NEXT PASS" : "STOP FIRST TO RECORD";

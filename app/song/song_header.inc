@@ -78,6 +78,7 @@ static void song_now_read(struct song *s)
     song_now.ghost_tracks = (uint8_t)(c->length && !p->playing ? single ? 1U << track : c->tracks : 0);
     song_now.ghost_from = p->playhead;
     song_now.ghost_to = p->playhead + c->length;
+    song_now.start = p->start_at < song_end(s) ? p->start_at : song_end(s);
     song_follow(s, song_now.clock);
     song_ranges(s);
 }
@@ -93,9 +94,9 @@ static void song_playhead_line(void)
         paint_fill(song_drawn_x, SONG_RULER, 1, SONG_BOTTOM - SONG_RULER, GREEN);
 }
 /* The four recording knobs, by parameter name, on the take track. */
-static void song_knob_footer(void)
+static void song_knob_footer(unsigned t)
 {
-    unsigned t = song_port_recorder()->track, engine = song_port_engine(t);
+    unsigned engine = song_port_engine(t);
     for (unsigned k = 0; k < 4; ++k) {
         char value[12];
         const struct song_param *p = song_param_for(engine, song_knob_lane(t, k));
@@ -106,7 +107,7 @@ static void song_knob_footer(void)
 /* The footer: snap, loop and zoom, or the recording knobs during a take. */
 static void song_footer(const struct song *s, const char *shift_k1)
 {
-    if (song_now.recording) { song_knob_footer(); return; }
+    if (song_now.recording) { song_knob_footer(song_port_recorder()->track); return; }
     char start[24], end[24];
     song_position(s, s->loop_start, start, 0);
     song_position(s, s->loop_end, end, 0);
