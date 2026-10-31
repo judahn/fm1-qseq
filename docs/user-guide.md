@@ -1,5 +1,9 @@
 # FM1 QY user guide
 
+New to FM1 QY? [Getting started](getting-started.md) explains the screen and walks through a first song.
+This guide is the full reference. Its screenshots come from the preview's checks, which regenerate them on
+every run, so they match the build.
+
 This covers the song mode as it is built, in the full device build (`FM1_SONG_DEVICE_FULL=1`) and in the
 browser preview, which has all of it. The default device build is the hardware test build: it has only a
 diagnostics page, described at the end. Song playback timing has been measured on the FM-1 with that build.
@@ -45,6 +49,8 @@ it. It stays until YES, NO, or a change that cancels it (another song, action or
 page). It never times out. With nothing open, NO goes back to the song view. In the song view and step entry
 OCT- and OCT+ still move the keyboard's octave.
 
+<img src="yesno-load-ask.png" width="300" alt="The song list asking LOAD 2? UNSAVED CHANGES GO, with OCT+ YES and OCT- NO">
+
 | Page | How to get there | How to leave |
 |---|---|---|
 | Song view | SEQ from any stock page, or from the grid | SEQ to the grid, HOME to the stock overview |
@@ -81,7 +87,10 @@ stops, at most every 15 seconds, and the song list offers it after a restart.
 
 Tracks are rows, bars run across. The loop region is shaded and is also the selection. Only the song plays
 here, on every track. Coming from the grid, every track goes back to the song at the next launch point, or at
-once when stopped or with the launch quantize off.
+once when stopped or with the launch quantize off. [Getting started](getting-started.md#the-screen) labels
+everything on this screen.
+
+<img src="phase1-song-view.png" width="300" alt="The song view playing, with the loop on and the selection on track 1"> <img src="phase3-select.png" width="300" alt="The selection on tracks 1 and 2, outlined in cyan">
 
 | Control | Action |
 |---|---|
@@ -152,6 +161,11 @@ One copied track pastes onto the current track. Several paste back onto their ow
 survives loading another song. SHIFT+D#4 clears it, in the song view or the grid. A clip copied in the grid
 pastes as a clip block instead (see Clips in the song).
 
+While the clipboard holds something, a white outline from the playhead shows where a paste would land and how
+long it is, so PRESETS can line it up before SHIFT+A3.
+
+<img src="rec-block.png" width="300" alt="A white paste outline on track 8, from the playhead">
+
 ## Recording
 
 REC works the same way in the song view, the automation view, the grid and step entry:
@@ -177,6 +191,8 @@ with the take. PUNCH and LOOP stay inside the loop, as before. Settings page 1's
 directly (Song settings).
 
 The record settings:
+
+<img src="phase3-rec.png" width="300" alt="The record settings for track 7, OVERDUB picked, count-in 1 bar"> <img src="phase3-recording.png" width="300" alt="A take on track 7, shown as a roll with the recording knobs in the footer">
 
 | Control | Setting |
 |---|---|
@@ -230,6 +246,8 @@ fills during a take, the take ends there and says so.
 The screen shows the track as a small piano roll: the notes at their real lengths, the pointer in amber, and
 under the roll a row of dashes, one per cell, the pointer's lit. The header has the pointer's position, the
 time signature and, at the right, the span ALGO has zoomed to.
+
+<img src="phase2-step-view.png" width="300" alt="Step entry with a chord at the pointer"> <img src="step-roll-2bars.png" width="300" alt="Step entry zoomed to 2 bars">
 
 | Control | Action |
 |---|---|
@@ -306,6 +324,8 @@ a drum track that picks one pad, every hi-hat in two bars, say. Then:
 Each is one undo step. A change undo couldn't hold (about 630 notes on the device) is refused with a notice,
 and nothing changes. The sweep ends when the pointer moves without SEL, a note goes in, or step entry is left.
 
+<img src="step-sweep.png" width="300" alt="A sweep with one pitch picked: PICK 8 NOTES"> <img src="phase4b-step-glitch.png" width="300" alt="The glitch layer's page 1: repeats, drift and fade">
+
 The glitch layer gives each new or selected note glitch attributes. ARP steps through its three pages and
 back off, and ALGO still zooms, PRESETS moves the pointer and K4 the pitch:
 
@@ -326,6 +346,8 @@ Tap GLO on a song page. ALGO turns the five pages. They're saved with the song.
 | 3 | The parameter K1 records | ...K2 records | ...K3 records | ...K4 records |
 | 4 | Humanize timing, up to 30 clocks | Humanize velocity, up to 30 | | |
 | 5 | Chord mode on or off | Voicing | Strum | Direction |
+
+<img src="phase2-settings.png" width="300" alt="Settings page 1: tempo, time signature, swing and length"> <img src="phase4-knobs.png" width="300" alt="Settings page 3: the parameters K1 to K4 record on track 2">
 
 On pages 1 and 2 the keys F3 to F4 switch swing per track, and their lights show which tracks swing. Pages 3,
 4 and 5 are for the track SELECT picks. Tempo and time signature here are the song's starting values. K1 in
@@ -365,6 +387,8 @@ SHIFT+LFO in the song view. The conductor row sits above track 1. Turning SELECT
 | SEL | Delete the change at the playhead |
 | SHIFT+SEL | Clear the shown lanes in the selection |
 
+<img src="phase4-automation.png" width="300" alt="The automation view: time signature changes on the conductor row and a program lane on track 1">
+
 The footer shows the lane on K1 and its value at the playhead on K2, or a dash where the lane has no value
 yet. Everything else works as in the song view, REC included, but SHIFT+SEL clears lanes here, and the bottom
 line doesn't show REC's mode. A take here stays in this view instead of showing the roll, and controller
@@ -395,6 +419,14 @@ On the song view, the grid, the automation view and the settings, ARP and FX wor
 A tap is a press and release within 600 ms with no other button, key or knob used meanwhile. In step entry,
 the song list, the edit jobs and the record settings FX is only SHIFT, and ARP opens no settings.
 
+<img src="buttons-effects.png" width="300" alt="The effects page for track 1: sends, volume and returns"> <img src="phase4b-arp.png" width="300" alt="The arpeggiator settings for track 2">
+
+**The mixer.** Hold GLO on a song page. It stays open when GLO is let go, and a tap of GLO or HOME goes back.
+F3 to F4 mute tracks 1 to 8 and G4 to G5 solo them. K1 to K4 set the levels of tracks 1 to 4, or of 5 to 8
+when SELECT is on one of those.
+
+<img src="panel-mix.png" width="300" alt="The mixer: mute and solo for 8 tracks, levels on K1 to K4">
+
 ## Edit jobs
 
 SHIFT+EDIT in the song view. K1 picks the job. K2 to K4 set its settings, ALGO turns to the next three, and
@@ -403,6 +435,8 @@ SHIFT moves a setting by ten. YES (OCT+) asks first, with how many events the jo
 the question, and so does changing the job, a setting, the track or the picked tracks. With no question open
 NO goes back to the song view, as HOME and EDIT do. SAVE opens the song list. PLAY plays. Hold SEL and tap keys to
 pick tracks, as in the song view. RANGE is the selection or the whole song.
+
+<img src="phase6-jobs.png" width="300" alt="The QUANTIZE job over the whole song on track 3"> <img src="yesno-jobs-ask.png" width="300" alt="The job asking QUANTIZE 72 EVENTS? before it runs">
 
 Jobs: QUANTIZE, VELOCITY, CRESCENDO, GATE TIME, TRANSPOSE, FIT TO SCALE, SHIFT CLOCK, CHORD SORT, STRUM,
 PASTE N TIMES, ERASE, EXTRACT, RAMP, THIN OUT, TIME STRETCH, COPY TRACK, MERGE TRACKS, CLEAR TRACK, NORMALIZE
@@ -423,6 +457,11 @@ probe. It is measured once each time the list opens, only while nothing plays, a
 is freed at once. Opened while playing, it reads `HEAP -` until playing stops. A "+" means it reached the top
 of the probe's search, so it's that much or more, and `HEAP ?` that malloc gave a block outside the heap, so
 there's no reading. The browser preview has no heap and always shows `HEAP -`.
+
+<img src="phase5a-song-list.png" width="300" alt="The song list with two songs, LOAD picked"> <img src="phase5a-restore.png" width="300" alt="The recovery row, RESTORE THE UNSAVED SONG, at the top of the list">
+
+A song saves the sounds on its tracks with it: each track's instrument and settings, the arpeggiator, and
+the name of its kit. Loading the song brings them back.
 
 | Control | Action |
 |---|---|
@@ -482,6 +521,8 @@ round at its end instead of stopping, so the transport keeps running until PLAY.
 | SHIFT+REC | Step entry in the cell's clip from its start, stopped. An empty cell first gets a clip of the REC length, 4 bars when it's FREE. On the SONG row it says step entry needs a row |
 | Hold REC | The record settings. HOME comes back to the grid |
 
+<img src="phase7-grid.png" width="300" alt="The grid playing two clips in row 1"> <img src="phase7-named.png" width="300" alt="A grid row named AB">
+
 Launches wait for the launch quantize, counted on the song's bar lines. The loop's wrap and the song's end
 count as launch points too. A clip starts from its beginning and keeps its phase through song loops and
 jumps. The track keys light while their clip plays and blink while a launch waits.
@@ -514,6 +555,8 @@ take ends.
 - PLAY or REC ends the take, and playing goes on. In the count-in, before anything is recorded, PLAY or REC
   calls it off, stops, and an empty cell stays empty.
 
+<img src="grid-rec-armed.png" width="300" alt="A grid cell armed, waiting to record"> <img src="grid-rec-recording.png" width="300" alt="Recording into a grid cell, shown as a roll">
+
 The record settings' input quantize applies, and the metronome when it is set to play while recording. The
 take, and a new clip with it, is one undo step. SEQ waits until the take is over.
 
@@ -529,6 +572,8 @@ the grid opens the cell's clip straight
 into step entry, where PLAY plays the clip without leaving, and SHIFT+REC or SEQ goes back to the grid, the
 clip staying launched if it plays, so you can enter and listen without leaving the grid.
 
+<img src="phase7-clip.png" width="300" alt="Clip 1 open in the editor, CLIP END on K4">
+
 The open clip plays with the grid's other launched clips while it is open, not with the song, so a part can
 be written against them. REC while playing records into the clip as loop recording from its next pass, and
 the rest plays on. REC or PLAY ends the recording and playing goes on, and PLAY again stops. Recording from a
@@ -542,6 +587,8 @@ the song view a block shows in the track's color with the clip's row number in b
 do, and the clip's notes on it. The track's own notes aren't drawn inside a block, since they don't play
 there. A stop shows dark with an X. A block ends at its length or where the next one on its track starts.
 Editing a clip changes it everywhere it's used.
+
+<img src="phase7b-blocks.png" width="300" alt="Clip blocks on tracks 1 and 2, stop blocks marked X"> <img src="phase7b-take.png" width="300" alt="The grid recording a performance: REC: LAUNCHES BECOME BLOCKS">
 
 **Recording a performance.** In the grid, a tap of REC on the SONG row arms it. The take starts with the next
 launch, or with PLAY. The song gets what was heard over the take. Each launch writes a block for its track
@@ -596,6 +643,8 @@ it. In C major, D gives D minor and C# gives C# dim. With no scale set it plays 
 
 Settings on page 5:
 
+<img src="phase8-settings.png" width="300" alt="Settings page 5: chord mode on for track 1, close voicing, a 1/16 strum up">
+
 | Knob | Setting |
 |---|---|
 | K1 | On or off. A drum track shows DRUMS |
@@ -609,6 +658,8 @@ chord at the pointer, strummed when strum is on, and F5, F#5 and G5 enter the la
 or an octave up. Rest, tie and repeat stay on SHIFT there.
 
 ## The workbench
+
+<img src="phase7b-workbench.png" width="480" alt="The workbench's Songs and kits section">
 
 The workbench page (README.md, The workbench) has the Songs and kits section. Two of its buttons fill the
 device from what FM1 Open's page carries:
@@ -641,6 +692,8 @@ regular preview don't have it.
 | ENV | Memory probe, with each engine on track 6 in turn (stopped) |
 | LFO | Largest free memory block |
 | HOME | Back to the stock overview |
+
+<img src="hw-diag.png" width="300" alt="The hardware diagnostics page">
 
 The page shows control loop timing, how late notes land for the method in use, audio health and memory. A
 memory figure with "+" or "OR MORE" reached the top of the probe's search, so it's that much or more. The
