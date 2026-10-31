@@ -143,14 +143,15 @@ SHIFT plus a key:
 | C4 | Duplicate: paste right after the selection and move the selection onto the copy |
 | D4 | Insert empty bars the length of the selection |
 | E4 | Delete the selected bars (later bars move left) |
+| D#4 | Clear the clipboard, and the paste outline with it |
 | F#3 | Mangle: scramble the 16ths in the selection |
 | G#3 | Mangle: reverse the note order |
 | A#3 | Mangle: shuffle notes between the selected tracks |
 | F4 to G5 (white) | Jump to markers 1 to 9 |
 
 One copied track pastes onto the current track. Several paste back onto their own tracks. The clipboard
-survives loading another song. A clip copied in the grid pastes as a clip block instead (see Clips in the
-song).
+survives loading another song. SHIFT+D#4 clears it, in the song view or the grid. A clip copied in the grid
+pastes as a clip block instead (see Clips in the song).
 
 ## Recording
 
@@ -471,6 +472,7 @@ round at its end instead of stopping, so the transport keeps running until PLAY.
 | SHIFT+SEL | REC's mode: REPLACE or OVERDUB (Recording) |
 | ENV | Name the row: K1 picks the letter, K2 changes it, YES (OCT+) keeps the name, NO (OCT-) leaves the old one. SAVE does nothing while naming |
 | SHIFT + F3, G3, A3 or B3, E4 | Copy, cut, paste, paste, delete the cell |
+| SHIFT+D#4 | Clear the clipboard |
 | PLAY | Play and stop. Launching a clip while stopped starts playback. Stopping leaves every track stopped and the playhead back at the start point (Song view). During a take, end the recording and play on |
 | REC | A tap: record into the cell at the cursor (below), and on the SONG row record a performance (Clips in the song). REC again ends it |
 | SHIFT+REC | Step entry in the cell's clip from its start, stopped. An empty cell first gets a clip of the REC length, 4 bars when it's FREE. On the SONG row it says step entry needs a row |

@@ -2,6 +2,13 @@
 
 The version is `FM1_QY_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.5.4
+
+- SHIFT+D#4 clears the clipboard, in the song view, the clip editor and the grid, and the song view's paste
+  outline goes with it. The bottom line says `CLIPBOARD CLEARED`, or `NOTHING COPIED` when it was empty. D#4
+  is the black key beside E4, which deletes. Before this the clipboard only emptied when the FM-1 was turned
+  off.
+
 ## 0.5.3
 
 - K3 in the grid sets the length of the clip at the cursor, where it only showed it: a bar a click, or a beat

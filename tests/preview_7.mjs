@@ -8,8 +8,9 @@
 // SEQ to the song view hands every track back to the song. Copy, paste,
 // delete and undo on a cell, a
 // row name (YES keeps it, NO leaves the old one), the launch quantize, the
-// clips surviving a save and a load, and K3 on the grid setting a clip's
-// length, stopped and playing (0.5.3).
+// clips surviving a save and a load, K3 on the grid setting a clip's
+// length, stopped and playing (0.5.3), and SHIFT+D#4 clearing the clipboard
+// in the grid and the song view (0.5.4).
 // Saves docs/phase7-*.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
 
@@ -198,6 +199,26 @@ export async function phase7(browser, root) {
     render(50);
     o.k3.ended = r.balanced(heard().filter(x => x.track === 1));
     c.sim_song_capture(0);
+
+    // 9. SHIFT+D#4 empties the clipboard (0.5.4), in the grid and the song
+    // view, and the song view's paste outline goes with it.
+    const board = () => [info(29, 0, 11), info(29, 0, 12)];
+    held(B.FX, () => key(0));                       // copy track 2's clip
+    o.board = { copied: board()[0] };
+    held(B.FX, () => key(10));                      // SHIFT+D#4
+    o.board.gridCleared = board();
+    held(B.FX, () => key(4));                       // paste: nothing to paste
+    o.board.pasteless = [info(39, 0, cell(1, 0)), info(40, 0, cell(1, 0))];
+    tap(B.SEQ);                                     // the song view, stopped
+    render(4);
+    const bare = r.pixels();
+    held(B.FX, () => key(0));                       // copy the selection: the outline shows
+    render(4);
+    const outlined = r.pixels();
+    held(B.FX, () => key(10));
+    render(4);
+    o.board.view = { page: pageNow(), outline: r.differ(outlined, 0, 40, 240, 178, bare) > 0, cleared: board(),
+      left: r.differ(r.pixels(), 0, 40, 240, 178, bare) };
     return o;
   });
   for (const [name, key] of [['grid-empty', 'emptyPng'], ['step', 'stepPng'], ['clip', 'clipPng'], ['grid', 'gridPng'],
@@ -261,5 +282,11 @@ export async function phase7(browser, root) {
   t.eq('K3 on an empty cell makes no clip', k3.empty, [0, 'CLIP EMPTY']);
   t.eq('shortened while playing, it plays its first bar only', k3.playing, { notes: true, firstBarOnly: true });
   t.eq('every note it started ends', k3.ended, true);
+  const b = q.board;
+  t.eq('SHIFT+F3 in the grid copies the clip', b.copied, 1920);
+  t.eq('SHIFT+D#4 in the grid clears the clipboard', b.gridCleared, [0, 0]);
+  t.eq('pasting after leaves the cell as it was', b.pasteless, [1920, 4]);
+  t.yes('in the song view a copy shows the paste outline', b.view.outline && b.view.page === 19, b.view);
+  t.eq('SHIFT+D#4 there clears it, outline and all', [b.view.cleared, b.view.left], [[0, 0], 0]);
   return { phase: '7', checks: t.list, out };
 }

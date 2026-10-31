@@ -8,13 +8,13 @@
  * they stop it), G4 to G5 rows 1 to 8 of the page. SCL opens the clip at the
  * cursor, SHIFT+SCL switches REC between REPLACE and OVERDUB, ENV names the
  * row (YES keeps the name, NO leaves the old one), and SHIFT plus F3, G3, A3
- * or B3, and E4 copy, cut, paste and delete the cell. REC records into the
- * cell at the cursor (song_grid_take.c), and while it is armed or recording
- * the keys play its track instead of launching. On the SONG row REC records
- * a performance (song_perf.c). SHIFT+REC opens the cell's clip in step
- * entry. A held REC opens the record settings (song_rec.inc). A cell's take
- * shows the roll (0.5.0), where K1 to K4 record their lanes and ALGO zooms.
- * Drawing is in song_grid_draw.inc. */
+ * or B3, and E4 copy, cut, paste and delete the cell, with D#4 clearing the
+ * clipboard. REC records into the cell at the cursor (song_grid_take.c), and
+ * while it is armed or recording the keys play its track instead of
+ * launching. On the SONG row REC records a performance (song_perf.c).
+ * SHIFT+REC opens the cell's clip in step entry. A held REC opens the record
+ * settings (song_rec.inc). A cell's take shows the roll (0.5.0), where K1 to
+ * K4 record their lanes and ALGO zooms. Drawing is in song_grid_draw.inc. */
 #include "clips.h"
 
 enum { GRID_X = 46, GRID_W = 24, GRID_SONG = 34, GRID_Y = 52, GRID_H = 16, GRID_EMPTY = 0x2104 };
@@ -158,6 +158,7 @@ static int song_grid_input(const struct fm1_controls *c, uint32_t *pressed, uint
         static const uint8_t keys[5] = {0, 1, 2, 3, 6}; /* F3 G3 A3 B3 E4 */
         for (unsigned i = 0; i < 5 && grid_row; ++i)
             if (down & (1U << white_keys[keys[i]])) grid_action(keys[i], now);
+        if (down & (1U << 10)) song_clipboard_clear(now); /* D#4, on the SONG row too */
         return 1;
     }
     for (unsigned t = 0; t < SONG_TRACKS; ++t)

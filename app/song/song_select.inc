@@ -4,7 +4,7 @@
  * until tracks are picked by hand: hold LFO and tap F3 to F4 for tracks 1
  * to 8, G4 for all (again for just the current one). SHIFT plus the lower
  * white keys copy, cut, paste (inserting or over), duplicate, insert bars
- * and delete bars. */
+ * and delete bars, and SHIFT+D#4 clears the clipboard. */
 #include "arrange.h"
 #include "blocks.h"
 #include "record.h"
@@ -60,7 +60,19 @@ static void song_action(unsigned which, uint32_t now)
         : r == -2 ? "THAT CLIP IS IN ANOTHER SONG" : "DOESN'T FIT";
     notice_until = now + 1500U;
 }
-/* SHIFT+K2: the marker section around the playhead, then the next ones. */
+/* SHIFT+D#4, beside delete, in the song view and the grid (0.5.4): the
+ * clipboard emptied, and the song view's paste outline with it. */
+static void song_clipboard_clear(uint32_t now)
+{
+    struct song_clip *c = song_port_clip();
+    notice = c->length ? "CLIPBOARD CLEARED" : "NOTHING COPIED";
+    notice_until = now + 1500U;
+    c->length = 0;
+    c->count = 0;
+    c->tracks = 0;
+    c->cell = 0;
+}
+/* SHIFT+K3: the marker section around the playhead, then the next ones. */
 static void song_sections(int delta)
 {
     struct song *s = song_port_song();
