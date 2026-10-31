@@ -28,7 +28,8 @@ int song_erase(struct song *s, unsigned tracks, uint32_t from, uint32_t to);
  * an open clip, which keeps its length. */
 void song_grow(struct song *s, uint32_t to);
 /* One copied track pastes onto `track`. Several paste back onto their own.
- * Over what's there, growing the song to fit, or inserting time. */
+ * Over what's there, growing the song to fit, or inserting time. Clip
+ * blocks pasted onto another track land as their clips' notes (0.5.7). */
 int song_paste(struct song *s, const struct song_clip *clip, uint32_t at, unsigned track, unsigned insert);
 /* Clipboard event i moved `at` on, its glitch found in this song's table. */
 struct song_event song_board_event(struct song *s, const struct song_clip *clip, unsigned i, uint32_t at);

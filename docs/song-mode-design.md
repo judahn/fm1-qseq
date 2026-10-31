@@ -493,7 +493,8 @@ changes it everywhere it's used.
   from there too, silence as a stop block, so the song gets what was heard. The take is one undo step.
 - **Placing by hand.** A clip copied in the grid pastes into the song view as a block at the playhead, the
   clip's length long, and Duplicate extends it. Bar edits (copy, paste, insert and delete bars) carry blocks
-  the way they carry notes.
+  the way they carry notes. A block pasted onto another track than its own lands as its clip's notes, notes
+  only (0.5.7), since a block can only point at its own track's column.
 - **Expand job** (the QY70's Expand Backing). It turns the blocks in the selection into plain notes on their
   tracks, so one spot can go its own way. MIDI export expands every block on its own.
 

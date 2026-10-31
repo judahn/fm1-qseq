@@ -380,10 +380,45 @@ static void test_files(void)
     CHECK_EQ(song_file_check(data, length, &sound, &n), -1);
 }
 
+/* One copied track pasted onto another (0.5.7): its clip block lands as the
+ * clip's notes, pass after pass, without the clip's controller. The track's
+ * own note under the block stays behind, one sounding into it ends where it
+ * starts, and a stop block leaves its span empty. Back on its own track the
+ * block stays a block. */
+static void test_cross_paste(void)
+{
+    static struct song_clip board;
+    song_clear(&song, 16, 12000);
+    unsigned cell = song_cell(1, 2), count;
+    song.clip_length[cell] = 1920;
+    clip_note(cell, 0, 50, 240);
+    clip_note(cell, 960, 52, 240);
+    const struct song_event cc = song_lane_event(480, 74, 90);
+    song_add_event(&song, song_cell_part(cell), &cc);
+    CHECK_EQ(song_block_put(&song, 1, 1920, 5760, 2), 0);   /* two passes */
+    CHECK_EQ(song_block_put(&song, 1, 6400, 7000, SONG_BLOCK_STOP), 0);
+    song_add_note(&song, 1, 960, 60, 100, 1920);           /* into the block */
+    song_add_note(&song, 1, 2500, 70, 100, 100);           /* silent under it */
+    song_add_note(&song, 1, 6000, 72, 100, 100);
+    song_add_note(&song, 1, 6500, 74, 100, 100);           /* under the stop */
+    CHECK_EQ(song_copy(&song, &board, 1U << 1, 0, 7680), 0);
+    CHECK_EQ(song_paste(&song, &board, 0, 4, 0), 0);
+    const struct song_event *e = song_track(&song, 4, &count);
+    static const uint32_t want[6][3] = {{960, 60, 960}, {1920, 50, 240}, {2880, 52, 240}, {3840, 50, 240}, {4800, 52, 240}, {6000, 72, 100}};
+    CHECK_EQ(count, 6);
+    CHECK_EQ(blocks_on(&song, 4), 0);
+    for (unsigned i = 0; i < 6 && i < count; ++i)
+        CHECK(song_is_note(&e[i]) && song_event_start(&e[i]) == want[i][0] && e[i].a == want[i][1] && e[i].length == want[i][2]);
+    CHECK_EQ(blocks_on(&song, 1), 2);                       /* the original is untouched */
+    CHECK_EQ(song_paste(&song, &board, 7680, 1, 0), 0);     /* on its own track: blocks */
+    CHECK_EQ(blocks_on(&song, 1), 4);
+}
+
 int main(void)
 {
     test_edges();
     test_bar_edits();
+    test_cross_paste();
     test_expand();
     test_files();
     return report("test_blocks");

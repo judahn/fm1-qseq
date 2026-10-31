@@ -2,6 +2,16 @@
 
 The version is `FM1_QY_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.5.7
+
+- A clip block copied in the song view and pasted onto another track played nothing and showed no notes,
+  because a block plays a clip from its own track's column, and on the new track it pointed at an empty
+  cell. Now it lands there as the clip's notes over the block's length, pass after pass: a copy, not a
+  link, the way Ableton copies a clip between tracks. The clip's automation stays behind, since it was made
+  for the other track's sound, and so do the track's own notes the block kept silent. A note sounding into
+  a block ends where the block starts, and a stop block leaves its bars empty. Pasted back on its own track a
+  block stays a block, linked to its clip as before.
+
 ## 0.5.6
 
 - SEL is the select button. Hold it and tap F3 to F4 to pick tracks in the song view and the edit jobs, G4

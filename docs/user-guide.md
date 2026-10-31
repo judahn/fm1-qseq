@@ -549,7 +549,10 @@ the whole take is one undo step. SEQ waits while a performance is armed or runni
 
 **By hand.** Copy a cell in the grid (SHIFT+F3), go to the song view, and paste with SHIFT+A3 or SHIFT+B3. The
 block lands at the playhead, the clip's length long, and becomes the selection. SHIFT+C4 (Duplicate) then
-extends it. Copy, paste, delete and insert bars carry blocks as they carry notes. A grid copy only pastes
+extends it. Copy, paste, delete and insert bars carry blocks as they carry notes. A block can only play a
+clip of its own track, so one copied in the song view and pasted onto another track lands as its clip's
+notes there, a copy rather than a link, as in Ableton. The clip's automation stays behind, since it was made
+for the other sound, and so does whatever the block kept silent on its own track. A grid copy only pastes
 as a block into the song it came from.
 
 **Expand.** The EXPAND CLIPS job turns the blocks starting in its range into plain notes on their tracks, so

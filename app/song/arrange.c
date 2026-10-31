@@ -93,21 +93,75 @@ SONG_SMALL void song_grow(struct song *s, uint32_t to)
 {
     while (!s->open && s->bars < SONG_MAX_BARS && song_bar_clock(s, s->bars) < to) ++s->bars;
 }
+/* A cell's clip as notes over [from, to) on track t, pass after pass and
+ * cut at `to`, as Expand leaves them, but notes only. Counted (apply 0) or
+ * added. */
+SONG_SMALL static unsigned clip_notes(struct song *s, unsigned t, unsigned cell, uint32_t from, uint32_t to, unsigned apply)
+{
+    unsigned part = song_owner(s, SONG_TRACKS + cell), n = 0;
+    uint32_t length = s->clip_length[cell];
+    unsigned count = length ? song_find(s, part, length) : 0;
+    for (uint32_t pass = from; length && pass < to; pass += length)
+        for (unsigned j = 0; j < count; ++j) {
+            struct song_event x = s->event[s->first[part] + j]; /* the part moves as track t grows */
+            uint32_t start = pass + song_event_start(&x);
+            if (start >= to) break;
+            if (!song_is_note(&x)) continue;
+            ++n;
+            if (!apply) continue;
+            x.at = (x.at & ~(SONG_FRESH | 0xffffffU)) | start;
+            if (start + x.length > to) x.length = (uint16_t)(to - start);
+            (void)song_add_event(s, t, &x);
+        }
+    return n;
+}
+/* The clipboard's events landing at `at`, counted (apply 0) or added. One
+ * copied track pasted onto another (0.5.7) can't take its clip blocks
+ * along, since a block plays a clip of its own track, so each lands as its
+ * clip's notes, a copy and not a link, as in Ableton. The clip's lanes,
+ * made for the other track's sound, stay behind, and so does what the
+ * block kept silent on its track. A note sounding into a block ends where
+ * it starts, and a stop block leaves its span empty. */
+SONG_SMALL static unsigned land(struct song *s, const struct song_clip *clip, uint32_t at, unsigned track, unsigned single, unsigned apply)
+{
+    unsigned n = 0;
+    uint32_t cover = 0; /* where the blocks so far end, in the clipboard's clocks */
+    for (unsigned i = 0; i < clip->count; ++i) {
+        const struct song_event *c = &clip->event[i];
+        unsigned own = clip->track[i], t = single ? track : own, cross = t != own;
+        uint32_t start = song_event_start(c), end = song_is_note(c) ? start + c->length : 0;
+        if (cross && song_is_block(c)) {
+            uint32_t to = start + song_block_length(c);
+            for (unsigned j = i + 1U; j < clip->count; ++j) /* a block ends where the next one starts */
+                if (song_is_block(&clip->event[j])) { if (song_event_start(&clip->event[j]) < to) to = song_event_start(&clip->event[j]); break; }
+            cover = to;
+            if (c->a != SONG_BLOCK_STOP)
+                n += clip_notes(s, t, own * SONG_GRID_ROWS + (c->a & (SONG_GRID_ROWS - 1U)), at + start, at + to, apply);
+            continue;
+        }
+        if (cross && start < cover) continue; /* silent under a block */
+        for (unsigned j = i + 1U; cross && j < clip->count && song_event_start(&clip->event[j]) < end; ++j)
+            if (song_is_block(&clip->event[j])) { end = song_event_start(&clip->event[j]); break; }
+        ++n;
+        if (!apply) continue;
+        struct song_event e = song_board_event(s, clip, i, at);
+        if (end && end < start + c->length) e.length = (uint16_t)(end - start);
+        (void)song_add_event(s, t, &e);
+    }
+    return n;
+}
 SONG_SMALL int song_paste(struct song *s, const struct song_clip *clip, uint32_t at, unsigned track, unsigned insert)
 {
     unsigned single = clip->tracks && !(clip->tracks & (clip->tracks - 1U)), targets = single ? 1U << track : clip->tracks;
     if (!clip->length || track >= SONG_TRACKS || at + clip->length > SONG_MAX_CLOCK) return -1;
     unsigned freed = insert ? 0 : in_range(s, targets, at, at + clip->length);
-    if (s->events - freed + clip->count > SONG_EVENTS) return -1;
+    if (s->events - freed + land(s, clip, at, track, single, 0) > SONG_EVENTS) return -1;
     if (insert) { if (song_insert_time(s, at, clip->length)) return -1; }
     else {
         clear(s, targets, at, at + clip->length);
         song_grow(s, at + clip->length);
     }
-    for (unsigned i = 0; i < clip->count; ++i) {
-        struct song_event e = song_board_event(s, clip, i, at);
-        (void)song_add_event(s, single ? track : clip->track[i], &e);
-    }
+    (void)land(s, clip, at, track, single, 1);
     return 0;
 }
 SONG_SMALL struct song_event song_board_event(struct song *s, const struct song_clip *clip, unsigned i, uint32_t at)
