@@ -2,6 +2,15 @@
 
 The version is `FM1_QY_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.5.3
+
+- K3 in the grid sets the length of the clip at the cursor, where it only showed it: a bar a click, or a beat
+  with SHIFT, from a beat to 16 bars. Without SHIFT it stops at a bar, unless the clip is shorter already. A
+  length off the bar steps onto it first: a bar and 2 beats goes to 2 bars, or back to 1. Shortening keeps
+  the notes past the new end, hidden, and they play again when it grows. It works on a clip playing, which
+  carries on in its new length, and on an empty cell it does nothing. Like CLIP END in the clip editor, it
+  isn't an undo step.
+
 ## 0.5.2
 
 - PRESETS and ALGO, side by side on the panel, are where you are and how wide you see on every page with a

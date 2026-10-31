@@ -438,7 +438,7 @@ copies to another song on the device, and the workbench can copy clips between s
 **The grid.** SEQ switches between the song view and the clip grid: 8 tracks across, 16 rows down in two pages
 of 8, and a SONG row at the top. Rows are numbered and can take a short name, like markers. A filled cell is a
 clip, a playing cell shows its progress, and a waiting cell blinks. SELECT picks the track (the column), as
-everywhere, and K1 moves the row cursor. Function buttons are labeled on screen, as in step mode.
+everywhere, K1 moves the row cursor, and K3 sets the length of the clip at the cursor (0.5.3). Function buttons are labeled on screen, as in step mode.
 
 The stock sync and MIDI pages that SEQ used to reach move to the device settings on SHIFT+GLO (8a).
 
@@ -468,7 +468,7 @@ from the song until that track went back to the song, whatever the view, so a me
 over drums on a clip. Since 0.4.0 the view decides (below): the grid plays only launched clips, and the song
 view only the song, its blocks included.
 
-**Editing a clip.** SEL opens it in the song view's editor, looped to the clip, with K3 (loop end) setting its
+**Editing a clip.** SEL opens it in the song view's editor, looped to the clip, with K4 (CLIP END) setting its
 length. Everything there works on the clip: step entry, recording, automation, glitch and the jobs. SEQ goes
 back to the grid. Pasting copied song bars into a cell turns a section already written into a clip, and several
 copied tracks paste across the row onto their own tracks.

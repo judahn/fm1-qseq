@@ -463,6 +463,7 @@ round at its end instead of stopping, so the transport keeps running until PLAY.
 | SELECT | The track (column) |
 | K1 | The row cursor, the SONG row first |
 | K2 | REC LENGTH: 1, 2, 4, 8 or 16 bars, or FREE. It starts on 4 bars and keeps the last pick while the FM-1 is on |
+| K3 | The length of the clip at the cursor: a bar a click, a beat with SHIFT, from a beat to 16 bars. Notes past the end are kept, hidden, and play again when it grows. It works while the clip plays. An empty cell has no length to set |
 | K4 | Launch quantize: off, beat, bar, 2 bars or 4 bars |
 | F3 to F4 | Launch that track's cell in the cursor row. An empty cell stops the track. On the SONG row they stop their track |
 | G4 to G5 | Launch rows 1 to 8 of the page on every track (a scene). Tracks with nothing in the row stop |

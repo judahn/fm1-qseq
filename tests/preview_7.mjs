@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception
 // Phase 7a of the preview check: the clip grid through the panel. SEQ opens
 // it, SEL makes a clip and opens it in the song view's editor, step entry
-// fills it, K3 sets a second clip's length, a track key launches a clip
+// fills it, CLIP END sets a second clip's length, a track key launches a clip
 // (starting playback) and only launched clips play in the grid (0.4.0), a
 // scene key launches row 1 on every track at the next bar line, checked
 // against exact block arithmetic, then the SONG row's key stops a track and
 // SEQ to the song view hands every track back to the song. Copy, paste,
 // delete and undo on a cell, a
-// row name (YES keeps it, NO leaves the old one), the launch quantize, and
-// the clips surviving a save and a load.
+// row name (YES keeps it, NO leaves the old one), the launch quantize, the
+// clips surviving a save and a load, and K3 on the grid setting a clip's
+// length, stopped and playing (0.5.3).
 // Saves docs/phase7-*.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
 
@@ -156,6 +157,47 @@ export async function phase7(browser, root) {
     tap(B.YES);
     tap(B.HOME);
     o.loaded = [info(39, 0, cell(0, 0)), info(40, 0, cell(0, 0)), info(39, 0, cell(1, 0)), info(46, 0, 0), info(42) >> 8];
+
+    // 8. K3 sets the length of the clip at the cursor (0.5.3): a bar a detent,
+    // SHIFT a beat, at least a bar unshifted, 16 bars at most. The notes past
+    // the end stay, and come back as it grows. An empty cell has none to set.
+    // Shortened while it plays, the clip plays its first bar only, and every
+    // note it started ends.
+    tap(B.SEQ);
+    if (pageNow() !== 27) tap(B.SEQ);
+    const k3 = () => (render(2), r.knobs()[2]), length2 = () => info(39, 0, cell(1, 0));
+    turn(0, 1);                                     // track 2, row 1: two bars
+    o.k3 = { page: pageNow(), before: k3() };
+    turn(4, -1);
+    o.k3.shorter = [length2(), info(0, part(1, 0)), k3()];
+    turn(4, -1);
+    o.k3.floor = length2();
+    held(B.FX, () => turn(4, -1));
+    o.k3.beat = [length2(), k3()];
+    turn(4, 1);
+    o.k3.snapped = length2();
+    turn(4, 1);
+    o.k3.grown = [length2(), notes(part(1, 0)).map(n => n.clock)];
+    turn(4, 30);
+    o.k3.most = [length2(), k3()];
+    turn(4, -14);
+    o.k3.back = length2();
+    turn(2, 1);                                     // row 2: empty
+    turn(4, 1);
+    o.k3.empty = [info(39, 0, cell(1, 1)), k3()];
+    turn(2, -1);
+    c.sim_song_capture(1);
+    key(2);                                         // G3 launches track 2's clip, playing starts
+    render(1400);                                   // into its second bar
+    turn(4, -1);
+    const mark = heard().length, late = new Set(o.clip2.notes.slice(2).map(n => n.pitch));
+    render(1400);
+    const after = heard().slice(mark).filter(x => x.track === 1 && x.velocity);
+    o.k3.playing = { notes: after.length > 1, firstBarOnly: after.every(x => !late.has(x.pitch)) };
+    tap(B.PLAY);
+    render(50);
+    o.k3.ended = r.balanced(heard().filter(x => x.track === 1));
+    c.sim_song_capture(0);
     return o;
   });
   for (const [name, key] of [['grid-empty', 'emptyPng'], ['step', 'stepPng'], ['clip', 'clipPng'], ['grid', 'gridPng'],
@@ -171,7 +213,7 @@ export async function phase7(browser, root) {
   t.eq('no clip open after', q.closed, 0);
   t.eq('the four quarters are in the clip', q.clip1.map(n => n.clock), [0, 480, 960, 1440]);
   t.eq('SHIFT+REC leaves step entry, still in the clip', q.inClipPage, 19);
-  t.eq('K3 made the second clip two bars long', q.clip2.length, 3840);
+  t.eq('CLIP END (K4) made the second clip two bars long', q.clip2.length, 3840);
   t.eq('the second clip\'s half notes', q.clip2.notes.map(n => n.clock), [0, 960, 1920, 2880]);
   t.over('the song\'s own track 2 untouched', q.song2, 0);
   t.eq('F3 launches while stopped: playing starts', q.playing, 1);
@@ -207,5 +249,17 @@ export async function phase7(browser, root) {
   t.eq('SHIFT+SAVE opens the song list too', q.listPage, 25);
   t.eq('YES with unsaved changes asks before loading', q.askedFirst, 0);
   t.eq('loaded back: both clips, the row name and the launch quantize', q.loaded, [1920, 4, 3840, q.rowName, 1]);
+  const k3 = q.k3;
+  t.eq('K3: on the grid, the clip at the cursor is two bars', [k3.page, k3.before], [27, 'CLIP 2 BARS']);
+  t.eq('K3 left: a bar shorter, its notes all kept', k3.shorter, [1920, 4, 'CLIP 1 BAR']);
+  t.eq('K3 left again: a bar is the least without SHIFT', k3.floor, 1920);
+  t.eq('SHIFT+K3: a beat shorter', k3.beat, [1440, 'CLIP 3 BEATS']);
+  t.eq('K3 right from 3 beats steps onto the bar', k3.snapped, 1920);
+  t.eq('K3 right: two bars, the hidden notes back', k3.grown, [3840, [0, 960, 1920, 2880]]);
+  t.eq('K3 stops at 16 bars', k3.most, [30720, 'CLIP 16 BARS']);
+  t.eq('and comes back down a bar a detent', k3.back, 3840);
+  t.eq('K3 on an empty cell makes no clip', k3.empty, [0, 'CLIP EMPTY']);
+  t.eq('shortened while playing, it plays its first bar only', k3.playing, { notes: true, firstBarOnly: true });
+  t.eq('every note it started ends', k3.ended, true);
   return { phase: '7', checks: t.list, out };
 }

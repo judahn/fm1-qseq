@@ -2,19 +2,19 @@
 /* song-mode: the clip grid (design 8f), included by song_view.inc. SEQ flips
  * between it and the song view. 8 tracks across, 16 rows in two pages of 8,
  * and the SONG row on top. SELECT picks the track, K1 the row, K2 the REC
- * length, K4 the launch quantize. Only launched clips play here (0.4.0,
- * song_player_view). The keys launch: F3 to F4 the track's cell in the
- * cursor row (an empty cell stops the track, and on the SONG row they stop
- * it), G4 to G5 rows 1 to 8 of the page. SCL opens the clip at the
- * cursor, SHIFT+SCL switches REC between REPLACE and OVERDUB, ENV names
- * the row (YES keeps the name, NO leaves the old one), and SHIFT plus F3,
- * G3, A3 or B3, and E4 copy, cut, paste and delete the cell. REC records
- * into the cell at the cursor (song_grid_take.c), and while it is armed or
- * recording the keys play its track instead of launching. On the SONG row
- * REC records a performance (song_perf.c). SHIFT+REC opens the cell's clip
- * in step entry. A held REC opens the record settings (song_rec.inc).
- * A cell's take shows the roll (0.5.0), where K1 to K4 record their lanes
- * and ALGO zooms. Drawing is in song_grid_draw.inc. */
+ * length, K3 the clip's length, K4 the launch quantize. Only launched clips
+ * play here (0.4.0, song_player_view). The keys launch: F3 to F4 the track's
+ * cell in the cursor row (an empty cell stops the track, and on the SONG row
+ * they stop it), G4 to G5 rows 1 to 8 of the page. SCL opens the clip at the
+ * cursor, SHIFT+SCL switches REC between REPLACE and OVERDUB, ENV names the
+ * row (YES keeps the name, NO leaves the old one), and SHIFT plus F3, G3, A3
+ * or B3, and E4 copy, cut, paste and delete the cell. REC records into the
+ * cell at the cursor (song_grid_take.c), and while it is armed or recording
+ * the keys play its track instead of launching. On the SONG row REC records
+ * a performance (song_perf.c). SHIFT+REC opens the cell's clip in step
+ * entry. A held REC opens the record settings (song_rec.inc). A cell's take
+ * shows the roll (0.5.0), where K1 to K4 record their lanes and ALGO zooms.
+ * Drawing is in song_grid_draw.inc. */
 #include "clips.h"
 
 enum { GRID_X = 46, GRID_W = 24, GRID_SONG = 34, GRID_Y = 52, GRID_H = 16, GRID_EMPTY = 0x2104 };
@@ -71,6 +71,23 @@ static void grid_rec_go(unsigned step, uint32_t now)
         if (song_port_clip_open(cell)) notice = "NOT NOW";
         else song_step_enter();
     }
+}
+/* K3 on the cell's clip (0.5.3): a bar longer or shorter a detent, a beat
+ * with SHIFT, from a beat (a bar unshifted, unless it's shorter already) to
+ * 16 bars. A length off the grid steps onto it first. What a clip keeps
+ * past its end stays, hidden, and plays again as it grows, and a clip
+ * playing finds its place in the new length (song_player_advance). Not an
+ * undo step, like CLIP END in the editor. */
+static void grid_resize(struct song *s, unsigned cell, int delta, unsigned shift)
+{
+    int length = s->clip_length[cell], beat = (int)(SONG_WHOLE / s->meter[0].unit), bar = beat * s->meter[0].beats;
+    int unit = shift ? beat : bar, most = (int)song_clip_max(s);
+    if (!length) return;
+    if (most > 0xffff) most = 0xffff / bar * bar; /* the length is 16 bits */
+    int to = clamp((length / unit + (length % unit && delta < 0) + delta) * unit, shift ? beat : length < bar ? length : bar, most);
+    if (to == length) return;
+    s->clip_length[cell] = (uint16_t)to;
+    ++s->revision;
 }
 /* REC that ends something acts at once: a performance running or armed
  * ends, and a cell's take goes on to its next step (song_grid_rec_key).
@@ -136,6 +153,7 @@ static int song_grid_input(const struct fm1_controls *c, uint32_t *pressed, uint
     s->launch_q = (uint8_t)clamp(s->launch_q + c->encoders[5], 0, 4);
     select_track(c->encoders[0]);
     grid_rec_len = (uint8_t)clamp(grid_rec_len + c->encoders[3], 0, 5);
+    if (c->encoders[4] && grid_row) grid_resize(s, song_cell(track, grid_row - 1U), c->encoders[4], shift);
     if (shift) {
         static const uint8_t keys[5] = {0, 1, 2, 3, 6}; /* F3 G3 A3 B3 E4 */
         for (unsigned i = 0; i < 5 && grid_row; ++i)
