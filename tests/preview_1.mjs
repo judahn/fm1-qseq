@@ -67,21 +67,22 @@ export async function phase1(browser, root) {
     r.render(2000); r.rms = r.blocks = 0; r.render(1000); // stopped, the engine falls silent: no stuck notes
     loop.rmsAfterStop = r.level();
 
-    // 3. Panel controls. Encoders 2 to 5 are K1 to K4, and SHIFT is FX.
+    // 3. Panel controls. Encoders 2 to 5 are K1 to K4, 1 is ALGO and 6 PRESETS,
+    // and SHIFT is FX.
     const controls = {};
     r.held(B.FX, () => r.tap(B.PLAY));             // SHIFT+PLAY: to the loop start
     controls.rewound = r.info(8);
     r.tap(B.ENV);                                   // loop off
     controls.loopOn = r.info(16) & 1;
-    r.turn(5, 3);                                   // K4: zoom in to 2 bars, snap 1/8
+    r.turn(1, 3);                                   // ALGO: zoom in to 2 bars, snap 1/8
     controls.zoomKnobs = r.knobs();
-    r.turn(2, 1);                                   // K1: one 8th
+    r.turn(6, 1);                                   // PRESETS: one 8th
     controls.afterK1 = r.info(8);
-    r.held(B.FX, () => r.turn(2, 1));               // SHIFT+K1: next marker
+    r.held(B.FX, () => r.turn(6, 1));               // SHIFT+PRESETS: next marker
     controls.afterShiftK1 = r.info(8);
-    r.turn(3, -1); r.turn(4, 2);                    // K2 and K3: loop edges by snap
+    r.turn(4, -1); r.turn(5, 2);                    // K3 and K4: loop edges by snap (0.5.2)
     controls.loopEdges = [r.info(14), r.info(15)];
-    r.turn(5, -3);
+    r.turn(1, -3);
     // A marker jump while playing waits for the bar line: start at bar 1, ask
     // for marker 3 (BREAK, bar 7) in beat 2, then check the bar 2 line.
     r.held(B.FX, () => r.key(12));                  // F4: marker 1
@@ -154,8 +155,8 @@ export async function phase1(browser, root) {
   t.under('loop: silent once stopped (rms)', l.rmsAfterStop, 1e-4);
   t.eq('SHIFT+PLAY rewinds to the loop start', k.rewound, loopStart);
   t.eq('ENV turns the loop off', k.loopOn, 0);
-  t.eq('K1 moves by the snap (an 8th zoomed in)', k.afterK1, loopStart + 240);
-  t.eq('SHIFT+K1 goes to the next marker', k.afterShiftK1, 6 * 1920);
+  t.eq('PRESETS moves by the snap (an 8th zoomed in)', k.afterK1, loopStart + 240);
+  t.eq('SHIFT+PRESETS goes to the next marker', k.afterShiftK1, 6 * 1920);
   const g = k.toggle, nearest = Math.round(g.clock / 1920 - 0.001) * 1920;
   t.eq('SEL on a marker, stopped, removes it', g.removed, g.before.filter(c => c !== 2 * 1920));
   t.eq('HOME+SAVE brings a removed marker back', g.undone, g.before);
@@ -163,7 +164,7 @@ export async function phase1(browser, root) {
   t.eq('SEL while playing adds at the nearest bar line, named M2', [g.whilePlaying, g.playedName],
     [[...g.added, nearest].sort((a, b) => a - b), 'M2']);
   t.eq('SEL while playing never removes', g.again, g.whilePlaying);
-  t.eq('K2 and K3 move the loop edges by snap', k.loopEdges, [loopStart - 240, loopEnd + 480]);
+  t.eq('K3 and K4 move the loop edges by snap', k.loopEdges, [loopStart - 240, loopEnd + 480]);
   t.yes('a jump asked for while playing waits', k.pendingAfterRequest);
   t.yes('the jump lands on the bar line', k.atBreak.length > 0 && JSON.stringify(k.inBlock) === JSON.stringify(k.atBreak),
     { atBreak: k.atBreak, inBlock: k.inBlock });

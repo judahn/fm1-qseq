@@ -19,7 +19,7 @@ export async function phase4b(browser, root) {
     // 1. Step entry on track 1 (DX7) at the song end: the glitch layer, 4
     // repeats on a quarter C4, then 3 repeats (a triplet ratchet) on D4.
     const st = o.step;
-    r.turn(2, 12);
+    r.turn(6, 12);
     const at = info(8);
     r.step();
     r.tap(B.ARP);
@@ -34,7 +34,7 @@ export async function phase4b(browser, root) {
     r.step();                                      // SHIFT+REC leaves
     st.entered = notes(0).filter(n => n.clock >= at);
     st.repeats = st.entered.map(n => [3, 2].indexOf(n.glitch & 7) >= 0 ? (n.glitch & 7) === 3 ? 4 : 3 : 0);
-    r.turn(2, -1);                                 // back to the bar line where they start
+    r.turn(6, -1);                                 // back to the bar line where they start
     c.sim_song_capture(1);
     r.tap(B.PLAY);
     r.render(700);

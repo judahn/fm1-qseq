@@ -90,11 +90,11 @@ export async function phaseButtons(browser, root) {
     r.tap(B.GLO);
     r.turn(2, 5);                                   // K1: 125 BPM
     tp.settings = [info(6, 0, 0), engine()];
-    r.held(B.FX, () => r.turn(2, 50));              // SHIFT+K1: 125.50
+    r.held(B.FX, () => r.turn(2, 1));               // SHIFT+K1: 125.5 (half BPM since 0.5.2)
     tp.hundredths = [info(6, 0, 0), engine(), r.page()];
     r.tap(B.GLO);
-    while (info(8) > 13440) r.turn(2, -1);          // K1: to bar 8
-    while (info(8) < 13440) r.turn(2, 1);
+    while (info(8) > 13440) r.turn(6, -1);          // PRESETS: to bar 8
+    while (info(8) < 13440) r.turn(6, 1);
     r.tap(B.PLAY);
     render(200);
     tp.beforeChange = [info(8) < 15360, engine()];
@@ -141,7 +141,7 @@ export async function phaseButtons(browser, root) {
   t.eq('step entry keeps FX to itself', fx.step, 20);
   t.eq('the engine\'s tempo starts at the song\'s', tp.start, [120, 12000]);
   t.eq('settings K1 to 125: the engine follows', tp.settings, [12500, 125]);
-  t.eq('125.50: the engine rounds to 126, FX held as SHIFT', tp.hundredths, [12550, 126, 21]);
+  t.eq('125.5: the engine rounds to 126, FX held as SHIFT', tp.hundredths, [12550, 126, 21]);
   t.eq('playing from bar 8: still 126 before bar 9', tp.beforeChange, [true, 126]);
   t.eq('across the change at bar 9: 133', tp.afterChange, [true, 133, 13300]);
   t.eq('stopped back before bar 9: 126 again', tp.stoppedBack, 126);

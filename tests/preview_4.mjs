@@ -83,10 +83,10 @@ export async function phase4(browser, root) {
     // the lane answers with its value just before it. Playing from there
     // starts with the same value. A marker jump while playing chases too.
     const ch = o.chase;
-    r.turn(5, 3);
+    r.turn(1, 3);
     r.held(B.FX, () => r.tap(B.PLAY));
     c.sim_song_capture(1);
-    r.turn(2, 2);
+    r.turn(6, 2);
     ch.playhead = info(8);
     const before = clock => { const e = recorded.filter(x => x.clock < clock); return e.length ? e[e.length - 1].value : recorded[0].value; };
     ch.want = before(ch.playhead);
@@ -98,8 +98,8 @@ export async function phase4(browser, root) {
     const firstPlay = cutoff(r.heard())[0];
     ch.atStart = firstPlay && firstPlay.block === info(9) ? firstPlay.b : -1;
     r.tap(B.PLAY);
-    r.turn(5, -3);
-    r.turn(2, 1);                                  // bar 2, past the sweep
+    r.turn(1, -3);
+    r.turn(6, 1);                                  // bar 2, past the sweep
     c.sim_song_capture(1);
     r.tap(B.PLAY);
     r.render(100);
@@ -109,33 +109,33 @@ export async function phase4(browser, root) {
     const barBlock = r.tempo().block(info(9), 1920, 3840);
     ch.jumpChase = cutoff(r.heard()).filter(h => h.block === barBlock).map(h => h.b);
 
-    // 5. The conductor lane: SHIFT+LFO, SELECT up past track 1. SHIFT+ALGO
-    // sets 140 BPM at bar 3 (0.5.0, ALGO before), then PRESETS to time
-    // signatures and 3/4 from bar 4.
+    // 5. The conductor lane: SHIFT+LFO, SELECT up past track 1. K2 sets
+    // 140 BPM at bar 3 (0.5.2, SHIFT+ALGO from 0.5.0, ALGO before), then K1
+    // to time signatures and 3/4 from bar 4.
     const co = o.conductor;
     r.held(B.FX, () => r.tap(B.LFO));
     co.page = r.page();
     r.turn(0, -1); r.turn(0, -1);
     r.held(B.FX, () => r.tap(B.PLAY));
-    r.turn(2, 2);
-    r.held(B.FX, () => r.turn(1, 20));
+    r.turn(6, 2);
+    r.turn(3, 20);
     co.tempos = Array.from({ length: info(4) }, (_, i) => [info(5, 0, i), info(6, 0, i)]);
-    r.turn(6, 1);
     r.turn(2, 1);
-    r.held(B.FX, () => r.turn(1, -1));
+    r.turn(6, 1);
+    r.turn(3, -1);
     co.meters = Array.from({ length: info(32, 1) }, (_, i) => info(32, 0, i)).map(m => [m & 0xffff, m >> 16 & 255, m >>> 24]);
     // 6. A program change on track 1 (DX7) at bar 2.
     const pr = o.program;
     r.turn(0, 1);
-    r.turn(6, 20);                                 // the last lane: programs
+    r.turn(2, 20);                                 // K1 to the last lane: programs
     r.held(B.FX, () => r.tap(B.PLAY));
-    r.turn(2, 1);
-    r.held(B.FX, () => r.turn(1, 3));
+    r.turn(6, 1);
+    r.turn(3, 3);
     pr.lane = lane(0, 0, 2);
-    r.turn(5, 2);                                  // 4 bars across for the picture
-    r.render(4);
+    r.turn(1, 2);                                  // 4 bars across for the picture
+    r.render(600);                                 // past ALGO's notice of the zoom (0.5.2)
     o.autoPng = r.png();
-    r.turn(5, -2);
+    r.turn(1, -2);
     // Played from the top: notes keep exact time across the new tempo, and
     // the program change lands on its block.
     r.held(B.FX, () => r.tap(B.PLAY));
@@ -162,7 +162,7 @@ export async function phase4(browser, root) {
     // 8. SHIFT+SEL clears the shown lane in the selection: track 2's cutoff
     // over bars 1 and 2, then undo brings it back.
     r.turn(0, 1);
-    r.turn(3, -3); r.turn(4, -4);
+    r.turn(4, -3); r.turn(5, -4);
     co.loop = [info(14), info(15)];
     r.held(B.FX, () => r.tap(B.SCL));
     o.cleared = lane(1, 74).length;

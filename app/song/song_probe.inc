@@ -93,7 +93,7 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     case 55: return song_port_battery_shown();
     case 56: return groove_arp_enabled(track & 7U);
     case 57: { uint32_t v; memcpy(&v, song.name, 4); return v; } /* the working song's name (0.3.1) */
-    case 58: return song_panel_probe(index); /* 0.5.0: the roll's zoom, the glitch page, what shows, the sweep */
+    case 58: return song_panel_probe(index); /* 0.5.0: the roll's zoom, the glitch page, what shows, the sweep, and the song view's zoom (0.5.2) */
     case 59: return track ? player.start_song : player.start_at; /* the start point (0.5.0) */
 #endif
     case 18: return index < count ? e[index].b : 0;
@@ -114,6 +114,9 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
 }
 #if SONG_UI
 SONG_EXPORT("sim_song_kit_copy") int sim_song_kit_copy(void) { return sim_song_kit_copy_run(); }
+/* A tempo change set as an import or an old song can bring it, hundredths
+ * and all, which the tempo knobs snap to their grid (0.5.2). */
+SONG_EXPORT("sim_song_tempo") int sim_song_tempo(unsigned clock, unsigned bpm100) { return song_port_set_tempo(clock, bpm100); }
 /* Phase 5b: the page's stock sample loader sends its bank through the
  * transfer calls, so it lands in the pool as a kit, and templates are
  * songs made from the factory sound sets, saved so they can be read out. */

@@ -15,8 +15,10 @@
 
 static unsigned sent, seen; /* the BPM last sent, and the engine's after it */
 
-/* The tempo change in force at the playhead, in the song's own time. */
-SONG_SMALL static unsigned segment(void)
+/* The tempo change in force at the playhead, in the song's own time: with
+ * a clip open, where the song is, not the clip's own place. The header and
+ * K1 read it too (0.5.2), so they show and turn the tempo heard. */
+SONG_SMALL unsigned song_tempo_now(void)
 {
     const struct song_player *p = song_port_player();
     const struct song *s = p->song;
@@ -25,7 +27,7 @@ SONG_SMALL static unsigned segment(void)
 SONG_SMALL void song_tempo_follow(unsigned force)
 {
     if (groove_clock_mode() == GROOVE_CLOCK_MIDI) return;
-    unsigned bpm = (song_port_song()->tempo[segment()].bpm100 + 50U) / 100U;
+    unsigned bpm = (song_port_song()->tempo[song_tempo_now()].bpm100 + 50U) / 100U;
     bpm = bpm < 30 ? 30 : bpm > 300 ? 300 : bpm;
     if (bpm == sent && (!force || groove_tempo_saved() == bpm)) return;
     groove_tempo_edit((int)bpm - (int)groove_tempo_saved());
@@ -37,7 +39,7 @@ SONG_SMALL void song_tempo_adopt(void)
     unsigned bpm = groove_tempo_saved();
     if (groove_clock_mode() == GROOVE_CLOCK_MIDI || bpm == seen || !seen) return;
     const struct song *s = song_port_song();
-    (void)song_port_set_tempo(s->tempo[segment()].clock, bpm * 100U);
+    (void)song_port_set_tempo(s->tempo[song_tempo_now()].clock, bpm * 100U);
     sent = seen = bpm;
 }
 #endif

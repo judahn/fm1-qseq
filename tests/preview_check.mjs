@@ -5,7 +5,7 @@
 //   2  step entry and the settings page (preview_2.mjs)
 //   keys  step entry's keys: SHIFT by note name in every octave, F5 to G5 as notes (preview_keys.mjs)
 //   diagnostics  the hardware test build's page, A and B, in build/preview-test (preview_diag.mjs)
-//   panel  every button light on, the wake, a page change at the LCD's device pace (preview_panel.mjs)
+//   panel  every button light on, the wake, a page change at the LCD's device pace, the song pages' knobs (0.5.2) (preview_panel.mjs)
 //   3  the selection, clipboard, undo and real-time takes (preview_3.mjs)
 //   4  automation, chase, the conductor lane, program changes (preview_4.mjs)
 //   4b glitch: repeats, ARP as the arpeggiator, mangle (preview_4b.mjs)

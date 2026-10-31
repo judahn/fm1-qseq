@@ -56,7 +56,7 @@ export async function phaseRec(browser, root) {
     v.stepWhilePlaying = pageNow();
     tap(B.PLAY);
     // SHIFT+REC stopped: step entry at the playhead. SHIFT+REC leaves it (0.5.0).
-    turn(2, 3);
+    turn(6, 3);
     const at = info(8);
     r.step();
     v.step = { page: pageNow(), pointer: info(17) - at };
@@ -204,8 +204,8 @@ export async function phaseRec(browser, root) {
     k.page = pageNow();
     held(B.FX, () => tap(B.PLAY));                  // the top
     held(B.FX, () => key(6));                       // paste over: a block at bar 1
-    turn(5, 2);                                     // 4 bars across
-    turn(2, 8);                                     // the playhead to bar 3, out of the way
+    turn(1, 2);                                     // 4 bars across
+    turn(6, 8);                                     // the playhead to bar 3, out of the way, and ALGO's notice gone
     render(4);
     const lcd = r.pixels(), y0 = 48 + 7 * 18, x1 = 22 + 52;  /* the block's bar, less the column before the next bar line */
     k.label = lcd[(y0 + 1) * 240 + 4];

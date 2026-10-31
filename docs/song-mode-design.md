@@ -96,9 +96,10 @@ kept the top three keys for rest, repeat and tie, and put the lengths on the low
 With SHIFT held no key enters a note or strikes a chord. K1 runs the same way as the keys, 1/1 at the left, halving
 turning right (0.5.1).
 
-**Knobs (step mode):** K1 length, K2 velocity, K3 gate. K4 moves the pointer by the current length. SHIFT plus
-K4 jumps from note to note. SELECT picks the track. Landing on a note plays it, as on the QY70. ALGO zooms the
-roll and ARP steps the glitch layer's pages (0.5.0, below).
+**Knobs (step mode):** K1 length, K2 velocity, K3 gate, K4 pitch. PRESETS moves the pointer by the current
+length, and SHIFT plus PRESETS jumps from note to note (0.5.2, K4 moved the pointer and PRESETS was pitch).
+SELECT picks the track. Landing on a note plays it, as on the QY70. ALGO zooms the roll and ARP steps the
+glitch layer's pages (0.5.0, below).
 
 **Editing what's there.** The pointer is the selection. When it lands on existing notes, they're selected
 (the whole chord by default), and K1, K2 and K3 change their length, velocity and gate in place. On an empty
@@ -138,16 +139,18 @@ dashes following, and lines mark bars, beats and 16ths (below).
 | PLAY | Play from the start point, and stop back there (0.5.0). Until then a stop left the playhead where it was |
 | SHIFT + PLAY | Back to the start, or to the loop start when looping. It becomes the start point |
 | REC | A tap records in the song's mode, SHIFT+REC is step entry, a hold opens the record settings (0.4.0) |
-| K1 | Move the playhead by one snap step, and the start point. With SHIFT, it moves marker to marker |
-| K2 / K3 | Loop start / loop end, by snap step |
-| K4 | Zoom the timeline. The snap follows the zoom. ALGO zooms too (0.5.0) |
+| PRESETS | Move the playhead by one snap step, and the start point. With SHIFT, it moves marker to marker (0.5.2, K1 before) |
+| ALGO | Zoom the timeline. The snap follows the zoom (0.5.0, and K4 until 0.5.2) |
+| K1 | The tempo in effect at the playhead, the header's, whole BPM or half with SHIFT (0.5.2) |
+| K2 | Input quantize, requantizing the last take (0.5.2) |
+| K3 / K4 | Loop start / loop end, by snap step (K2 and K3 until 0.5.2) |
 
 **Snap follows zoom** (an adaptive grid, as in Logic and Ableton). Zoomed out, the snap is 1 bar. Zooming in
 steps it down to a half bar, a beat, then an 8th, which is as fine as song view goes. The current snap is
-always shown on screen (`SNAP 1 BAR`). K1, the loop edges, selections and paste positions all use it, so what
-you see is the grid you move by. There's no acceleration, so a turn always moves by exactly one snap step.
-Long jumps use markers, or zoom out and move by bars. Step mode is separate: its pointer moves by the note
-length.
+shown on screen as ALGO turns (`ZOOM 16 BARS  SNAP 1 BAR`, in the footer until 0.5.2). PRESETS, the loop
+edges, selections and paste positions all use it, so what you see is the grid you move by. There's no
+acceleration, so a turn always moves by exactly one snap step. Long jumps use markers, or zoom out and move
+by bars. Step mode is separate: its pointer moves by the note length.
 | SELECT | Track |
 | FX | SHIFT |
 | SEL | Stopped: add a marker at the playhead, or remove the one there. Playing: add one at the nearest snap step, never remove |
@@ -188,8 +191,8 @@ pressing keys picks notes. Notes and automation are copied together.
 | D4 | Insert empty bars the length of the selection |
 | E4 | Delete the selected bars (later bars move left) |
 
-**Where a paste lands.** Paste always goes to the playhead, which can be anywhere: move it with K1 by the
-current snap (marker to marker with SHIFT), or jump to a marker, then paste. A selection that
+**Where a paste lands.** Paste always goes to the playhead, which can be anywhere: move it with PRESETS by
+the current snap (marker to marker with SHIFT), or jump to a marker, then paste. A selection that
 starts on a bar line and is pasted with the playhead on beat 3 starts on beat 3. After a copy, a faint outline
 shows where the paste would land as you move the playhead, so you can see it before committing. Only
 Duplicate pastes right after the selection.
@@ -293,7 +296,8 @@ and MIDI pages join it there (10/28), since SEQ now opens the clip grid.
 - Tempo and time signature (the starting values, since changes can happen anywhere in the song). Since 0.3.0
   the stock instrument's own tempo (whole BPM, 30 to 300, for the arpeggiator, the synced delay, the stock
   pages and MIDI clock out) follows the song's tempo at the playhead, rounded, and a tempo set on a stock page
-  or by tap tempo sets the song's tempo in force there, so the two never disagree
+  or by tap tempo sets the song's tempo in force there, so the two never disagree. Since 0.5.2 K1 in the song
+  view sets that tempo in force at the playhead too, and every tempo knob steps by whole BPM, half with SHIFT
 - Swing: amount and grid (8th or 16th), plus an on/off per track so drums can swing while the bass stays
   straight. Swing is applied at playback and never changes the recorded notes, like the QY70's groove
   quantize. Turn it off and everything is straight again.
@@ -596,6 +600,20 @@ Clip events come out of the song's shared event pool, and a block costs a few by
   elsewhere.
 - ALGO zooms the song view, the clip editor and the automation view, where SHIFT+ALGO now sets a change, tempo
   in whole BPM.
+
+**The knobs on the song pages, as built in 0.5.2** (Judah, 10/30):
+- PRESETS and ALGO, side by side, are where you are and how wide you see on every page with a playhead:
+  PRESETS moves the playhead in the song view, the clip editor and the automation view (SHIFT marker to
+  marker, or change to change), and the pointer in step entry (SHIFT note to note, LFO held a sweep). ALGO
+  zooms, with the span and snap in a notice now that the footer doesn't show them. During a take PRESETS does
+  nothing.
+- The K row: TEMPO, QUANTIZE, LOOP IN and LOOP OUT (CLIP END in the clip editor), and in the automation view
+  LANE, VALUE, LOOP IN and LOOP OUT. K1's tempo is the header's, the starting tempo or the change the playhead
+  is past, and settings page 1 keeps the starting one. K2's quantize is the record settings' and requantizes
+  the last take, a clip editor take included while the clip is open. VALUE sets a change while stopped, and
+  SHIFT+ALGO only zooms. Step entry's K4 is the pitch knob.
+- Every tempo knob steps by whole BPM, half with SHIFT, 20 to 300. Stored tempos keep their hundredths until
+  a knob turns them, the first step landing on the knob's grid, and a half shows with one decimal.
 
 **Later:** Live's follow actions, such as "after 4 bars, play a random clip from this column", next to the
 glitch tools.

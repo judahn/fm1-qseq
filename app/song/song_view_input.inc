@@ -1,14 +1,26 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* song-mode: the song view's input, included by song_panel.inc: transport,
- * REC (song_rec.inc), snap and zoom (K4, and ALGO since 0.5.0), the loop,
- * markers, the selection and arranging keys, and the knobs recording
- * parameters during a take, when ALGO zooms the roll the take shows. Every
- * move of the playhead here sets the start point (song_port_jump). The
- * automation view runs its controls through here too (song_auto.inc). */
-static void song_zoom_turn(int delta)
+ * REC (song_rec.inc), the playhead on PRESETS and the zoom on ALGO, side by
+ * side on the panel, then K1 the tempo, K2 input quantize and K3 and K4 the
+ * loop (0.5.2: K1 moved the playhead, K2 and K3 were the loop and K4
+ * zoomed), markers, the selection and arranging keys, and the knobs
+ * recording parameters during a take, when ALGO zooms the roll the take
+ * shows and PRESETS does nothing. Every move of the playhead here sets the
+ * start point (song_port_jump). The automation view runs its controls
+ * through here too, its own K1 and K2 first (song_auto.inc). */
+
+/* ALGO's zoom, and the span and snap in a notice, since the footer no
+ * longer shows them (0.5.2). A take's footer is the recording knobs. */
+static void song_zoom_turn(int delta, uint32_t now)
 {
+    static char line[32];
     unsigned zoom = (unsigned)clamp((int)song_zoom + delta, 0, SONG_ZOOMS - 1);
     if (zoom != song_zoom) { song_zoom = zoom; song_window = ~0U; }
+    if (song_port_recorder()->active) return;
+    strcpy(line, "ZOOM "); strcat(line, song_spans[zoom]);
+    strcat(line, "  SNAP "); strcat(line, song_snaps[zoom]);
+    notice = line;
+    notice_until = now + 1500U;
 }
 static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
 {
@@ -64,13 +76,13 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
     octave = clamp(octave + !!(*pressed & BUTTON(OCT_UP)) - !!(*pressed & BUTTON(OCT_DOWN)), -2, 2);
     select_track(c->encoders[0]);
     if (c->encoders[1] && page == SONG && song_port_recording()) step_zoom_turn(c->encoders[1]); /* the take's roll */
-    else if (c->encoders[1]) song_zoom_turn(c->encoders[1]);
+    else if (c->encoders[1]) song_zoom_turn(c->encoders[1], now);
     if (song_port_recorder()->active) { /* K1 to K4 record parameters on the take track */
         for (unsigned k = 0; k < 4; ++k)
             if (c->encoders[2 + k]) song_knob_turn(k, fm_encoder_delta(2 + k, c->encoders[2 + k]), now);
         return 1;
     }
-    int move = c->encoders[2];
+    int move = c->encoders[6]; /* PRESETS, beside ALGO: where the playhead is (0.5.2) */
     if (move && shift && !clip) {
         /* Marker to marker, from a pending jump or the playhead. */
         uint32_t at = p->playing ? (p->jumping ? p->jump : song_player_clock(p)) : p->playhead;
@@ -84,16 +96,30 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
         if (found >= 0) song_port_jump(at);
     } else if (move && !shift)
         song_port_jump(song_snap_move(s, song_player_target(p), song_zoom, move));
-    if (c->encoders[3] && shift) { if (!clip) song_sections(c->encoders[3]); }
-    else if (c->encoders[3]) {
-        uint32_t at = song_snap_move(s, s->loop_start, song_zoom, c->encoders[3]);
+    /* K1: the tempo the header shows, the starting tempo or the change the
+     * playhead is past, where the song is with a clip open (song_tempo_now),
+     * whole BPM or half with SHIFT, heard at once and the engine's following
+     * (song_tempo_follow). Settings page 1 keeps the
+     * starting one. K2: input quantize, the record settings' K3, and the
+     * last take again with it. */
+    if (c->encoders[2]) {
+        const struct song_tempo *t = &s->tempo[song_tempo_now()];
+        (void)song_port_set_tempo(t->clock, song_tempo_step(t->bpm100, c->encoders[2], shift));
+    }
+    if (c->encoders[3]) {
+        unsigned quantize = s->quantize;
+        s->quantize = (uint8_t)clamp(s->quantize + c->encoders[3], 0, 14);
+        if (song_rec_retake(quantize != s->quantize)) { notice = "REQUANTIZED THE LAST TAKE"; notice_until = now + 1500U; }
+    }
+    if (c->encoders[4] && shift) { if (!clip) song_sections(c->encoders[4]); }
+    else if (c->encoders[4]) {
+        uint32_t at = song_snap_move(s, s->loop_start, song_zoom, c->encoders[4]);
         if (at < s->loop_end) s->loop_start = at;
     }
-    if (c->encoders[4]) {
-        uint32_t at = song_snap_move(s, s->loop_end, song_zoom, c->encoders[4]);
+    if (c->encoders[5]) {
+        uint32_t at = song_snap_move(s, s->loop_end, song_zoom, c->encoders[5]);
         if (at > s->loop_start) s->loop_end = at;
     }
-    if (c->encoders[5]) song_zoom_turn(c->encoders[5]);
     uint32_t down = key_down & ~blocked_keys;
     if (shift) {
         /* SHIFT + the lower white keys, F3 to E4: copy, cut, paste inserting,

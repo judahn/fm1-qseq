@@ -36,15 +36,15 @@ export async function phase3(browser, root) {
     r.render(32);
     r.tap(B.SEQ);
 
-    // 1. Selection: LFO + G3 adds track 2, K3 pulls the loop end in to bars
-    // 3 and 4. SHIFT+F3 copies, K1 moves to bar 5, SHIFT+A3 pastes inserting.
+    // 1. Selection: LFO + G3 adds track 2, K4 pulls the loop end in to bars
+    // 3 and 4. SHIFT+F3 copies, PRESETS moves to bar 5, SHIFT+A3 pastes inserting.
     r.held(B.LFO, () => r.key(2));
-    r.turn(4, -2);
+    r.turn(5, -2);
     a.loop = [info(14), info(15)];
     const original = song(), [from, to] = a.loop;
     r.held(B.FX, () => r.key(0));
     a.clip = [state(11), state(12)];
-    r.turn(2, 4);
+    r.turn(6, 4);
     a.playhead = info(8);
     r.render(4);
     a.selectPng = r.png();
@@ -197,7 +197,7 @@ export async function phase3(browser, root) {
   const k = checker('3'), { arrange: a, take: t, loopTake: l } = out;
   k.eq('LFO+G3 and K3: the selection is bars 3 and 4', a.loop, [3840, 7680]);
   k.eq('SHIFT+F3 copies the selection on two tracks', a.clip, [3840, 3]);
-  k.eq('K1 moves the playhead to bar 5', a.playhead, 7680);
+  k.eq('PRESETS moves the playhead to bar 5', a.playhead, 7680);
   k.yes('SHIFT+A3 pastes inserting, everything later moving on', a.pasteOk, a.pasteDiff);
   k.eq('the paste is one undo step', a.levelsAfterPaste, 1);
   k.eq('still on the song view after the edits', a.stillOnSong, 19);

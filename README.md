@@ -197,11 +197,13 @@ power-on to force the update mode isn't documented in this tree or upstream, so 
 With the full build or the preview:
 
 - **SEQ** opens the song view. **PLAY** plays and stops, and a stop comes back to where it started (the start
-  point, which K1, the markers and SHIFT+PLAY set).
+  point, which PRESETS, the markers and SHIFT+PLAY set).
 - A tap of **REC** (stopped) records in the song's mode, OVERDUB to begin with, and the take shows on a piano
   roll. **SHIFT+REC** is step entry, and leaves it. A held **REC** opens the record settings. **SHIFT+SEL**
   switches REPLACE and OVERDUB.
-- **ALGO** zooms the song view, the automation view and step entry's roll.
+- **PRESETS** moves the playhead, or step entry's pointer, and **ALGO** beside it zooms the song view, the
+  automation view and step entry's roll. Under the song view K1 is the tempo, K2 input quantize, and K3 and
+  K4 the loop.
 - **SEQ** again opens the clip grid, which plays only launched clips, while the song view plays only the song.
 - A tap of **GLO** opens the song settings, with chord mode on the fifth page.
 - **SAVE** opens the song list, and **SAVE** there saves. On the list K2 picks the action, **OCT+** (YES) does it,

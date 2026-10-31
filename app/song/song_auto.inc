@@ -2,13 +2,16 @@
 /* song-mode: the automation view (SHIFT+LFO, design sections 7 and 8c).
  * The conductor row on top holds tempo and time signature changes, and
  * each track row shows one lane's curve. SELECT picks a row, past track 1
- * up to the conductor, and PRESETS the lane shown, or on the conductor
- * tempo or time signature. While stopped, SHIFT+ALGO sets the change at the
- * playhead: tempo there in whole BPM, the time signature from that bar, or
- * a program change (0.5.0, ALGO alone before). SCL deletes the change at
- * the playhead and SHIFT+SCL clears the shown lanes in the selection.
- * Everything else works as in the song view, ALGO zooming as K4 does, and
- * SHIFT+K1 goes from change to change on the row. A take here stays here. */
+ * up to the conductor, and K1 the lane shown, or on the conductor tempo or
+ * time signature (0.5.2, PRESETS before). While stopped, K2 sets the
+ * change at the playhead: tempo there in whole BPM, half with SHIFT, the
+ * time signature from that bar, or a program change (0.5.2, SHIFT+ALGO
+ * from 0.5.0, ALGO alone before). The footer shows both. SCL deletes the
+ * change at the playhead and SHIFT+SCL clears the shown lanes in the
+ * selection. Everything else works as in the song view, PRESETS moving the
+ * playhead, ALGO zooming and K3 and K4 the loop, and SHIFT+PRESETS goes
+ * from change to change on the row (0.5.2). A take here stays here, and
+ * K1 to K4 record their lanes. */
 
 enum { AUTO_C = SONG_ROWS, AUTO_CH = 13, AUTO_Y = SONG_ROWS + 15, AUTO_ROW = 16 };
 static uint8_t song_auto_lanes[SONG_TRACKS]; /* lane shown per track, 0 for the first knob's */
@@ -117,27 +120,32 @@ static void song_auto_draw(void)
     for (unsigned t = 0; t < SONG_TRACKS; ++t) song_auto_row(s, t);
     song_playhead_line();
     if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
-    char hint[40], part[24];
-    song_footer(s, "CHANGE");
-    song_notice_expire();
+    char hint[40], part[12], name[12], value[24];
+    unsigned lane = song_auto_lane(track);
+    /* The lane on K1 and its value at the playhead on K2, in the footer,
+     * and the row with that value on the bottom line (0.5.2). */
     if (song_auto_conductor && !song_auto_mode) {
-        unsigned bpm = s->tempo[song_tempo_at(s, song_now.clock)].bpm100;
-        strcpy(hint, "TEMPO "); decimal(part, (int)(bpm / 100), 1); strcat(hint, part);
-        strcat(hint, "."); decimal(part, (int)(bpm % 100), 2); strcat(hint, part);
-        strcat(hint, "  SHIFT+ALGO SET  SEL DEL");
+        strcpy(name, "TEMPO");
+        song_bpm_text(s->tempo[song_tempo_at(s, song_now.clock)].bpm100, song_now.shift, value);
+        strcpy(hint, "TEMPO "); strcat(hint, value);
     } else if (song_auto_conductor) {
         const struct song_meter *m = song_meter_at(s, song_bar_at(s, song_now.clock, NULL, NULL));
-        strcpy(hint, "TIME "); decimal(part, m->beats, 1); strcat(hint, part); strcat(hint, "/");
-        decimal(part, m->unit, 1); strcat(hint, part); strcat(hint, "  SHIFT+ALGO SET  SEL DEL");
+        strcpy(name, "TIME SIG");
+        decimal(value, m->beats, 1); strcat(value, "/"); decimal(part, m->unit, 1); strcat(value, part);
+        strcpy(hint, "TIME "); strcat(hint, value);
     } else {
-        unsigned lane = song_auto_lane(track);
-        int value = song_lane_at(s, track, lane, song_now.clock);
-        strcpy(hint, "T"); decimal(part, (int)track + 1, 1); strcat(hint, part); strcat(hint, " ");
-        strcat(hint, song_lane_name(track, lane));
-        if (value >= 0) { strcat(hint, " "); decimal(part, value + (lane == SONG_LANE_PROGRAM), 1); strcat(hint, part); }
-        strcat(hint, "  PRESETS LANE");
+        int at = song_lane_at(s, track, lane, song_now.clock);
+        const char *full = song_lane_name(track, lane);
+        strcpy(name, strlen(full) <= 9 ? full : "< >"); /* the knob's value holds 9 letters */
+        if (at >= 0) decimal(value, at + (lane == SONG_LANE_PROGRAM), 1);
+        else strcpy(value, "-");
+        strcpy(hint, "T"); decimal(part, (int)track + 1, 1); strcat(hint, part); strcat(hint, " "); strcat(hint, full);
+        if (at >= 0) { strcat(hint, " "); strcat(hint, value); }
     }
-    const char *shown = notice ? notice : hint;
+    song_footer(s, "LANE", name, "VALUE", value);
+    song_notice_expire();
+    if (!song_now.recording) strcat(hint, "  SEL DEL"); /* SEL waits during a take */
+    const char *shown = notice ? notice : song_now.shift && !song_now.recording ? "PRESETS CHANGE TO CHANGE  SEL CLEAR" : hint;
     song_hint(shown);
 }
 
@@ -158,18 +166,21 @@ static int song_auto_input(const struct fm1_controls *c, uint32_t *pressed, uint
     if (k.encoders[0] < 0 && !track && !song_auto_conductor) { song_auto_conductor = 1; k.encoders[0] = 0; }
     else if (k.encoders[0] > 0 && song_auto_conductor) { song_auto_conductor = 0; k.encoders[0] = 0; }
     else if (song_auto_conductor) k.encoders[0] = 0;
-    if (c->encoders[6]) {
-        if (song_auto_conductor) song_auto_mode = (uint8_t)clamp(song_auto_mode + c->encoders[6], 0, 1);
-        else { /* the engine's parameters, then programs where it has them */
-            const uint8_t *index;
-            unsigned n = song_params(song_port_engine(track), &index), lane = song_auto_lane(track), at = 0;
-            unsigned all = n + (song_programs(song_port_engine(track)) != 0);
-            while (at < n && song_param(index[at])->cc != lane) ++at;
-            at = (unsigned)clamp((int)at + c->encoders[6], 0, (int)all - 1);
-            song_auto_lanes[track] = (uint8_t)(at < n ? song_param(index[at])->cc : SONG_LANE_PROGRAM);
+    if (!song_port_recorder()->active) { /* during a take K1 to K4 record, and PRESETS does nothing */
+        if (c->encoders[2]) { /* K1, the lane: the engine's parameters, then programs where it has them */
+            if (song_auto_conductor) song_auto_mode = (uint8_t)clamp(song_auto_mode + c->encoders[2], 0, 1);
+            else {
+                const uint8_t *index;
+                unsigned n = song_params(song_port_engine(track), &index), lane = song_auto_lane(track), at = 0;
+                unsigned all = n + (song_programs(song_port_engine(track)) != 0);
+                while (at < n && song_param(index[at])->cc != lane) ++at;
+                at = (unsigned)clamp((int)at + c->encoders[2], 0, (int)all - 1);
+                song_auto_lanes[track] = (uint8_t)(at < n ? song_param(index[at])->cc : SONG_LANE_PROGRAM);
+            }
         }
+        if (c->encoders[3]) song_auto_set(s, c->encoders[3], shift, now); /* K2, a change at the playhead */
+        if (shift && c->encoders[6]) { song_auto_step(s, c->encoders[6]); k.encoders[6] = 0; }
+        k.encoders[2] = k.encoders[3] = 0;
     }
-    if (c->encoders[1] && shift) { song_auto_set(s, c->encoders[1], now); k.encoders[1] = 0; } /* ALGO alone zooms */
-    if (shift && k.encoders[2] && !song_port_recorder()->active) { song_auto_step(s, k.encoders[2]); k.encoders[2] = 0; }
     return song_view_input(&k, pressed, key_down, now);
 }

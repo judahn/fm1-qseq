@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* song-mode: what the song view shares with the automation view: reading
  * the transport, the header (position, transport or REC, the loop, the
- * marker, the time signature and the tempo), the playhead and the footer
- * knobs while recording. Included by song_view.inc. */
+ * marker, the time signature and the tempo), the playhead, the footer,
+ * and how a tempo shows and steps on a knob (0.5.2). Included by
+ * song_view.inc. */
 
 static void song_position(const struct song *s, uint32_t clock, char out[24], unsigned full)
 {
@@ -19,6 +20,32 @@ static void song_position(const struct song *s, uint32_t clock, char out[24], un
     strcat(out, part);
 }
 
+/* A tempo as the header, K1's footer and the settings page show it
+ * (0.5.2): whole BPM bare, a half with one decimal (79.5), and two only for
+ * real hundredths, from an import or an old song. `fine` shows at least
+ * one, while SHIFT steps by halves. */
+static void song_bpm_text(unsigned bpm100, unsigned fine, char out[24])
+{
+    char part[12];
+    unsigned cents = bpm100 % 100U;
+    decimal(out, (int)(bpm100 / 100U), 1);
+    if (!cents && !fine) return;
+    strcat(out, ".");
+    if (cents % 10U) decimal(part, (int)cents, 2);
+    else decimal(part, (int)(cents / 10U), 1);
+    strcat(out, part);
+}
+/* A tempo turned on a knob (0.5.2): whole BPM, or half with SHIFT, 20 to
+ * 300. Off that grid, hundredths from an import or an old song, the first
+ * step lands on it, 119.88 going to 120 or 119, and the rest step on. */
+static unsigned song_tempo_step(unsigned bpm100, int delta, unsigned shift)
+{
+    int step = shift ? 50 : 100, bpm = (int)bpm100, off = bpm % step;
+    if (off && delta > 0) { bpm += step - off; --delta; }
+    else if (off && delta < 0) { bpm -= off; ++delta; }
+    return (unsigned)clamp(bpm + delta * step, SONG_TEMPO_MIN, SONG_TEMPO_MAX);
+}
+
 static void song_header(const struct song *s)
 {
     if (paint_rendering && paint_top >= 30) return;
@@ -30,7 +57,7 @@ static void song_header(const struct song *s)
         paint_fill(4, 4, 116, 18, BACK);
         text(6, 6, position, 2, TEXT, BACK);
     }
-    unsigned bar = song_bar_at(s, song_now.clock, NULL, NULL), bpm = s->tempo[song_tempo_at(s, song_now.clock)].bpm100;
+    unsigned bar = song_bar_at(s, song_now.clock, NULL, NULL), bpm = s->tempo[song_tempo_now()].bpm100;
     const struct song_meter *m = song_meter_at(s, bar);
     int marker = s->open ? -1 : song_marker_step(s, song_now.clock + 1U, -1);
     sig = song_now.playing | (s->loop_on << 1) | (song_now.jumping << 2) | ((uint32_t)(marker + 1) << 3) |
@@ -53,11 +80,8 @@ static void song_header(const struct song *s)
     strcat(meter, unit);
     text(154, 16, meter, 1, DIM, BACK);
     if (bpm % 100) {
-        char tempo[12], hundredths[12];
-        decimal(tempo, (int)(bpm / 100), 1);
-        decimal(hundredths, (int)(bpm % 100), 2);
-        strcat(tempo, ".");
-        strcat(tempo, hundredths);
+        char tempo[24];
+        song_bpm_text(bpm, 0, tempo);
         text(200, 8, tempo, 1, TEXT, BACK);
     } else number(200, 4, (int)(bpm / 100), 3, 2, TEXT, BACK);
     text(212, 19, "BPM", 1, DIM, BACK);
@@ -104,17 +128,20 @@ static void song_knob_footer(unsigned t)
         knob(k, p ? p->name : "-", value, song_knob_held(k) ? AMBER : colors[k]);
     }
 }
-/* The footer: snap, loop and zoom, or the recording knobs during a take. */
-static void song_footer(const struct song *s, const char *shift_k1)
+/* The footer, or the recording knobs during a take. K1 and K2 are the
+ * view's: tempo and quantize, or in the automation view the lane and its
+ * value. K3 and K4 are the loop (0.5.2), with PRESETS moving the playhead
+ * and ALGO zooming, so nothing here shows the snap or the zoom. */
+static void song_footer(const struct song *s, const char *k1, const char *v1, const char *k2, const char *v2)
 {
     if (song_now.recording) { song_knob_footer(song_port_recorder()->track); return; }
     char start[24], end[24];
     song_position(s, s->loop_start, start, 0);
     song_position(s, s->loop_end, end, 0);
-    knob(0, song_now.shift ? shift_k1 : "SNAP", song_now.shift ? "< >" : song_snaps[song_zoom], colors[0]);
-    knob(1, "LOOP IN", start, colors[1]);
-    knob(2, s->open ? "CLIP END" : "LOOP OUT", end, colors[2]);
-    knob(3, "ZOOM", song_spans[song_zoom], colors[3]);
+    knob(0, k1, v1, colors[0]);
+    knob(1, k2, v2, colors[1]);
+    knob(2, "LOOP IN", start, colors[2]);
+    knob(3, s->open ? "CLIP END" : "LOOP OUT", end, colors[3]);
 }
 /* Memory, compact: flash (songs, then kits) and the song's RAM pool. */
 static void song_memory_bars(void)

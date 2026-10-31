@@ -17,7 +17,7 @@ export async function phaseKeys(browser, root) {
       kind: info(30, 0, i) })).filter(n => !n.kind);
     r.render(32);
     r.tap(B.SEQ);
-    r.turn(2, 12);                                 // K1: to the song end, bar 13, where track 1 is empty
+    r.turn(6, 12);                                 // PRESETS: to the song end, bar 13, where track 1 is empty
     r.step();                                      // SHIFT+REC: step entry on track 1
     o.stepPage = r.page();
 

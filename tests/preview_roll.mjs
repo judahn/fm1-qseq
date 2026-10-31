@@ -6,7 +6,7 @@
 // roll (4 bars, 2 bars, 1 bar, half a bar), named in the header, with bar,
 // beat and 16th or 32nd lines where they are 4 px apart, bar numbers at 2
 // and 4 bars, and notes 1 px short. ARP steps the glitch pages, where ALGO
-// still zooms. LFO and K4 sweep a selection, both ends in, keys toggle pitches in it,
+// still zooms. LFO and PRESETS sweep a selection, both ends in, keys toggle pitches in it,
 // VELOCITY changes it relatively, and SEL deletes it in one undo step.
 // Saves docs/step-roll-2bars.png and docs/step-sweep.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
@@ -27,7 +27,7 @@ export async function phaseRoll(browser, root) {
     const notes = t => Array.from({ length: info(0, t) }, (_, i) => ({ clock: info(1, t, i), pitch: info(2, t, i), velocity: info(18, t, i) }));
     render(32);
     tap(B.SEQ);
-    turn(2, 12);                                    // K1 to the song's end, bar 13, where track 1 is empty
+    turn(6, 12);                                    // PRESETS to the song's end, bar 13, where track 1 is empty
     const p0 = info(8);
     r.step();
 
@@ -97,8 +97,8 @@ export async function phaseRoll(browser, root) {
     tk.ended = [pageNow(), info(29, 0, 0), info(7)];
     tap(B.PLAY);
     tk.back = info(8) - p0;
-    held(B.LFO, () => turn(5, 1));                  // nothing to do with the take: a sweep of one step
-    turn(5, 3);                                     // and the pointer on, which ends the sweep
+    held(B.LFO, () => turn(6, 1));                  // nothing to do with the take: a sweep of one step
+    turn(6, 3);                                     // and the pointer on, which ends the sweep
     const left = info(17);
     r.step();
     tk.left = [pageNow(), info(8) - left, info(59) - left];
@@ -116,20 +116,20 @@ export async function phaseRoll(browser, root) {
     turn(1, 1);
 
     // 6. A sweep: bar 14 gets alternating C4 and E4 16ths. Hold LFO and
-    // turn K4 to the bar's last 16th: all 16. C4 alone with LFO and its key, E4 back
+    // turn PRESETS to the bar's last 16th: all 16. C4 alone with LFO and its key, E4 back
     // in, and out again. VELOCITY lifts the C4s by 5, SEL deletes them, and
     // one undo brings them back.
     const sw = o.sweep = {};
-    const move = n => { for (; n; n -= Math.sign(n) * Math.min(Math.abs(n), 100)) turn(5, Math.sign(n) * Math.min(Math.abs(n), 100)); };
+    const move = n => { for (; n; n -= Math.sign(n) * Math.min(Math.abs(n), 100)) turn(6, Math.sign(n) * Math.min(Math.abs(n), 100)); };
     move(-400);                                     // the pointer to the start (a turn is at most 127)
     move(13 * 16);                                  // bar 14, at the song's end
     for (let i = 0; i < 16; i++) key(i % 2 ? 11 : 7);
-    turn(5, -16);
+    turn(6, -16);
     const bar = info(17);
     const inBar = () => notes(0).filter(n => n.clock >= bar && n.clock < bar + 1920);
     sw.entered = inBar().length;
     c.sim_control(0, B.LFO, 1);
-    turn(5, 15);                                    // the pointer on the bar's last 16th
+    turn(6, 15);                                    // the pointer on the bar's last 16th
     sw.all = [swept(), info(58, 0, 3) & 1, info(58, 0, 4) - bar];
     key(7);
     sw.c4 = swept();
@@ -149,12 +149,12 @@ export async function phaseRoll(browser, root) {
     sw.deleted = inBar().map(n => n.pitch).join();
     held(B.HOME, () => tap(B.SAVE));
     sw.undone = inBar().length;
-    turn(5, 1);                                     // the pointer on without LFO: the sweep goes
+    turn(6, 1);                                     // the pointer on without LFO: the sweep goes
     sw.cleared = info(58, 0, 3) & 1;
     r.step();
 
     // For the guide: bars 7 and 8 of the test song at 2 bars, the 64th run.
-    while (info(8) > 6 * 1920) turn(2, -1);
+    while (info(8) > 6 * 1920) turn(6, -1);
     r.step();
     turn(1, -1); render(4);
     o.twoPng = r.png();
@@ -198,7 +198,7 @@ export async function phaseRoll(browser, root) {
   t.eq('ARP on to off', q.glitch.off, 0);
   const s = q.sweep;
   t.eq('a bar of alternating 16ths entered', s.entered, 16);
-  t.eq('LFO and K4 sweep the bar: 16 notes, from where it began', s.all, [16, 1, 0]);
+  t.eq('LFO and PRESETS sweep the bar: 16 notes, from where it began', s.all, [16, 1, 0]);
   t.eq('LFO and C4 in the sweep: the C4s alone', s.c4, 8);
   t.eq('LFO and E4: the E4s in too', s.both, 16);
   t.eq('LFO and E4 again: out', s.again, 8);

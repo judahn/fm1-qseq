@@ -139,7 +139,7 @@ export async function phase6(browser, root) {
       r.turn(1, 3); r.turn(0, 1); r.turn(2, 9); r.turn(3, 12); // humanize track 2: 9 clocks, 12 steps
       r.turn(1, -3); r.tap(B.GLO);
       r.turn(0, -1);
-      r.turn(2, 12);                                // the playhead to bar 13
+      r.turn(6, 12);                                // the playhead to bar 13
       r.step(); r.tap(B.ARP);
       r.held(B.FX, () => r.key(4));                 // SHIFT+A3: quarters
       r.turn(2, 3); r.key(7); r.turn(2, -1); r.key(9);

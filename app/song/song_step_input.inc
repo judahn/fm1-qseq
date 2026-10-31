@@ -3,15 +3,17 @@
  * G5, enters notes, and a chord goes in when every key is up. With SHIFT
  * held a key works by its note name in any octave: the white keys pick the
  * length, F longest to E shortest, as K1 does turning right (0.5.1), and
- * the black ones are triplet, dots, rest, tie and repeat. Holding LFO
- * picks notes in a chord, and turning K4 meanwhile sweeps a selection,
- * where keys toggle pitches (0.5.0). In chord mode the roots enter their
- * chords, F4 to E5 pick the type, and F5 to G5 enter the last chord again,
- * an octave down and an octave up (song_chord_keys). PLAY plays from the
- * pointer's bar and stays here, and while it plays the keys only sound. REC
- * records a take here as in the other views, a hold opens the record
- * settings, and SHIFT+REC leaves, as SEQ does (0.5.0). ALGO zooms the roll
- * and ARP steps the glitch pages. */
+ * the black ones are triplet, dots, rest, tie and repeat. PRESETS steers
+ * the pointer, SHIFT+PRESETS note to note, and K4 is the pitch knob (0.5.2,
+ * the other way round before). Holding LFO picks notes in a chord, and
+ * turning PRESETS meanwhile sweeps a selection, where keys toggle pitches
+ * (0.5.0). In chord mode the roots enter their chords, F4 to E5 pick the
+ * type, and F5 to G5 enter the last chord again, an octave down and an
+ * octave up (song_chord_keys). PLAY plays from the pointer's bar and stays
+ * here, and while it plays the keys only sound. REC records a take here as
+ * in the other views, a hold opens the record settings, and SHIFT+REC
+ * leaves, as SEQ does (0.5.0). ALGO zooms the roll and ARP steps the glitch
+ * pages. */
 static uint32_t step_held; /* entry keys down for the chord being built */
 static uint8_t step_from; /* the page step entry was opened from (0.4.1) */
 static unsigned song_key_note(unsigned note);
@@ -110,7 +112,7 @@ static int song_step_input(const struct fm1_controls *c, uint32_t *pressed, uint
         else { step_to_bar(); song_start(now); }
         playing = song_port_player()->playing;
     }
-    if (taking) { /* the pointer is hidden: K1 to K4 record their lanes, ALGO zooms */
+    if (taking) { /* the pointer is hidden: K1 to K4 record their lanes, ALGO zooms, PRESETS does nothing */
         *pressed &= ~(BUTTON(PLAY) | BUTTON(FX) | BUTTON(SCL) | BUTTON(ENV) | BUTTON(LFO) | BUTTON(ARP));
         if (*pressed & (BUTTON(HOME) | BUTTON(EDIT) | BUTTON(GLO) | BUTTON(SAVE))) return 0;
         octave = clamp(octave + !!(*pressed & BUTTON(OCT_UP)) - !!(*pressed & BUTTON(OCT_DOWN)), -2, 2);
@@ -141,17 +143,17 @@ static int song_step_input(const struct fm1_controls *c, uint32_t *pressed, uint
         if (c->encoders[3]) step_refused(step_set_velocity(st, c->encoders[3]), now);
         if (c->encoders[4]) step_refused(step_set_gate(st, c->encoders[4]), now);
     }
-    if (c->encoders[5]) { /* with LFO held, a sweep */
-        if (picking) step_sweep(st, c->encoders[5], shift);
-        else if (shift) step_jump(st, c->encoders[5] > 0 ? 1 : -1);
-        else step_move(st, c->encoders[5]);
+    if (c->encoders[6]) { /* PRESETS, the pointer (0.5.2): with LFO held, a sweep */
+        if (picking) step_sweep(st, c->encoders[6], shift);
+        else if (shift) step_jump(st, c->encoders[6] > 0 ? 1 : -1);
+        else step_move(st, c->encoders[6]);
     }
-    if (c->encoders[6]) { /* the pitch knob: scale steps, octaves with SHIFT, pads on drums */
+    if (c->encoders[5]) { /* K4, the pitch knob (0.5.2): scale steps, octaves with SHIFT, pads on drums */
         unsigned pads = groove_pad_count(track);
         uint8_t notes[GROOVE_PADS];
         for (unsigned i = 0; i < pads && i < GROOVE_PADS; ++i) notes[i] = (uint8_t)groove_pad_note(track, i);
-        step_refused(pads ? step_transpose_pads(st, notes, pads < GROOVE_PADS ? pads : GROOVE_PADS, c->encoders[6])
-                          : step_transpose(st, c->encoders[6], shift), now);
+        step_refused(pads ? step_transpose_pads(st, notes, pads < GROOVE_PADS ? pads : GROOVE_PADS, c->encoders[5])
+                          : step_transpose(st, c->encoders[5], shift), now);
     }
     uint32_t down = key_down & ~blocked_keys;
     if (shift) {

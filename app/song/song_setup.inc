@@ -9,12 +9,6 @@
 
 static unsigned song_setup_page, song_setup_back = SONG, song_glo_from;
 static const char *const song_launch_names[5] = {"OFF", "BEAT", "BAR", "2 BARS", "4 BARS"};
-static void song_tempo_text(const struct song *s, char out[24])
-{
-    char part[12];
-    decimal(out, s->tempo[0].bpm100 / 100, 1);
-    if (s->tempo[0].bpm100 % 100) { strcat(out, "."); decimal(part, s->tempo[0].bpm100 % 100, 2); strcat(out, part); }
-}
 static void song_meter_text(const struct song *s, char out[24])
 {
     char part[12];
@@ -138,7 +132,7 @@ static void song_setup_draw(void)
             paint_fill(0, 30, 240, 162, BACK);
             if (paint_rendering) {
                 char value[24];
-                song_tempo_text(s, value);
+                song_bpm_text(s->tempo[0].bpm100, 0, value);
                 song_setup_row(40, "TEMPO", value, !page2);
                 song_meter_text(s, value);
                 song_setup_row(66, "TIME SIG", value, !page2);
@@ -161,7 +155,7 @@ static void song_setup_draw(void)
     static const char *const labels[2][4] = {{"TEMPO", "TIME SIG", "SWING", "GRID"}, {"KEY", "SCALE", "METRONOME", "LAUNCH Q"}};
     char values[4][24];
     if (!page2) {
-        song_tempo_text(s, values[0]);
+        song_bpm_text(s->tempo[0].bpm100, (previous_buttons & BUTTON(FX)) != 0, values[0]); /* SHIFT: half BPM (0.5.2) */
         song_meter_text(s, values[1]);
         decimal(values[2], s->swing, 1); strcat(values[2], "%");
         strcpy(values[3], s->swing_grid ? "16TH" : "8TH");
@@ -207,9 +201,8 @@ static int song_setup_input(const struct fm1_controls *c, uint32_t *pressed, uin
             s->knob_cc[track][i] = song_param(index[clamp((int)at + k[i], 0, (int)n - 1)])->cc;
         }
     } else if (!song_setup_page) {
-        if (k[0]) /* whole BPM, or hundredths with SHIFT */
-            (void)song_port_set_tempo(0, (unsigned)clamp(s->tempo[0].bpm100 + k[0] * (shift ? 1 : 100),
-                                                               SONG_TEMPO_MIN, SONG_TEMPO_MAX));
+        if (k[0]) /* whole BPM, or half with SHIFT (0.5.2, hundredths before) */
+            (void)song_port_set_tempo(0, song_tempo_step(s->tempo[0].bpm100, k[0], shift));
         if (k[1]) {
             static const uint8_t units[3] = {4, 8, 16};
             unsigned unit = s->meter[0].unit, beats = s->meter[0].beats, u = unit == 4 ? 0 : unit == 8 ? 1 : 2;

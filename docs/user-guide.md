@@ -27,9 +27,9 @@ the metronome is on. The key lights work as described below.
 | | PLAY, REC | Transport and recording. PLAY starts from the start point and a stop comes back to it. A tap of REC records, SHIFT+REC is step entry (and leaves it), and a hold opens the record settings |
 | | OCT- / OCT+ | Move the keys an octave, two at most each way. On the song list, the edit jobs and while naming they are NO and YES |
 | Encoders | SELECT | The track |
-| | ALGO (ALGORITHM) | Turns pages on pages that have them. Zooms the song view, the automation view and the roll |
+| | ALGO (ALGORITHM) | Turns pages on pages that have them. Zooms the song view, the clip editor, the automation view and the roll |
 | | K1 to K4 | The four knobs above the screen. Their labels sit at the bottom of the screen |
-| | PRESETS | The pitch knob in step entry, the lane in the automation view |
+| | PRESETS | Moves the playhead in the song view, the clip editor and the automation view, and the pointer in step entry. Beside ALGO, so one hand has where you are and how wide you see |
 | Keys | F3 to G5 | 27 keys: 16 white, 11 black |
 
 The white keys from left to right are F3 G3 A3 B3 C4 D4 E4 F4 G4 A4 B4 C5 D5 E5 F5 G5. The first eight, F3 to
@@ -90,13 +90,15 @@ once when stopped or with the launch quantize off.
 | REC | A tap, stopped: a take in the song's mode (see Recording). Playing with a clip open: record into the clip (below). During a take, end the recording and play on |
 | SHIFT+REC | Step entry at the playhead, stopped |
 | Hold REC | The record settings |
-| K1 | Move the playhead one snap step, and the start point with it. While playing, a jump waits for the next bar line |
-| SHIFT+K1 | Marker to marker |
-| ALGO | Zoom, as K4 does. During a take, the roll's zoom (see Recording) |
-| K2 | Loop start |
-| SHIFT+K2 | Select the marker section around the playhead. Turning on adds the next sections |
-| K3 | Loop end |
-| K4 | Zoom: 16, 8, 4 or 2 bars across. The snap follows: a bar, half a bar, a beat or an 8th |
+| PRESETS | Move the playhead one snap step, and the start point with it. While playing, a jump waits for the next bar line |
+| SHIFT+PRESETS | Marker to marker |
+| ALGO | Zoom: 16, 8, 4 or 2 bars across. The snap follows: a bar, half a bar, a beat or an 8th. The bottom line shows both for a moment, `ZOOM 8 BARS  SNAP 1/2 BAR`. During a take, the roll's zoom (see Recording) |
+| K1 | Tempo: the one the header shows, the starting tempo or the tempo change the playhead is past. Whole BPM, 20 to 300, heard at once while playing |
+| SHIFT+K1 | Tempo by half BPM |
+| K2 | Input quantize, as in the record settings: off, or 1/64 to 1/1, each with a triplet. After a take it requantizes the take (Recording) |
+| K3 | Loop start |
+| SHIFT+K3 | Select the marker section around the playhead. Turning on adds the next sections |
+| K4 | Loop end |
 | ENV | Loop on or off |
 | SHIFT+ENV | Metronome: off, on, or only while recording |
 | SEL | Stopped: add a marker at the playhead, or remove the one already there. Playing: add one at the nearest snap step |
@@ -107,17 +109,26 @@ once when stopped or with the launch quantize off.
 | Hold LFO, tap G4 | All tracks, or back to just the current one |
 
 New markers are named M1, M2 and so on, taking the first free number, 16 at most. To remove one, go to it
-with SHIFT+K1, which lands on it exactly, and press SEL. Removing only happens while stopped. HOME+SAVE brings
-a removed marker back.
+with SHIFT+PRESETS, which lands on it exactly, and press SEL. Removing only happens while stopped. HOME+SAVE
+brings a removed marker back.
+
+**Tempo.** K1 changes the tempo in effect at the playhead, the number in the header. Before the song's first
+tempo change that is the starting tempo, and past one it is that change. Settings page 1 sets the starting
+tempo and time signature. Tempo is set in whole BPM, with SHIFT for half. A tempo with hundredths, from a
+MIDI file say, keeps them until a knob turns it, and the first step lands on the knob's grid: from 119.88,
+K1 goes to 120 or 119, and SHIFT+K1 to 120 or 119.5. The header shows a half as 79.5, and two decimals only
+for real hundredths. The stock instrument's tempo follows (Song settings), and turning K1, however far, is
+one undo step.
 
 **The start point.** PLAY starts from the start point, and every stop comes back to it: PLAY again, a take
 ending with a stop, or the song playing out at its end. So PLAY, listen, PLAY plays the same passage again.
-Whatever puts the playhead somewhere on purpose sets it: K1, SHIFT+K1 marker to marker, SHIFT+F4 to G5 to a
-marker, SHIFT+PLAY, SHIFT+K1 in the automation view, and step entry (its PLAY sets the pointer's bar, and
-leaving puts the playhead at the pointer). While playing, K1's waiting jump is the start point. A loaded or
-new song starts at the top. The start point isn't saved with the song. While the playhead is elsewhere, a
-small white mark on the ruler shows it. The grid, the automation view and a clip in the editor use it too,
-the clip with one of its own that starts at its top.
+Whatever puts the playhead somewhere on purpose sets it: PRESETS, SHIFT+PRESETS marker to marker, SHIFT+F4 to
+G5 to a marker, SHIFT+PLAY, SHIFT+PRESETS change to change in the automation view, and step entry (its PLAY
+sets the pointer's bar, and leaving puts the playhead at the pointer). While playing, the jump PRESETS asked
+for, waiting for the bar line, is the start point. A loaded or new song starts at the top. The start point
+isn't saved with the song. While the playhead is elsewhere, a small white mark on the ruler shows it. The
+grid, the automation view and a clip in the editor use it too, the clip with one of its own that starts at
+its top.
 
 The selection starts as the current track and follows SELECT until tracks are picked by hand.
 
@@ -193,6 +204,7 @@ During a take:
 | PLAY or REC | End the take. Playing goes on, and PLAY again stops. In the count-in, before anything is recorded, they call the take off and stop |
 | K1 to K4 | Record their parameters on the take track. Which parameter each knob drives is on settings page 3 |
 | ALGO | Zoom the roll |
+| PRESETS | Nothing: the playhead stays with the take |
 
 **A take shows the roll.** A take into one track, from the song view, the clip editor, a grid cell or step
 entry, shows that track (the clip, for a clip) as step entry's roll while it is armed or running: the count-in,
@@ -203,7 +215,9 @@ still playing if it plays on. A performance stays on the grid, so you can see wh
 the automation view stays there.
 
 Recorded notes are stored already quantized. The take keeps its raw timing, so turning K3 or K4 in the
-record settings afterwards requantizes the last take. Undo takes the whole take back. If the song's memory
+record settings afterwards requantizes the last take, and so does K2 in the song view or the clip editor,
+which says so on the bottom line when notes move. A take into a grid cell can't be requantized once the grid
+is back, since its clip closes with it. Undo takes the whole take back. If the song's memory
 fills during a take, the take ends there and says so.
 
 ## Step entry
@@ -224,9 +238,9 @@ time signature and, at the right, the span ALGO has zoomed to.
 | K1 | Length: 1/1 at the left, and each step right halves it, down to 1/64, the same order as SHIFT+F to E |
 | K2 | Velocity, 1 to 127, named by the nearest of PPP to FFFF. Past the top: random R1 to R4 |
 | K3 | Gate: 50, 90, 99 or 100% |
-| K4 | Move the pointer one step. SHIFT+K4 jumps note to note |
-| Hold LFO, turn K4 | Sweep a selection (below) |
-| PRESETS | Move the selected notes by scale step, by octave with SHIFT. On drum tracks, from pad to pad |
+| K4 | Pitch: move the selected notes by scale step, by octave with SHIFT. On drum tracks, from pad to pad. The footer says PITCH, OCTAVE or PAD |
+| PRESETS | Move the pointer one step. SHIFT+PRESETS jumps note to note |
+| Hold LFO, turn PRESETS | Sweep a selection (below) |
 | SEL | Delete the selected notes |
 | ENV | Back-delete: move back one step and delete there |
 | Hold LFO, tap keys | Pick which notes at the pointer K1 to K3 and delete act on. In a sweep, pick pitches in it |
@@ -270,7 +284,7 @@ automation view, the clip editor or the grid. Stopped, the playhead follows the 
 next. Playing goes on: in the song view the song plays on, and in the grid the clip stays launched. Leaving
 ends a sweep.
 
-**Sweeping a selection.** Hold LFO and turn K4: the pointer moves as usual, and the selection becomes every
+**Sweeping a selection.** Hold LFO and turn PRESETS: the pointer moves as usual, and the selection becomes every
 note that starts from where the sweep began to the pointer, both included, at every pitch. A lighter band
 shows the range, the selected notes are white, and the SEL line counts them, for example `16 NOTES`. With LFO
 still held, a key picks its pitch alone, and later keys toggle theirs in or out, across the whole range. On
@@ -282,13 +296,13 @@ a drum track that picks one pad, every hi-hat in two bars, say. Then:
 | K2 | Velocity, by the same amount for every note, so accents stay |
 | K1, K3 | Length and gate: each note's length scales as the entry's does, 1/16 to 1/8 doubling them |
 | Glitch layer K1 to K3 | That field on every note |
-| PRESETS | Move every note, by scale step, octave or pad. A note whose new pitch is taken at its clock stays |
+| K4 | Move every note, by scale step, octave or pad. A note whose new pitch is taken at its clock stays |
 
 Each is one undo step. A change undo couldn't hold (about 630 notes on the device) is refused with a notice,
 and nothing changes. The sweep ends when the pointer moves without LFO, a note goes in, or step entry is left.
 
 The glitch layer gives each new or selected note glitch attributes. ARP steps through its three pages and
-back off, and ALGO still zooms:
+back off, and ALGO still zooms, PRESETS moves the pointer and K4 the pitch:
 
 | Page | K1 | K2 | K3 |
 |---|---|---|---|
@@ -302,14 +316,15 @@ Tap GLO on a song page. ALGO turns the five pages. They're saved with the song.
 
 | Page | K1 | K2 | K3 | K4 |
 |---|---|---|---|---|
-| 1 | Tempo (SHIFT: hundredths) | Time signature beats (SHIFT: the unit) | Swing, 0 to 50% | Swing grid, 8th or 16th |
+| 1 | Starting tempo, whole BPM (SHIFT: half) | Time signature beats (SHIFT: the unit) | Swing, 0 to 50% | Swing grid, 8th or 16th |
 | 2 | Key | Scale | Metronome: OFF, ON, REC | Launch quantize (clips) |
 | 3 | The parameter K1 records | ...K2 records | ...K3 records | ...K4 records |
 | 4 | Humanize timing, up to 30 clocks | Humanize velocity, up to 30 | | |
 | 5 | Chord mode on or off | Voicing | Strum | Direction |
 
 On pages 1 and 2 the keys F3 to F4 switch swing per track, and their lights show which tracks swing. Pages 3,
-4 and 5 are for the track SELECT picks. Tempo and time signature here are the song's starting values.
+4 and 5 are for the track SELECT picks. Tempo and time signature here are the song's starting values. K1 in
+the song view changes the tempo in effect at the playhead (Song view).
 
 The stock instrument keeps a tempo of its own, in whole BPM from 30 to 300, for the arpeggiator, the synced
 delay, the stock pages' tempo and MIDI clock out. It follows the song's tempo where the playhead is, rounded: as
@@ -336,17 +351,21 @@ SHIFT+LFO in the song view. The conductor row sits above track 1. Turning SELECT
 | Control | Action |
 |---|---|
 | SELECT | The row: a track, or the conductor |
-| PRESETS | The lane shown: one of the track engine's parameters, or programs. On the conductor: tempo or time signature |
-| ALGO | Zoom, as K4 does |
-| SHIFT+ALGO | Stopped: set a change at the playhead. Tempo in whole BPM, the time signature from that bar, or a program change |
+| PRESETS | Move the playhead one snap step, as in the song view |
+| SHIFT+PRESETS | Move to the next or previous change on the row |
+| ALGO | Zoom, as in the song view, with or without SHIFT |
+| K1 | The lane shown: one of the track engine's parameters, or programs. On the conductor: tempo or time signature |
+| K2 | Stopped: set a change at the playhead. Tempo in whole BPM (SHIFT: half), the time signature from that bar, or a program change |
+| K3, K4 | Loop start and loop end, as in the song view. SHIFT+K3 selects the marker section |
 | SEL | Delete the change at the playhead |
 | SHIFT+SEL | Clear the shown lanes in the selection |
-| SHIFT+K1 | Move to the next or previous change on the row |
 
-Everything else works as in the song view, REC included, but SHIFT+SEL clears lanes here, and the bottom
-line doesn't show REC's mode. A take here stays in this view instead of showing the roll, and controller lanes
-are recorded with K1 to K4 during it. ALGO alone set changes until 0.5.0. Tempo runs 20 to 300 BPM, in
-hundredths on settings page 1 (SHIFT+K1). Time signatures run 1/4 to 8/4, 1/8 to 16/8 and 1/16 to 16/16.
+The footer shows the lane on K1 and its value at the playhead on K2, or a dash where the lane has no value
+yet. Everything else works as in the song view, REC included, but SHIFT+SEL clears lanes here, and the bottom
+line doesn't show REC's mode. A take here stays in this view instead of showing the roll, and controller
+lanes are recorded with K1 to K4 during it, K1 and K2 recording rather than picking the lane or setting a
+change. Tempo runs 20 to 300 BPM, set in whole BPM, with SHIFT for half (Song view). Time signatures run 1/4
+to 8/4, 1/8 to 16/8 and 1/16 to 16/16.
 
 ## Glitch
 
@@ -493,10 +512,13 @@ take, and a new clip with it, is one undo step. SEQ waits until the take is over
 
 ### A clip in the editor
 
-SEL on a cell opens the clip in the song view's editor, looped to its own length. K3, labelled CLIP END,
+SEL on a cell opens the clip in the song view's editor, looped to its own length. K4, labelled CLIP END,
 sets that length. Step entry (SHIFT+REC), recording, automation, glitch and the jobs that stay inside the
-track all work on the clip. SELECT stays on the clip's track, and the markers are hidden. ALGO zooms, as K4
-does. SEQ closes it and goes back to the grid. SHIFT+REC on a row of the grid opens the cell's clip straight
+track all work on the clip. SELECT stays on the clip's track, and the markers are hidden. The other knobs
+work as in the song view: PRESETS moves the playhead, ALGO zooms, K1 is the tempo the header shows, which
+here is the tempo where the song is, the one you hear, not at the clip's own place, K2 input quantize, requantizing a take made here while the clip is open, and K3 the loop start. SHIFT+PRESETS and
+SHIFT+K3 do nothing, with no markers to go to. SEQ closes it and goes back to the grid. SHIFT+REC on a row of
+the grid opens the cell's clip straight
 into step entry, where PLAY plays the clip without leaving, and SHIFT+REC or SEQ goes back to the grid, the
 clip staying launched if it plays, so you can enter and listen without leaving the grid.
 

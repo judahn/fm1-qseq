@@ -2,6 +2,40 @@
 
 The version is `FM1_QY_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.5.2
+
+- PRESETS and ALGO, side by side on the panel, are where you are and how wide you see on every page with a
+  playhead. In the song view, the clip editor and the automation view PRESETS moves the playhead one snap step,
+  the start point with it, and SHIFT+PRESETS goes marker to marker, or in the automation view change to change.
+  ALGO zooms as before, and since the footer no longer shows them, a turn shows the span and the snap on the
+  bottom line for a moment, for example `ZOOM 8 BARS  SNAP 1/2 BAR`. K1 used to move the playhead and K4 to
+  zoom.
+- The knobs under the song view and the clip editor are TEMPO, QUANTIZE, LOOP IN and LOOP OUT, or CLIP END.
+  The loop moved from K2 and K3 to K3 and K4, and the marker section from SHIFT+K2 to SHIFT+K3.
+- K1 is the tempo the header shows: the starting tempo, or the tempo change the playhead is past. In the clip
+  editor that's where the song is, the tempo you hear, not the clip's own place. It works stopped or playing,
+  heard at once, and the stock instrument's tempo follows. Settings page 1 still sets the starting tempo.
+- K2 is input quantize, the record settings' K3, and turning it after a take requantizes that take, with
+  `REQUANTIZED THE LAST TAKE` on the bottom line. It works on a take made in the clip editor while the clip is
+  open. A take into a grid cell closes its clip and can't be requantized afterwards, as before.
+- Tempo is set in whole BPM, with SHIFT for half, on every knob that sets one: K1 in the song view and the
+  clip editor, settings page 1 (SHIFT gave hundredths) and the automation view's K2 on the tempo lane. A tempo
+  with hundredths, from a MIDI file or an older song, keeps them until a knob turns it, and the first step lands
+  on the knob's grid: 119.88 goes to 120 or 119, or with SHIFT to 120 or 119.5. A half shows with one decimal,
+  79.5, and two decimals only for real hundredths.
+- The automation view's knobs are LANE, VALUE, LOOP IN and LOOP OUT. K1 picks the lane, PRESETS did. K2 sets a
+  change at the playhead while stopped, as SHIFT+ALGO did, and the footer shows the lane and its value there.
+  SHIFT+ALGO only zooms now. The bottom line names no knobs: the row and its value, SEL DEL, and with SHIFT,
+  PRESETS for change to change and SEL for clearing.
+- Step entry swaps PRESETS and K4. PRESETS moves the pointer, SHIFT+PRESETS jumps note to note, and holding LFO
+  while turning PRESETS sweeps a selection. K4 is the pitch knob: scale steps, octaves with SHIFT, pad to pad
+  on drum tracks, and every note of a sweep. Its place in the footer reads PITCH, OCTAVE with SHIFT, or PAD on a
+  drum track, and the glitch pages keep it.
+- Takes are as they were: K1 to K4 record their lanes and ALGO zooms the roll. PRESETS does nothing during a
+  take.
+- SHIFT in the song view names PRESETS for markers on the bottom line (EDIT JOBS made room), and step entry's
+  line names PRESETS for moving and sweeping.
+
 ## 0.5.1
 
 - K1 in step entry runs from the whole note: 1/1 at the left, and each step right halves the length, down to

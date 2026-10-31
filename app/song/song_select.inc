@@ -96,10 +96,10 @@ static void song_undo_key(uint32_t buttons, uint32_t now)
     else { notice = redo ? "REDONE" : "UNDONE"; song_port_recorder()->taken = 0; } /* the take can't be requantized now */
     notice_until = now + 1500U;
 }
-/* SCL, stopped: removes the markers at the playhead (SHIFT+K1 lands on one
- * exactly), or drops one there. Playing: drops one at the snap step nearest
- * where the song is, and never removes. A new one takes the first free name
- * of M1 to M16. */
+/* SCL, stopped: removes the markers at the playhead (SHIFT+PRESETS lands
+ * on one exactly), or drops one there. Playing: drops one at the snap step
+ * nearest where the song is, and never removes. A new one takes the first
+ * free name of M1 to M16. */
 static void song_marker_key(uint32_t now)
 {
     struct song *s = song_port_song();

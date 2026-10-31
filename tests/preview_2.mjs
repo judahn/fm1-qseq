@@ -14,7 +14,7 @@ export async function phase2(browser, root) {
     const shiftKey = k => r.held(B.FX, () => r.key(k));
     r.render(32);
     r.tap(B.SEQ);
-    r.turn(2, 12);                                 // K1: to the song end, bar 13
+    r.turn(6, 12);                                 // PRESETS: to the song end, bar 13
     const p0 = r.info(8);
     r.step();                                      // SHIFT+REC: step entry on track 1
     o.stepPage = r.page();
@@ -39,9 +39,9 @@ export async function phase2(browser, root) {
     o.stored = [];
     for (let i = 0; i < r.info(0, 0); i++) if (r.info(1, 0, i) >= p0) o.stored.push({ clock: r.info(1, 0, i), pitch: r.info(2, 0, i), length: r.info(3, 0, i) });
     o.pointerAfter = r.info(17) - p0;
-    // Back onto the chord: K4 by an 8th. The pointer selects and previews it.
+    // Back onto the chord: PRESETS by an 8th. The pointer selects and previews it.
     c.sim_song_capture(1);
-    r.turn(5, -1);
+    r.turn(6, -1);
     o.previewedChord = r.heard().map(h => h.pitch).sort().join();
     r.render(4);
     o.stepPng = r.png();
@@ -49,7 +49,7 @@ export async function phase2(browser, root) {
     // SHIFT+REC leaves at the pointer (0.5.0). Back to the bar line and play the phrase.
     r.step();
     o.backInSong = r.page();
-    r.turn(2, -1);
+    r.turn(6, -1);
     o.playhead = r.info(8) - p0;
     c.sim_song_capture(1);
     r.tap(B.PLAY);
@@ -81,7 +81,7 @@ export async function phase2(browser, root) {
     o.scaleLeds = leds().every((on, k) => !!on === major.includes((53 + k) % 12));
     // In step entry an out-of-scale key snaps up: C#4 enters D4. At the song
     // end, where the track is empty.
-    r.turn(2, 20);
+    r.turn(6, 20);
     r.step();
     const p1 = r.info(17), count = r.info(0, 0);
     r.key(8);
@@ -103,7 +103,7 @@ export async function phase2(browser, root) {
   t.eq('the bar went in as entered', q.stored, q.want);
   t.eq('landing on the chord previews it', q.previewedChord, '60,64,67');
   t.eq('SHIFT+REC leaves step entry for the song view', q.backInSong, 19);
-  t.eq('K1 puts the playhead back on the phrase', q.playhead, 0);
+  t.eq('PRESETS puts the playhead back on the phrase', q.playhead, 0);
   t.yes('the phrase plays on exact blocks, ons and offs', q.playback.ok, q.playback);
   t.eq('playback stopped at the song end', q.playback.playing, 0);
   t.eq('GLO opens the settings', q.settingsPage, 21);

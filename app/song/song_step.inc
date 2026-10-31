@@ -7,7 +7,8 @@
  * song_step_input.inc. */
 
 /* The glitch layer: ARP steps through its three pages and back off, and K1
- * to K3 set the selected notes' glitch (or the entry's), K4 still moving. */
+ * to K3 set the selected notes' glitch (or the entry's), PRESETS still
+ * moving the pointer and K4 the pitch (0.5.2). */
 static uint8_t song_glitch_layer;
 static const uint8_t song_glitch_pages[3][3] = {
     {GLITCH_REPEATS, GLITCH_DRIFT, GLITCH_FADE}, {GLITCH_CHANCE, GLITCH_OCTAVE, GLITCH_RANGE},
@@ -147,19 +148,20 @@ static void song_step_draw(void)
         knob(1, "VELOCITY", velocity, colors[1]);
         knob(2, "GATE", gate, colors[2]);
     }
-    knob(3, shift ? "NOTE JUMP" : picking ? "SWEEP" : "MOVE", "< >", colors[3]);
+    knob(3, groove_pad_count(step_now.track) ? "PAD" : shift ? "OCTAVE" : "PITCH", "< >", colors[3]); /* the pitch knob (0.5.2) */
     char page_hint[40] = "GLITCH 1/3  ARP NEXT";
     page_hint[7] = (char)('0' + song_glitch_layer);
     if (song_glitch_layer == 1) strcpy(page_hint, "GLITCH 1/3  SHIFT+K2 SCALE  ARP NEXT");
     uint32_t from, to;
     const char *hint = notice ? notice : song_glitch_layer ? page_hint : shift ? "SHIFT: F-E LENGTH  F# TRIP  G# DOT"
-        : picking ? step_range(st, &from, &to) ? "LFO: KEYS TOGGLE PITCHES IN THE SWEEP" : "LFO: KEYS PICK  K4 SWEEPS"
-        : step_clock != ~0U ? "PLAYING: KEYS ONLY SOUND  PLAY STOPS" : "SHIFT+REC LEAVES  PRESETS PITCH";
+        : picking ? step_range(st, &from, &to) ? "LFO: KEYS TOGGLE PITCHES IN THE SWEEP" : "LFO: KEYS PICK  PRESETS SWEEPS"
+        : step_clock != ~0U ? "PLAYING: KEYS ONLY SOUND  PLAY STOPS" : "SHIFT+REC LEAVES  PRESETS MOVES";
     song_hint(hint);
 }
 #ifdef FM1_OPEN_WEB
 /* For the preview check (song_probe.inc): the roll's zoom, the glitch
- * page, what the screen shows, and the sweep. */
+ * page, what the screen shows, the sweep, and the song view's zoom (0.5.2),
+ * which the footer no longer shows. */
 uint32_t song_panel_probe(unsigned what);
 uint32_t song_panel_probe(unsigned what)
 {
@@ -171,6 +173,7 @@ uint32_t song_panel_probe(unsigned what)
     case 3: return st->ranged | (uint32_t)st->picked << 1;
     case 4: return st->anchor;
     case 5: return step_count(st);
+    case 6: return song_zoom;
     default: return 0;
     }
 }

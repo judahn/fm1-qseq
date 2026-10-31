@@ -117,7 +117,7 @@ export async function phase7b(browser, root) {
     held(B.FX, () => key(0));                       // copy, at row 1 of track 1
     tap(B.SEQ);
     held(B.FX, () => tap(B.PLAY));
-    turn(2, 8);                                     // the playhead to bar 9
+    turn(6, 8);                                     // the playhead to bar 9
     o.pasteAt = info(8);
     held(B.FX, () => key(6));                       // paste over
     o.placed = blocks(0).filter(b => b[0] >= o.pasteAt);

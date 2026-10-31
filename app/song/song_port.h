@@ -91,6 +91,7 @@ void song_grid_take_ended(unsigned began, uint32_t clock);
  * into the song, at the tempo in force there. */
 void song_tempo_follow(unsigned force);
 void song_tempo_adopt(void);
+unsigned song_tempo_now(void); /* the change in force where the song is, a clip open or not (0.5.2) */
 /* The battery's ADC reading (fm1_controls), each poll, and the smoothed
  * value shown, at most once a second (0.3.0). Full is a full battery read on
  * a device, unplugged (0.3.2). Empty is an estimate, 0.81 of full, which is

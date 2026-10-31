@@ -31,6 +31,14 @@ static void song_rec_toggle(uint32_t now) /* SHIFT+SEL: REPLACE and OVERDUB, and
     notice_until = now + 1500U;
 }
 
+/* The last take again from its raw timing, once input quantize or its
+ * strength has changed: the record settings' K3 and K4, and K2 in the song
+ * view and the clip editor (0.5.2). Returns how many notes moved. */
+static int song_rec_retake(unsigned changed)
+{
+    struct song_recorder *r = song_port_recorder();
+    return changed && r->taken && !r->active ? song_rec_requantize(r) : 0;
+}
 static void song_quantize_name(unsigned q, char out[12])
 {
     static const char names[7][5] = {"1/64", "1/32", "1/16", "1/8", "1/4", "1/2", "1/1"};
@@ -91,7 +99,6 @@ static int song_rec_input(const struct fm1_controls *c, uint32_t *pressed, uint3
 {
     (void)key_down;
     struct song *s = song_port_song();
-    struct song_recorder *r = song_port_recorder();
     if (*pressed & (BUTTON(PLAY) | BUTTON(REC) | BUTTON(HOME))) { /* back, and REC or PLAY goes */
         unsigned go = (*pressed & (BUTTON(PLAY) | BUTTON(REC))) != 0;
         *pressed &= ~(BUTTON(PLAY) | BUTTON(REC) | BUTTON(HOME));
@@ -109,6 +116,6 @@ static int song_rec_input(const struct fm1_controls *c, uint32_t *pressed, uint3
     unsigned quantize = s->quantize, strength = s->strength;
     s->quantize = (uint8_t)clamp(s->quantize + c->encoders[4], 0, 14);
     s->strength = (uint8_t)clamp(s->strength + c->encoders[5] * 5, 0, 100);
-    if ((quantize != s->quantize || strength != s->strength) && r->taken && !r->active) song_rec_requantize(r);
+    (void)song_rec_retake(quantize != s->quantize || strength != s->strength);
     return 1;
 }

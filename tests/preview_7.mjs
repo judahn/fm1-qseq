@@ -42,16 +42,16 @@ export async function phase7(browser, root) {
     o.stepPage = pageNow();
     held(B.FX, () => key(4));                       // SHIFT+A3: quarters
     for (const k of [0, 4, 7, 11]) key(k);
-    turn(5, -4);                                    // the pointer back over them, for the picture
+    turn(6, -4);                                    // the pointer back over them, for the picture
     o.stepPng = png();
     tap(B.SEQ);
     o.backToGrid = pageNow();
     o.closed = info(42) & 255;
     o.clip1 = notes(part(0, 0));
-    // 2. Track 2's clip, two bars long by K3, two half notes in each bar.
+    // 2. Track 2's clip, two bars long by K4, two half notes in each bar.
     turn(0, 1);
     tap(B.SCL);
-    turn(4, 1);                                     // CLIP END to bar 3
+    turn(5, 1);                                     // CLIP END to bar 3 (K4 since 0.5.2)
     r.step();
     held(B.FX, () => key(2));                       // SHIFT+G3: halves
     for (const k of [0, 7, 4, 11]) key(k);
