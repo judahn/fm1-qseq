@@ -206,6 +206,17 @@ static void test_arrange(void)
     CHECK_EQ(song.bars, 18);
     CHECK_EQ(song_paste(&song, &clip, 18U * 1920U + 960U, 3, 0), 0);
     CHECK_EQ(song.bars, 20);
+    /* The song's length from settings (0.5.8): the loop comes inside, what's
+     * past the end stays, and it's held to 1 to SONG_MAX_BARS bars. */
+    song.loop_start = 4U * 1920U; song.loop_end = 8U * 1920U;
+    unsigned events = song.events;
+    song_set_bars(&song, 3);
+    CHECK(song.bars == 3 && song.loop_end == 3U * 1920U && song.loop_start == 2U * 1920U && song.events == events);
+    song_set_bars(&song, 0);
+    CHECK_EQ(song.bars, 1);
+    song_set_bars(&song, SONG_MAX_BARS + 5);
+    CHECK_EQ(song.bars, SONG_MAX_BARS);
+    song_set_bars(&song, 20);
     /* A paste that doesn't fit changes nothing. */
     while (song.events < SONG_EVENTS) song_add_note(&song, 0, song.events * 30U, 60, 100, 30);
     uint64_t full = fingerprint(&song);

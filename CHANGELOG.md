@@ -2,6 +2,17 @@
 
 The version is `FM1_QY_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.5.8
+
+- A live take in REPLACE or OVERDUB with the loop off runs on past the song's end instead of stopping there.
+  The song grows a bar at a time as the playhead passes the end, and undo takes the bars back with the take.
+  PUNCH and LOOP takes stay inside the loop as before, and a clip's take keeps its clip's length.
+- The song's length is on settings page 1's K4, LENGTH, 1 to 999 bars, faster as it spins. Longer adds empty
+  bars at the end. Shorter hides what's past the new end without deleting it, so turning it back up brings it
+  back, and pulls the loop inside.
+- The swing grid, 8th or 16th, moved from K4 to SHIFT+K3, the way TIME SIG has its unit on SHIFT+K2. With
+  SHIFT held the knob reads GRID.
+
 ## 0.5.7
 
 - A clip block copied in the song view and pasted onto another track played nothing and showed no notes,

@@ -44,7 +44,7 @@ SONG_SMALL static uint32_t view(const struct song_player *p, uint32_t clock)
  * both. */
 SONG_SMALL static uint32_t timeline_end(const struct song_player *p)
 {
-    return p->perf == 2 ? NEVER : song_bar_clock(p->song, p->song->bars);
+    return p->perf == 2 || p->open_end ? NEVER : song_bar_clock(p->song, p->song->bars);
 }
 SONG_SMALL static unsigned song_loop(const struct song_player *p, uint32_t *start, uint32_t *end)
 {

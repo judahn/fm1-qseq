@@ -162,6 +162,7 @@ SONG_SMALL int song_port_record(unsigned mode, unsigned track)
     loop_before = s->loop_on;
     if (mode == SONG_REC_LOOP) { s->loop_on = 1; p->playhead = s->loop_start; }
     song_rec_start(&recorder, s, track, mode, p->playhead);
+    p->open_end = !s->open && (mode == SONG_REC_REPLACE || mode == SONG_REC_OVERDUB); /* on past the end (0.5.8) */
     uint32_t from, to;
     if (song_rec_quiet(&recorder, &from, &to)) { p->mute_track = (uint8_t)track; p->mute_from = from; p->mute_to = to; }
     p->click = s->metronome != 0;
@@ -183,6 +184,7 @@ SONG_SMALL static void take_end(unsigned keep_playing, uint32_t clock)
     struct song_player *p = song_port_player();
     unsigned began = recorder.active && song_port_live_clock() >= 0;
     clip_armed = 0;
+    p->open_end = 0;
     if (recorder.active) {
         song_knobs_release(clock); /* before the chase on stop */
         if (!keep_playing) song_port_stop();
@@ -207,7 +209,8 @@ unsigned song_port_recording(void) { return recorder.active || clip_armed || son
 unsigned song_port_take_full(void) { unsigned was = full; full = 0; return was; }
 
 /* Each control poll: a cell's take starting or ending, an open clip's take
- * at its next pass, the song's end, a loop pass, and the song filling up. */
+ * at its next pass, the song's end, or growing past it, a loop pass, and the
+ * song filling up. */
 SONG_SMALL void song_takes_poll(void)
 {
     struct song *s = song_port_song();
@@ -216,6 +219,11 @@ SONG_SMALL void song_takes_poll(void)
     int64_t clock = song_port_live_clock();
     if (!recorder.active || clock < 0) return;
     if (s->events + ROOM >= SONG_EVENTS) { full = 1; take_end(1, (uint32_t)clock); return; }
+    struct song_player *p = song_port_player();
+    while (p->open_end && song_bar_clock(s, s->bars) <= (uint32_t)clock) { /* past the end: the song grows a bar at a time */
+        if (s->bars >= SONG_MAX_BARS) p->open_end = 0; /* then playing stops there */
+        else ++s->bars;
+    }
     if (recorder.mode == SONG_REC_LOOP && (uint32_t)clock < recorder.last) song_knobs_wrap(s->loop_end);
     song_rec_follow(&recorder, (uint32_t)clock);
 }

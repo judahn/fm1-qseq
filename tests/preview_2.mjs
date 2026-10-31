@@ -3,8 +3,9 @@
 // fresh simulator. A bar of lengths, triplets, a dot, a tie, a rest and a
 // chord built key by key, played back on exact blocks. Swing and the key
 // on the settings page with their key lights, and an out-of-scale key
-// snapping up in step entry. Saves docs/phase2-step-view.png and
-// docs/phase2-settings.png.
+// snapping up in step entry. On a second simulator, settings page 1's song
+// length and swing grid, and a take running on past the song's end (0.5.8).
+// Saves docs/phase2-step-view.png and docs/phase2-settings.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
 
 export async function phase2(browser, root) {
@@ -91,6 +92,47 @@ export async function phase2(browser, root) {
     r.step();
     r.held(B.FX, () => r.tap(B.GLO));
     o.shiftGlo = r.page();
+
+    // Settings page 1 (0.5.8), on a fresh simulator: K4 is the song's length,
+    // shorter pulling the loop in, and SHIFT+K3 the swing grid. Then a take
+    // in OVERDUB from a bar before the end runs on past it, the song growing
+    // as it goes, and undo takes the bars back with the notes.
+    const g = previewRig(), gi = g.info, bars = () => gi(29, 0, 13);
+    const click = (k, d) => { for (let i = 0; i < Math.abs(d); i++) { g.turn(k, Math.sign(d)); g.render(20); } }; /* no speed-up */
+    g.render(32);
+    g.tap(B.SEQ);
+    const len = o.length = { start: bars() };
+    g.tap(B.GLO);
+    click(5, 3); g.render(2);
+    len.longer = [bars(), g.knobs()[3]];
+    click(5, 2 - bars());
+    len.short = { bars: bars(), loop: [gi(14), gi(15)], end: gi(11) };
+    click(5, len.start - 2);
+    len.back = bars();
+    len.swing0 = gi(19) & 255;
+    g.c.sim_control(0, B.FX, 1);
+    click(4, -1); len.grid = [gi(19) >> 8 & 255, g.knobs()[2]];
+    click(4, 1); len.grid.push(gi(19) >> 8 & 255, g.knobs()[2]);
+    g.c.sim_control(0, B.FX, 0);
+    len.swing = gi(19) & 255;
+    g.tap(B.GLO);                                  // back to the song view
+    if (gi(16) & 1) g.tap(B.ENV);                  // the loop off
+    const end0 = gi(11), bars0 = bars();
+    g.turn(6, 400); g.turn(6, -1);                 // PRESETS: the end, then a step back
+    const from = gi(8), beat = 44100 * 60 * 100 / gi(6, 0, 0) / 128;
+    g.c.sim_song_capture(1);
+    g.tap(B.REC);                                  // a take, OVERDUB, from a stop
+    len.mode = gi(29, 0, 3);
+    g.render(Math.ceil(beat * (4 * gi(29, 0, 4) + (end0 - from) / 480 + 2))); /* the count-in, to the end, two beats on */
+    len.past = { playing: gi(7), recording: gi(29, 0, 0), bars: bars() - bars0, clock: gi(8) > end0 };
+    g.c.sim_control(1, 0, 1); g.render(Math.ceil(beat)); g.c.sim_control(1, 0, 0);
+    g.render(Math.ceil(beat));
+    g.tap(B.REC);                                  // REC ends the take, playing goes on
+    if (gi(7)) g.tap(B.PLAY);
+    const late = () => Array.from({ length: gi(0, 0) }, (_, i) => gi(1, 0, i)).filter(x => x >= end0).length;
+    len.after = { notes: late(), bars: bars() - bars0, covered: gi(11) > end0 };
+    g.c.sim_control(0, B.HOME, 1); g.tap(B.SAVE); g.c.sim_control(0, B.HOME, 0); // undo
+    len.undone = { notes: late(), bars: bars() - bars0 };
     return o;
   });
   savePng(root, 'phase2-step-view', out, 'stepPng');
@@ -107,6 +149,18 @@ export async function phase2(browser, root) {
   t.yes('the phrase plays on exact blocks, ons and offs', q.playback.ok, q.playback);
   t.eq('playback stopped at the song end', q.playback.playing, 0);
   t.eq('GLO opens the settings', q.settingsPage, 21);
+  const L = q.length;
+  t.eq('settings K4: three clicks make the song three bars longer', L.longer, [L.start + 3, 'LENGTH ' + (L.start + 3) + ' BARS']);
+  t.yes('K4 down to 2 bars pulls the loop inside them', L.short.bars === 2 && L.short.end === 3840 && L.short.loop[1] <= 3840 &&
+    L.short.loop[0] < L.short.loop[1], L.short);
+  t.eq('and back up to its length', L.back, L.start);
+  t.eq('SHIFT+K3: the swing grid, 8ths then 16ths, GRID on the knob', L.grid, [0, 'GRID 8TH', 1, 'GRID 16TH']);
+  t.eq('the swing amount left alone', L.swing, L.swing0);
+  t.eq('the take is in OVERDUB', L.mode, 2);
+  t.yes('past the old end the take runs on, the song a bar or more longer', L.past.playing === 1 && L.past.recording === 1 &&
+    L.past.bars >= 1 && L.past.clock, L.past);
+  t.yes('a note played past the old end is kept, and the song holds it', L.after.notes >= 1 && L.after.bars >= 1 && L.after.covered, L.after);
+  t.eq('undo takes the note and the bars back', L.undone, { notes: 0, bars: 0 });
   t.eq('swing set to 25%', q.swing, 25);
   t.eq('swing tracks: all but track 2', q.swingTracks, 0xfd);
   t.eq('key A minor', q.key, 9 | 2 << 8);

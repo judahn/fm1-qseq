@@ -93,6 +93,14 @@ SONG_SMALL void song_grow(struct song *s, uint32_t to)
 {
     while (!s->open && s->bars < SONG_MAX_BARS && song_bar_clock(s, s->bars) < to) ++s->bars;
 }
+SONG_SMALL void song_set_bars(struct song *s, int bars)
+{
+    unsigned to = (unsigned)(bars < 1 ? 1 : bars > SONG_MAX_BARS ? SONG_MAX_BARS : bars);
+    uint32_t end = song_bar_clock(s, to), *start = s->open ? &s->kept_start : &s->loop_start, *stop = s->open ? &s->kept_end : &s->loop_end;
+    s->bars = (uint16_t)to;
+    if (*stop > end) *stop = end;
+    if (*start >= *stop) *start = song_bar_clock(s, to - 1U);
+}
 /* A cell's clip as notes over [from, to) on track t, pass after pass and
  * cut at `to`, as Expand leaves them, but notes only. Counted (apply 0) or
  * added. */

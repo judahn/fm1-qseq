@@ -135,7 +135,7 @@ export async function phase6(browser, root) {
     // (repeats from step entry): one plays it as it is, the other bakes it
     // first. They must be heard the same, block for block.
     const setup = r => {
-      r.tap(B.GLO); r.turn(4, 30); r.turn(5, 1);   // swing 30% on 16ths, every track
+      r.tap(B.GLO); r.turn(4, 30); r.held(B.FX, () => r.turn(4, 1)); // swing 30% on 16ths (SHIFT+K3 since 0.5.8), every track
       r.turn(1, 3); r.turn(0, 1); r.turn(2, 9); r.turn(3, 12); // humanize track 2: 9 clocks, 12 steps
       r.turn(1, -3); r.tap(B.GLO);
       r.turn(0, -1);

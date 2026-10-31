@@ -27,6 +27,10 @@ int song_erase(struct song *s, unsigned tracks, uint32_t from, uint32_t to);
 /* The song grows to reach `to`, when something lands past its end. Not in
  * an open clip, which keeps its length. */
 void song_grow(struct song *s, uint32_t to);
+/* The song's length, 1 to SONG_MAX_BARS bars, from settings page 1 (0.5.8).
+ * Shorter hides what's past the end without deleting it, and the loop
+ * comes inside. */
+void song_set_bars(struct song *s, int bars);
 /* One copied track pastes onto `track`. Several paste back onto their own.
  * Over what's there, growing the song to fit, or inserting time. Clip
  * blocks pasted onto another track land as their clips' notes (0.5.7). */

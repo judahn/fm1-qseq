@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* song-mode: the song settings page (design section 8a). Starting tempo and
- * time signature, swing, key, the metronome and the clips' launch quantize
- * (8f). ALGO turns between the knob pages, and
+ * time signature, swing (SHIFT+K3 its grid) and the song's length (0.5.8), key,
+ * the metronome and the clips' launch quantize (8f). ALGO turns between the knob pages, and
  * the first eight white keys switch swing per track. The third page picks
  * the parameter each of K1 to K4 records on a track, the fourth sets the
  * track's humanize, and the fifth its chord mode (8g), SELECT for the track
@@ -152,20 +152,22 @@ static void song_setup_draw(void)
         }
     }
     if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
-    static const char *const labels[2][4] = {{"TEMPO", "TIME SIG", "SWING", "GRID"}, {"KEY", "SCALE", "METRONOME", "LAUNCH Q"}};
+    unsigned shift = (previous_buttons & BUTTON(FX)) != 0;
+    static const char *const labels[2][4] = {{"TEMPO", "TIME SIG", "SWING", "LENGTH"}, {"KEY", "SCALE", "METRONOME", "LAUNCH Q"}};
     char values[4][24];
     if (!page2) {
-        song_bpm_text(s->tempo[0].bpm100, (previous_buttons & BUTTON(FX)) != 0, values[0]); /* SHIFT: half BPM (0.5.2) */
+        song_bpm_text(s->tempo[0].bpm100, shift, values[0]); /* SHIFT: half BPM (0.5.2) */
         song_meter_text(s, values[1]);
-        decimal(values[2], s->swing, 1); strcat(values[2], "%");
-        strcpy(values[3], s->swing_grid ? "16TH" : "8TH");
+        if (shift) strcpy(values[2], s->swing_grid ? "16TH" : "8TH"); /* SHIFT+K3: the swing grid (0.5.8, K4 before) */
+        else { decimal(values[2], s->swing, 1); strcat(values[2], "%"); }
+        decimal(values[3], s->bars, 1); strcat(values[3], s->bars == 1 ? " BAR" : " BARS");
     } else {
         strcpy(values[0], song_key_names[s->key_root]);
         strcpy(values[1], song_scale_names[s->key_scale]);
         static const char *const clicks[3] = {"OFF", "ON", "REC"};
         strcpy(values[2], clicks[s->metronome % 3U]); strcpy(values[3], song_launch_names[s->launch_q % 5U]);
     }
-    for (unsigned col = 0; col < 4; ++col) knob(col, labels[page2][col], values[col], colors[col]);
+    for (unsigned col = 0; col < 4; ++col) knob(col, !page2 && col == 2 && shift ? "GRID" : labels[page2][col], values[col], colors[col]);
     const char *hint = page2 ? "ALGO PAGE  GLO BACK" : "KEYS 1-8 SWING TRACKS  ALGO PAGE";
     song_hint(hint);
 }
@@ -211,8 +213,9 @@ static int song_setup_input(const struct fm1_controls *c, uint32_t *pressed, uin
             if (unit == 4 && beats > 8) beats = 8;
             (void)song_set_meter(s, 0, beats, unit);
         }
-        s->swing = (uint8_t)clamp(s->swing + k[2], 0, 50);
-        if (k[3]) s->swing_grid = k[3] > 0;
+        if (k[2] && shift) s->swing_grid = k[2] > 0; /* 8ths or 16ths */
+        else s->swing = (uint8_t)clamp(s->swing + k[2], 0, 50);
+        if (k[3]) song_set_bars(s, (int)s->bars + fm_encoder_delta(5, k[3])); /* the song's length, faster as it spins (0.5.8) */
     } else {
         if (k[0]) s->key_root = (uint8_t)((s->key_root + 12 + k[0] % 12) % 12);
         s->key_scale = (uint8_t)clamp(s->key_scale + k[1], 0, SONG_SCALES - 1);

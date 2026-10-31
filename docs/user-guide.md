@@ -171,6 +171,11 @@ REPLACE and OVERDUB, and from PUNCH or LOOP to OVERDUB, in the song view, the cl
 notice. Those show the mode in red at the right end of the bottom line while nothing else needs it. The mode is
 saved with the song. A song saved before 0.4.0 with STEP, the old default, loads in OVERDUB.
 
+A take in REPLACE or OVERDUB with the loop off doesn't stop at the song's end. It runs on, and the song grows a
+bar at a time to hold what's recorded, so a part can be played on past the last bar. Undo takes the bars back
+with the take. PUNCH and LOOP stay inside the loop, as before. Settings page 1's K4 sets the song's length
+directly (Song settings).
+
 The record settings:
 
 | Control | Setting |
@@ -316,7 +321,7 @@ Tap GLO on a song page. ALGO turns the five pages. They're saved with the song.
 
 | Page | K1 | K2 | K3 | K4 |
 |---|---|---|---|---|
-| 1 | Starting tempo, whole BPM (SHIFT: half) | Time signature beats (SHIFT: the unit) | Swing, 0 to 50% | Swing grid, 8th or 16th |
+| 1 | Starting tempo, whole BPM (SHIFT: half) | Time signature beats (SHIFT: the unit) | Swing, 0 to 50% (SHIFT: its grid, 8th or 16th) | The song's length, 1 to 999 bars. Longer adds empty bars at the end. Shorter hides what's past the end without deleting it, and brings the loop inside |
 | 2 | Key | Scale | Metronome: OFF, ON, REC | Launch quantize (clips) |
 | 3 | The parameter K1 records | ...K2 records | ...K3 records | ...K4 records |
 | 4 | Humanize timing, up to 30 clocks | Humanize velocity, up to 30 | | |

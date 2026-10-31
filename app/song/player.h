@@ -85,6 +85,9 @@ struct song_player {
     struct song_launch { uint32_t clock; uint8_t track, to; } log[16];
     uint32_t began_at;
     uint8_t perf, log_in, log_out, began[SONG_TRACKS];
+    /* A live take on the song, in REPLACE or OVERDUB, runs on past the
+     * song's end, and the take grows the song as it goes (0.5.8). */
+    uint8_t open_end;
 #endif
 };
 #if SONG_UI
