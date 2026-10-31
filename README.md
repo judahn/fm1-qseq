@@ -1,4 +1,4 @@
-# FM1 QY
+# QSEQ
 
 Custom firmware for the M-VAVE FM-1, built on [FM1 Open V14](https://github.com/m-vave/fm1_open). It adds a song
 mode modeled on the Yamaha QY70's song sequencer, a clip grid after Ableton Live's session view, chord mode and
@@ -7,13 +7,13 @@ glitch tools, and a browser workbench for songs and kits.
 The song mode was built clean-room from descriptions in Yamaha's QY manuals. It contains no Yamaha code and no
 code from any other sequencer.
 
-This project is not affiliated with Yamaha, Ableton or M-VAVE.
+This project is not affiliated with Yamaha, Ableton or M-VAVE. It was called FM1 QY until 0.6.0.
 
 <img src="docs/phase1-song-view.png" width="260" alt="The song view"> <img src="docs/phase7-grid.png" width="260" alt="The clip grid"> <img src="docs/phase2-step-view.png" width="260" alt="Step entry">
 
 New to it? [Getting started](docs/getting-started.md) explains the screen and walks through a first song.
 
-The release version is `FM1_QY_VERSION` in `app/version.h` (semver, with [CHANGELOG.md](CHANGELOG.md)), and
+The release version is `QSEQ_VERSION` in `app/version.h` (semver, with [CHANGELOG.md](CHANGELOG.md)), and
 releases are tagged `v<version>`.
 
 ## Status

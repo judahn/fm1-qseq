@@ -1,6 +1,6 @@
 # Getting started
 
-This page is for a first session with FM1 QY. It covers what's on the screen, the three places notes go, and
+This page is for a first session with QSEQ. It covers what's on the screen, the three places notes go, and
 a first song from an empty start. The [user guide](user-guide.md) has every page and control.
 
 It assumes the full build is on the FM-1 ([README, Installing on the device](../README.md#installing-on-the-device)),
@@ -8,9 +8,9 @@ or that you're in the browser preview, which has the same song mode.
 
 ## Before the first song
 
-**Check the version.** The boot screen shows FM1 Open V14, and QY with its version under that.
+**Check the version.** The boot screen shows FM1 Open V14, and QSEQ with its version under that.
 
-<img src="panel-boot.png" width="240" alt="The boot screen: FM1, OFFICIAL OPEN, V14, then QY and its version">
+<img src="panel-boot.png" width="240" alt="The boot screen: FM1, OFFICIAL OPEN, V14, then QSEQ and its version">
 
 **Send the sounds, once.** The full build leaves the factory sounds out to make room for the song mode. Open
 the workbench ([README, The workbench](../README.md#the-workbench)) with the FM-1 connected and click **Send

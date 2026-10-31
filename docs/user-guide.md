@@ -1,6 +1,6 @@
-# FM1 QY user guide
+# QSEQ user guide
 
-New to FM1 QY? [Getting started](getting-started.md) explains the screen and walks through a first song.
+New to QSEQ? [Getting started](getting-started.md) explains the screen and walks through a first song.
 This guide is the full reference. Its screenshots come from the preview's checks, which regenerate them on
 every run, so they match the build.
 

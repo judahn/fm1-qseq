@@ -88,7 +88,7 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     case 49: return song.chord[track & 7U] | (uint32_t)song.chord_type[track & 7U] << 8; /* phase 8 */
     case 50: return song_port_blocks();
     case 52: { char n[17]; uint32_t v; song_store_name(song_store_id(index), n); memcpy(&v, n, 4); return v; } /* a stored name */
-    case 53: { static const char q[16] = FM1_QY_VERSION; uint32_t v; memcpy(&v, q + (index & 3U) * 4U, 4); return v; } /* the release */
+    case 53: { static const char q[16] = QSEQ_VERSION; uint32_t v; memcpy(&v, q + (index & 3U) * 4U, 4); return v; } /* the release */
     case 54: return groove_tempo_saved() | groove_tempo_current() << 16; /* the engine's tempo (0.3.0) */
     case 55: return song_port_battery_shown();
     case 56: return groove_arp_enabled(track & 7U);

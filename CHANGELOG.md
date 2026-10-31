@@ -1,6 +1,14 @@
 # Changelog
 
-The version is `FM1_QY_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
+The version is `QSEQ_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
+
+## 0.6.0
+
+- The project is QSEQ now, FM1 QY until this release. The boot screen and the song list's header say
+  `QSEQ 0.6.0`, the workbench's badge `V14 · QSEQ 0.6.0`, and the version is `QSEQ_VERSION` in
+  `app/version.h`. Nothing else changes: songs, kits and settings carry over as they are.
+- Docs: a getting-started page for a first session (`docs/getting-started.md`), with the song view, the grid
+  and step entry labeled, and the preview's screenshots through the user guide.
 
 ## 0.5.8
 

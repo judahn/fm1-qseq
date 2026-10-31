@@ -85,7 +85,7 @@
     document.head.append(style);
     library.insertAdjacentHTML('beforeend', html);
     const badge = $('release-version'); /* FM1 Open's release, then this fork's, from Build-Web.ps1 */
-    if (badge && root.FM1_QY_VERSION) badge.textContent += ' · QY ' + root.FM1_QY_VERSION;
+    if (badge && root.QSEQ_VERSION) badge.textContent += ' · QSEQ ' + root.QSEQ_VERSION;
     $('sw-refresh').onclick = ui.act(async () => { await ui.run(ui.refresh); ui.status('Up to date.'); });
     $('sw-target').onchange = () => ui.status('Refresh to read ' + ($('sw-target').value === 'sim' ? 'the simulator.' : 'the FM-1.'));
     for (const part of ui.parts) part.mount();

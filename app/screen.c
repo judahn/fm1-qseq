@@ -1355,7 +1355,7 @@ static __attribute__((noinline, cold, minsize)) void boot_draw(void)
         text((240 - 12 * (sizeof FM1_RELEASE_VERSION - 1)) / 2, 120,
              FM1_RELEASE_VERSION, 2, TEXT, BACK);
 #if SONG_UI /* song-mode: this fork's release, between the bars and M-VAVE */
-        text((240 - 6 * (sizeof "QY " FM1_QY_VERSION - 1)) / 2, 194, "QY " FM1_QY_VERSION, 1, ACCENT, BACK);
+        text((240 - 6 * (sizeof "QSEQ " QSEQ_VERSION - 1)) / 2, 194, "QSEQ " QSEQ_VERSION, 1, ACCENT, BACK);
 #endif
         text(102, 208, "M-VAVE", 1, DIM, BACK);
     }

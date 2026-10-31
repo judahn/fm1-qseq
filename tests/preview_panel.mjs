@@ -52,8 +52,8 @@ export async function phasePanel(browser, root) {
       return { on: runs[1].length, off: runs[0].length, even: Math.abs(mean(runs[1]) - mean(runs[0])) <= 0.1 * mean(runs[0]) };
     };
     const word = i => { const w = r.info(53, 0, i); return [w & 255, w >>> 8 & 255, w >>> 16 & 255, w >>> 24]; };
-    const bytes = [0, 1, 2, 3].flatMap(word), line = 'QY ' + String.fromCharCode(...bytes.slice(0, bytes.indexOf(0)));
-    o.version = line.slice(3);
+    const bytes = [0, 1, 2, 3].flatMap(word), line = 'QSEQ ' + String.fromCharCode(...bytes.slice(0, bytes.indexOf(0)));
+    o.version = line.slice(5);
     const drawn = (lcd, y0, y1) => { /* the box around what is drawn in these rows */
       const box = { left: 240, right: -1, top: 240, bottom: -1 };
       for (let y = y0; y < y1; y++)
@@ -169,12 +169,12 @@ export async function phasePanel(browser, root) {
   t.yes('the song played through the page changes', q.playingThrough);
   t.eq('device-paced LCD: the song view\'s footer painted after the page change, as at full speed', q.footer, 0);
   t.eq('the firmware\'s release is CHANGELOG.md\'s latest', q.version, latest);
-  t.eq('the boot screen shows QY and the release, centered between the bars and M-VAVE', q.bootBox, q.bootWant);
+  t.eq('the boot screen shows QSEQ and the release, centered between the bars and M-VAVE', q.bootBox, q.bootWant);
   t.yes('the song list\'s header shows the same line', q.sameLine);
   t.eq('the battery: the simulator\'s reading, smoothed', q.battery, 900);
   t.eq('BAT 900 under the release, 7 letters wide', q.batteryBox, { left: 76, right: 76 + 6 * 7 - 2, top: 15, bottom: 21 });
   t.eq('its bar: the frame and all 22 lit, 900 being past full (622)', q.batteryBar, [true, true, true, true, true]);
-  t.eq('the page\'s version badge: FM1 Open\'s release, then this one', q.badge, 'V14 · QY ' + latest);
+  t.eq('the page\'s version badge: FM1 Open\'s release, then this one', q.badge, 'V14 · QSEQ ' + latest);
   knobChecks(t, q.knobs);
   return { phase: 'panel', checks: t.list, out };
 }

@@ -95,7 +95,7 @@ static void song_list_draw(void)
         paint_fill(0, 0, 240, 196, BACK);
         if (paint_rendering) {
             text(8, 6, "SONGS", 2, ACCENT, BACK);
-            text(76, 5, "QY " FM1_QY_VERSION, 1, DIM, BACK); /* this fork's release, the battery under it */
+            text(76, 5, "QSEQ " QSEQ_VERSION, 1, DIM, BACK); /* this fork's release, the battery under it */
             strcpy(line, "FREE "); song_kb(part, g.free); strcat(line, part); /* flash for songs, the free heap under it */
             text(232 - 6 * (unsigned)strlen(line), 5, line, 1, DIM, BACK);
             song_heap_line(line);
