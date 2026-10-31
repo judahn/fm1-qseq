@@ -157,7 +157,7 @@ For the full build, set `FM1_SONG_DEVICE_FULL=1`. Its outputs go to `build/dx7-s
 `build/official-web-songfull/`. With `COMMIT` as the commit you built:
 
 ```sh
-FM1_SONG_DEVICE_FULL=1 FM1_SOURCE_URL=https://github.com/judahn/fm1-qy/archive/COMMIT.tar.gz ./build.sh --package
+FM1_SONG_DEVICE_FULL=1 FM1_SOURCE_URL=https://github.com/judahn/fm1-qseq/archive/COMMIT.tar.gz ./build.sh --package
 ```
 
 A firmware build prints its size and checks it fits. A package build also prints the flash layout, for example
