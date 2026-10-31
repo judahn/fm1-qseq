@@ -3,8 +3,9 @@
  * loop region is the selection. It covers the current track and follows it,
  * until tracks are picked by hand: hold LFO and tap F3 to F4 for tracks 1
  * to 8, G4 for all (again for just the current one). SHIFT plus the lower
- * white keys copy, cut, paste (inserting or over), duplicate, insert bars
- * and delete bars, and SHIFT+D#4 clears the clipboard. */
+ * white keys copy, cut, paste (A3 and B3 both, over what's there),
+ * duplicate, insert bars and delete the selection, and SHIFT+D#4 clears
+ * the clipboard. */
 #include "arrange.h"
 #include "blocks.h"
 #include "record.h"
@@ -29,13 +30,12 @@ static void song_pick_tracks(uint32_t down)
 }
 static void song_action(unsigned which, uint32_t now)
 {
-    static const char *const done[7] = {"COPIED", "CUT", "PASTED, INSERTING", "PASTED OVER",
-                                        "DUPLICATED", "BARS INSERTED", "BARS DELETED"};
+    static const char *const done[7] = {"COPIED", "CUT", "PASTED", "PASTED", "DUPLICATED", "BARS INSERTED", "DELETED"};
     struct song *s = song_port_song();
     const struct song_player *p = song_port_player();
     struct song_clip *c = song_port_clip();
     uint32_t at = p->playing ? song_player_clock(p) : p->playhead;
-    if (s->open && (which == 2 || which > 3)) { /* a clip keeps its length: copy, cut and paste over only */
+    if (s->open && (which == 4 || which == 5)) { /* a clip keeps its length: no duplicate or inserted bars */
         notice = "NOT INSIDE A CLIP";
         notice_until = now + 1500U;
         return;
@@ -43,21 +43,23 @@ static void song_action(unsigned which, uint32_t now)
     struct song_place place;
     song_player_hold(song_port_player(), &place); /* playing goes on in time */
     int r;
+    /* Only inserting bars moves what follows (0.5.5). Paste and duplicate
+     * go over it, and delete leaves the selected tracks empty there. */
     if (which == 0) r = song_copy(s, c, song_selected(), s->loop_start, s->loop_end);
     else if (which == 1) r = song_cut(s, c, song_selected(), s->loop_start, s->loop_end);
     else if (which <= 3 && c->cell && !s->open) { /* a clip from the grid: a block, selected so Duplicate extends it */
-        r = which == 2 && song_insert_time(s, at, c->length) ? -1 : song_block_paste(s, c, at);
-        if (!r) { s->loop_start = at; s->loop_end = at + c->length; }
-    } else if (which <= 3) r = c->length ? song_paste(s, c, at, track, which == 2) : -1;
+        r = song_block_paste(s, c, at);
+        if (!r) { song_grow(s, at + c->length); s->loop_start = at; s->loop_end = at + c->length; }
+    } else if (which <= 3) r = c->length ? song_paste(s, c, at, track, 0) : -1;
     else if (which == 4) {
         r = song_duplicate(s, song_selected(), &s->loop_start, &s->loop_end);
         song_blocks_join(s, song_selected());
     }
     else if (which == 5) r = song_insert_time(s, s->loop_start, s->loop_end - s->loop_start);
-    else r = song_delete_time(s, s->loop_start, s->loop_end);
+    else r = song_erase(s, song_selected(), s->loop_start, s->loop_end);
     song_player_resume(song_port_player(), &place);
     notice = !r ? done[which] : which >= 2 && which <= 3 && !c->length ? "COPY SOMETHING FIRST"
-        : r == -2 ? "THAT CLIP IS IN ANOTHER SONG" : "DOESN'T FIT";
+        : r == -2 ? "THAT CLIP IS IN ANOTHER SONG" : which == 6 ? "NOTHING TO DELETE" : "DOESN'T FIT";
     notice_until = now + 1500U;
 }
 /* SHIFT+D#4, beside delete, in the song view and the grid (0.5.4): the

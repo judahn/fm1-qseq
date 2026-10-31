@@ -24,8 +24,9 @@ static void song_start(uint32_t now)
  * and goes to the grid. Without the song pages SEQ opens the diagnostics
  * page and from there the stock step page. On the step page SEQ keeps its
  * stock long press (actions), and a tap comes back to the song. GLO on a
- * song page: a tap opens or closes the settings, a hold is still the stock
- * mixer layer, and SHIFT+GLO opens the device settings (song_device_turn). */
+ * song page: a tap opens or closes the settings, a hold shows the stock
+ * mixer, which stays when GLO is let go (0.5.5) until a GLO tap goes back,
+ * and SHIFT+GLO opens the device settings (song_device_turn). */
 static unsigned song_seq_on_steps;
 enum { SONG_HOME = SONG_UI ? SONG : SONG_DIAG }; /* where SEQ goes */
 #if SONG_UI
@@ -95,6 +96,12 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
             if (from == SONG_SETUP) page = song_setup_back;
             else { song_setup_back = from; page = SONG_SETUP; }
             music_page = page;
+            cache->shown_page = ~0U;
+            return 1;
+        }
+        if (page == from) { /* a hold: the mixer stays, and its GLO tap comes back here (music_page) */
+            page = MIX;
+            music_page = from;
             cache->shown_page = ~0U;
             return 1;
         }

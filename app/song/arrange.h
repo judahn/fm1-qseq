@@ -21,12 +21,20 @@ struct song_clip {
 };
 int song_copy(const struct song *s, struct song_clip *clip, unsigned tracks, uint32_t from, uint32_t to);
 int song_cut(struct song *s, struct song_clip *clip, unsigned tracks, uint32_t from, uint32_t to);
-/* One copied track pastes onto `track`. Several paste back onto their own. */
+/* The selection's events go, as a cut leaves it, with nothing copied and
+ * nothing moving (0.5.5). -1 when there is nothing there. */
+int song_erase(struct song *s, unsigned tracks, uint32_t from, uint32_t to);
+/* The song grows to reach `to`, when something lands past its end. Not in
+ * an open clip, which keeps its length. */
+void song_grow(struct song *s, uint32_t to);
+/* One copied track pastes onto `track`. Several paste back onto their own.
+ * Over what's there, growing the song to fit, or inserting time. */
 int song_paste(struct song *s, const struct song_clip *clip, uint32_t at, unsigned track, unsigned insert);
 /* Clipboard event i moved `at` on, its glitch found in this song's table. */
 struct song_event song_board_event(struct song *s, const struct song_clip *clip, unsigned i, uint32_t at);
-/* Copy the selection to right after itself, inserting, and move the
- * selection onto the copy. */
+/* Copy the selection to right after itself, over what's there, which
+ * stays where it is (0.5.5, it inserted before), and move the selection
+ * onto the copy. The song grows to fit. */
 int song_duplicate(struct song *s, unsigned tracks, uint32_t *from, uint32_t *to);
 int song_insert_time(struct song *s, uint32_t at, uint32_t length);
 int song_delete_time(struct song *s, uint32_t from, uint32_t to);

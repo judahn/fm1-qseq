@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception
 // Phase 3 of the preview check: the selection, the clipboard, undo and redo,
-// and real-time takes, on a fresh simulator. Copy and paste inserting,
-// undo and redo, deleting bars, a marker, an overdub with count-in and
+// and real-time takes, on a fresh simulator. Copy and paste over (0.5.5),
+// undo and redo, deleting the selection, a marker, an overdub with count-in and
 // requantize played back on exact blocks, and a loop take. Saves
 // docs/phase3-select.png, docs/phase3-rec.png and docs/phase3-recording.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
@@ -19,12 +19,6 @@ export async function phase3(browser, root) {
       markers: Array.from({ length: info(12) }, (_, k) => info(13, 0, k)),
       end: info(11), loop: [info(14), info(15)] });
     const byClock = list => list.sort((a, b) => a.clock - b.clock || a.pitch - b.pitch || a.length - b.length);
-    // Inserting `length` at `at` moves everything from there on.
-    const inserted = (s, at, length) => ({ ...s,
-      tracks: s.tracks.map(list => list.map(n => n.clock >= at ? { ...n, clock: n.clock + length } : n)),
-      tempos: s.tempos.map(([clock, bpm], k) => [k && clock >= at ? clock + length : clock, bpm]),
-      markers: s.markers.map(m => m >= at ? m + length : m), end: s.end + length,
-      loop: [s.loop[0] >= at ? s.loop[0] + length : s.loop[0], s.loop[1] > at ? s.loop[1] + length : s.loop[1]] });
     const undoKey = redo => {                      // HOME, then SAVE with it, SHIFT for redo
       if (redo) c.sim_control(0, B.FX, 1);
       c.sim_control(0, B.HOME, 1); c.sim_control(0, B.SAVE, 1);
@@ -37,7 +31,8 @@ export async function phase3(browser, root) {
     r.tap(B.SEQ);
 
     // 1. Selection: LFO + G3 adds track 2, K4 pulls the loop end in to bars
-    // 3 and 4. SHIFT+F3 copies, PRESETS moves to bar 5, SHIFT+A3 pastes inserting.
+    // 3 and 4. SHIFT+F3 copies, PRESETS moves to bar 5, SHIFT+A3 pastes over
+    // what's there, and nothing later moves (0.5.5).
     r.held(B.LFO, () => r.key(2));
     r.turn(5, -2);
     a.loop = [info(14), info(15)];
@@ -49,9 +44,10 @@ export async function phase3(browser, root) {
     r.render(4);
     a.selectPng = r.png();
     r.held(B.FX, () => r.key(4));
-    const pasted = song(), want = inserted(original, to, to - from);
+    const pasted = song(), want = { ...original, tracks: original.tracks.slice() };
     for (const tr of [0, 1])
-      want.tracks[tr] = byClock([...want.tracks[tr], ...original.tracks[tr].filter(n => n.clock >= from && n.clock < to)
+      want.tracks[tr] = byClock([...original.tracks[tr].filter(n => n.clock < to || n.clock >= to + (to - from)),
+        ...original.tracks[tr].filter(n => n.clock >= from && n.clock < to)
         .map(n => ({ ...n, clock: n.clock - from + to, length: Math.min(n.length, to - n.clock) }))]);
     pasted.tracks = pasted.tracks.map(byClock); want.tracks = want.tracks.map(byClock);
     a.pasteOk = same(pasted, want);
@@ -68,10 +64,11 @@ export async function phase3(browser, root) {
     undoKey(1);
     const redone = song(); redone.tracks = redone.tracks.map(byClock);
     a.redo = { same: same(redone, pasted), redoLevels: state(10) };
-    r.held(B.FX, () => r.key(11));                 // SHIFT+E4: delete bars 3 and 4
+    r.held(B.FX, () => r.key(11));                 // SHIFT+E4: delete the selection, bars 3 and 4 of tracks 1 and 2
     const deleted = song();
+    deleted.tracks = deleted.tracks.map(byClock);
     a.deleted = { end: deleted.end - pasted.end, tempo: deleted.tempos[1][0] - pasted.tempos[1][0], markers: deleted.markers.length - pasted.markers.length,
-      tracks: deleted.tracks.every((list, tr) => list.length === pasted.tracks[tr].filter(n => n.clock < from || n.clock >= to).length) };
+      tracks: deleted.tracks.every((list, tr) => same(list, tr < 2 ? pasted.tracks[tr].filter(n => n.clock < from || n.clock >= to) : pasted.tracks[tr])) };
     undoKey(0);
     const back = song(); back.tracks = back.tracks.map(byClock);
     a.deleteUndoOk = same(back, pasted);
@@ -198,17 +195,16 @@ export async function phase3(browser, root) {
   k.eq('LFO+G3 and K3: the selection is bars 3 and 4', a.loop, [3840, 7680]);
   k.eq('SHIFT+F3 copies the selection on two tracks', a.clip, [3840, 3]);
   k.eq('PRESETS moves the playhead to bar 5', a.playhead, 7680);
-  k.yes('SHIFT+A3 pastes inserting, everything later moving on', a.pasteOk, a.pasteDiff);
+  k.yes('SHIFT+A3 pastes over at bar 5, nothing later moving', a.pasteOk, a.pasteDiff);
   k.eq('the paste is one undo step', a.levelsAfterPaste, 1);
   k.eq('still on the song view after the edits', a.stillOnSong, 19);
   k.eq('undo stays on the song view', a.undoPage, 19);
   k.yes('undo gives back the song as it was', a.undoOk);
   k.eq('one step to redo', a.redoLevels, 1);
   k.eq('redo brings the paste back, nothing left to redo', a.redo, { same: true, redoLevels: 0 });
-  const span = a.loop[1] - a.loop[0];
-  k.eq('SHIFT+E4 deletes the bars, the tempo change and a marker moving left',
-    a.deleted, { end: -span, tempo: -span, markers: -1, tracks: true });
-  k.yes('undo puts the deleted bars back', a.deleteUndoOk);
+  k.eq('SHIFT+E4 deletes the selection on tracks 1 and 2 alone, nothing moving',
+    a.deleted, { end: 0, tempo: 0, markers: 0, tracks: true });
+  k.yes('undo puts the deleted notes back', a.deleteUndoOk);
   k.eq('SEL adds a marker', a.markersAdded, 1);
   k.eq('undo takes the marker back', a.markersAfterUndo, 0);
   k.eq('REC held opens the record settings', t.chooserPage, 23);

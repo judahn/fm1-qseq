@@ -122,8 +122,8 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
     }
     uint32_t down = key_down & ~blocked_keys;
     if (shift) {
-        /* SHIFT + the lower white keys, F3 to E4: copy, cut, paste inserting,
-         * paste over, duplicate, insert bars, delete bars. D#4 clears the
+        /* SHIFT + the lower white keys, F3 to E4: copy, cut, paste, paste,
+         * duplicate, insert bars, delete the selection. D#4 clears the
          * clipboard. The upper white keys, F4 to G5: markers 1 to 9. */
         for (unsigned i = 0; i < 7; ++i)
             if (down & (1U << white_keys[i])) song_action(i, now);

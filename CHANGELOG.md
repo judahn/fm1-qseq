@@ -2,6 +2,22 @@
 
 The version is `FM1_QY_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.5.5
+
+- SHIFT+E4 in the song view deletes what's selected: the notes, clip blocks and automation that start in the
+  selection, on the selected tracks only. Nothing moves and the other tracks are left alone. It deleted the
+  bars from every track before, and later bars moved left. It works in the clip editor now too. With nothing
+  there, the bottom line says `NOTHING TO DELETE`.
+- Pasting no longer moves what comes after. SHIFT+A3 pasted inserting, pushing later bars right, and now
+  pastes over what's there, as SHIFT+B3 does. Duplicate (SHIFT+C4) goes over the bars after the selection
+  instead of inserting. Either one past the song's end grows the song to fit. SHIFT+D4 still inserts bars,
+  on every track, the one edit that moves what follows.
+- The selection is easier to see: a cyan outline around it on each selected track, over the notes and clip
+  blocks, and a lighter fill. The paste outline stays white.
+- A held GLO opens the mixer, and now it stays up when GLO is let go, from any song page, the grid and the clip
+  editor included. A GLO tap there goes back to the page you were on. A tap of GLO on a song page still opens
+  the song settings.
+
 ## 0.5.4
 
 - SHIFT+D#4 clears the clipboard, in the song view, the clip editor and the grid, and the song view's paste

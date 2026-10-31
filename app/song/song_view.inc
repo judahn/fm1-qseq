@@ -19,7 +19,7 @@ enum { SONG = STARTUP + 1, SONG_STEP, SONG_SETUP, SONG_DIAG, SONG_REC, SONG_AUTO
 enum {
     SONG_X = 22, SONG_W = 214, SONG_RULER = 32, SONG_ROWS = 48, SONG_ROW = 18,
     SONG_BOTTOM = SONG_ROWS + 8 * SONG_ROW - 2,
-    SONG_BAR_LINE = 0x4228, SONG_BEAT_LINE = 0x2104, SONG_LOOP = 0x1147, SONG_SELECT = 0x0884
+    SONG_BAR_LINE = 0x4228, SONG_BEAT_LINE = 0x2104, SONG_LOOP = 0x21ab, SONG_SELECT = 0x1927
 };
 static const char *const song_snaps[SONG_ZOOMS] = {"1 BAR", "1/2 BAR", "BEAT", "1/8"};
 static const char *const song_spans[SONG_ZOOMS] = {"16 BARS", "8 BARS", "4 BARS", "2 BARS"};
@@ -248,6 +248,16 @@ static void song_row(const struct song *s, unsigned t)
         w = w > 2 ? w - 1 : 1;
         unsigned rise = span ? (unsigned)(e[i].a - song_low[t]) * 13U / span : 6U;
         paint_fill(x, y + 14 - rise, w, 2, color);
+    }
+    /* The selection's outline, over the notes and blocks (0.5.5), since the
+     * fill alone was hard to find. Its bottom edge sits in the gap below the
+     * row, clear of the lowest notes. Open where it runs past the window. */
+    if (picked && s->loop_end > song_window && s->loop_start < end) {
+        unsigned x1 = song_x(s->loop_start), x2 = song_x(s->loop_end), w = x2 > x1 ? x2 - x1 : 1, h = SONG_ROW - 1;
+        paint_fill(x1, y, w, 1, ACCENT);
+        paint_fill(x1, y + h - 1U, w, 1, ACCENT);
+        if (s->loop_start >= song_window) paint_fill(x1, y, 1, h, ACCENT);
+        if (s->loop_end <= end) paint_fill(x1 + w - 1U, y, 1, h, ACCENT);
     }
     /* Where a paste would land: an outline from the playhead. */
     if (ghost && song_now.ghost_to > song_window && song_now.ghost_from < end) {

@@ -219,10 +219,45 @@ export async function phase7(browser, root) {
     render(4);
     o.board.view = { page: pageNow(), outline: r.differ(outlined, 0, 40, 240, 178, bare) > 0, cleared: board(),
       left: r.differ(r.pixels(), 0, 40, 240, 178, bare) };
+
+    // 10. The song view (0.5.5). The selection, track 2 alone, has a cyan
+    // outline on its row. SHIFT+A3 pastes over at the playhead, and SHIFT+E4
+    // deletes the selection's notes on track 2 only. Neither moves what
+    // comes after, on any track.
+    const notesAt = t => Array.from({ length: info(0, t) }, (_, i) => i).filter(i => !info(30, t, i)).map(i => info(1, t, i));
+    const all = () => [0, 1, 2, 3, 4, 5, 6, 7].map(notesAt), sorted = a => a.slice().sort((x, y) => x - y);
+    const cyan = y => { const lcd = r.pixels(); let n = 0; for (let x = 22; x < 236; x++) n += lcd[y * 240 + x] === 0x07ff; return n; };
+    render(4);
+    o.outline = { track2: cyan(66), track1: cyan(48) };
+    o.selectionPng = png();
+    const lo = info(14), hi = info(15), before = all();
+    held(B.FX, () => key(0));                       // copy track 2's selection
+    turn(6, 2);                                     // the playhead two snap steps on
+    const p = info(8), length = hi - lo;
+    held(B.FX, () => key(4));                       // SHIFT+A3: paste
+    const pasted = all(), landed = sorted([...before[1].filter(x => x < p), ...before[1].filter(x => x >= lo && x < hi).map(x => x - lo + p),
+      ...before[1].filter(x => x >= p + length)]);
+    o.paste = { had: before[1].filter(x => x >= lo && x < hi).length > 0, later: before[1].filter(x => x >= p + length).length > 0,
+      track2: r.same(sorted(pasted[1]), landed), others: [0, 2, 3, 4, 5, 6, 7].every(t => r.same(pasted[t], before[t])) };
+    held(B.FX, () => key(11));                      // SHIFT+E4: delete
+    const deleted = all();
+    o.erase = { track2: r.same(sorted(deleted[1]), sorted(pasted[1].filter(x => x < lo || x >= hi))),
+      others: [0, 2, 3, 4, 5, 6, 7].every(t => r.same(deleted[t], before[t])), loop: [info(14), info(15)].join() === [lo, hi].join() };
+    held(B.FX, () => key(11));
+    o.erase.again = r.same(all(), deleted);
+
+    // 11. A held GLO opens the mixer, and it stays when GLO is let go
+    // (0.5.5), in the song view and the grid. A GLO tap goes back.
+    o.glo = [];
+    r.long(B.GLO); render(2); o.glo.push(pageNow());
+    tap(B.GLO); render(2); o.glo.push(pageNow());
+    tap(B.SEQ);                                     // the grid
+    r.long(B.GLO); render(2); o.glo.push(pageNow());
+    tap(B.GLO); render(2); o.glo.push(pageNow());
     return o;
   });
   for (const [name, key] of [['grid-empty', 'emptyPng'], ['step', 'stepPng'], ['clip', 'clipPng'], ['grid', 'gridPng'],
-    ['named', 'namedPng']]) savePng(root, 'phase7-' + name, out, key);
+    ['named', 'namedPng'], ['selection', 'selectionPng']]) savePng(root, 'phase7-' + name, out, key);
   await page.close();
   const t = checker('7'), q = out;
   t.eq('SEQ, SEQ opens the grid', q.gridPage, 27);
@@ -288,5 +323,13 @@ export async function phase7(browser, root) {
   t.eq('pasting after leaves the cell as it was', b.pasteless, [1920, 4]);
   t.yes('in the song view a copy shows the paste outline', b.view.outline && b.view.page === 19, b.view);
   t.eq('SHIFT+D#4 there clears it, outline and all', [b.view.cleared, b.view.left], [[0, 0], 0]);
+  t.yes('the selection has a cyan outline on its row, not on others', q.outline.track2 > 20 && q.outline.track1 === 0, q.outline);
+  t.yes('the selection has notes to copy, and track 2 has notes after where the paste ends', q.paste.had && q.paste.later, q.paste);
+  t.yes('SHIFT+A3 pastes over: track 2 has the copy and nothing after it moved', q.paste.track2, q.paste);
+  t.yes('the paste leaves the other tracks alone', q.paste.others, q.paste);
+  t.yes('SHIFT+E4 deletes the selection on track 2 only, nothing moving', q.erase.track2 && q.erase.others, q.erase);
+  t.yes('the selection stays where it was', q.erase.loop, q.erase);
+  t.yes('SHIFT+E4 on an empty selection changes nothing', q.erase.again, q.erase);
+  t.eq('a held GLO leaves the mixer up, a tap goes back, song view and grid', q.glo, [6, 19, 6, 27]);
   return { phase: '7', checks: t.list, out };
 }

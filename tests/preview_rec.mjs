@@ -212,7 +212,7 @@ export async function phaseRec(browser, root) {
     k.inside = lcd[(y0 + 12) * 240 + 60];
     const other = new Set();
     let black = 0, dim = 0;
-    for (let y = y0; y < y0 + 16; y++)
+    for (let y = y0 + 1; y < y0 + 16; y++)                   /* below the selection's outline on top (0.5.5) */
       for (let x = 23; x < x1; x++) { const p = lcd[y * 240 + x]; if (p === 0) black += x >= 29 && x < 35; else if (p !== k.label) other.add(p); }
     for (let y = y0; y < y0 + 16; y++) for (let x = 77; x < 128; x++) dim += lcd[y * 240 + x] === DIM; /* bar 2 */
     k.other = [...other];

@@ -185,11 +185,11 @@ pressing keys picks notes. Notes and automation are copied together.
 |---|---|
 | F3 | Copy the selection |
 | G3 | Cut |
-| A3 | Paste at the playhead, inserting (later bars move right) |
+| A3 | Paste at the playhead, replacing what's there. Until 0.5.5 it inserted, and later bars moved right |
 | B3 | Paste at the playhead, replacing what's there |
-| C4 | Duplicate: paste right after the selection and move the selection along, so repeated presses keep extending (4 bars become 8, then 12) |
+| C4 | Duplicate: paste right after the selection, replacing what's there (inserting until 0.5.5), and move the selection along, so repeated presses keep extending (4 bars become 8, then 12) |
 | D4 | Insert empty bars the length of the selection |
-| E4 | Delete the selected bars (later bars move left) |
+| E4 | Delete the selection on the selected tracks, leaving the bars in place (0.5.5). Until then it deleted the bars from every track and later bars moved left |
 
 **Where a paste lands.** Paste always goes to the playhead, which can be anywhere: move it with PRESETS by
 the current snap (marker to marker with SHIFT), or jump to a marker, then paste. A selection that

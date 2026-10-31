@@ -66,8 +66,8 @@ The full build and the preview have all of these. The [user guide](docs/user-gui
 **Real-time recording and arranging**
 - Replace, overdub, punch and loop recording, count-in, metronome, and input quantize with a strength that
   can be changed after the take.
-- The loop region is the selection. Copy, cut, paste (inserting or over), duplicate, insert and delete bars,
-  across tracks and between songs.
+- The loop region is the selection. Copy, cut, paste, duplicate, delete and insert bars,
+  across tracks and between songs. Only inserting bars moves what follows.
 - Up to 64 levels of undo and redo.
 
 **Automation**

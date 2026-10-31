@@ -169,23 +169,43 @@ static void test_arrange(void)
     CHECK_EQ(song.tempo[1].clock, 7U * 1920U);
     CHECK_EQ(song.markers, 1);
     CHECK_EQ(at(1, 6)->length, 960); /* bar 7's note stops at bar 8 */
-    /* Duplicate: 2 bars become 4, then 6, and the selection follows. */
+    /* Duplicate goes over what follows, which stays where it is (0.5.5): 2
+     * bars become 4 with the note after them still at bar 5, then 6 over
+     * it, and the selection follows. Another track is left alone. */
     fresh();
     for (unsigned i = 0; i < 4; ++i) song_add_note(&song, 3, i * 960U, 50 + i, 100, 240);
     song_add_note(&song, 3, 4U * 1920U, 70, 100, 240); /* after the selection */
+    song_add_note(&song, 0, 5U * 1920U, 80, 100, 240);
     uint32_t from = 0, end = 2U * 1920U;
     CHECK_EQ(song_duplicate(&song, 1U << 3, &from, &end), 0);
     CHECK_EQ(from, 2U * 1920U);
     CHECK_EQ(end, 4U * 1920U);
+    CHECK_EQ(count(3), 9);
+    CHECK(at(3, 8)->a == 70 && song_event_start(at(3, 8)) == 4U * 1920U);
     CHECK_EQ(song_duplicate(&song, 1U << 3, &from, &end), 0);
-    CHECK_EQ(count(3), 13);
-    CHECK_EQ(song_event_start(at(3, 8)), 4U * 1920U);
-    CHECK_EQ(at(3, 12)->a, 70);
-    CHECK_EQ(song_event_start(at(3, 12)), 8U * 1920U);
+    CHECK_EQ(count(3), 12);
+    CHECK(at(3, 8)->a == 50 && song_event_start(at(3, 8)) == 4U * 1920U); /* bar 5's note went under the copy */
+    CHECK(count(0) == 1 && song_event_start(at(0, 0)) == 5U * 1920U);
+    CHECK_EQ(song.bars, 16);
     /* Cut leaves the bars in place, empty. */
     CHECK_EQ(song_cut(&song, &clip, 1U << 3, 0, 1920U), 0);
-    CHECK_EQ(count(3), 11);
+    CHECK_EQ(count(3), 10);
     CHECK_EQ(song_event_start(at(3, 0)), 1920U);
+    /* Erase (delete, 0.5.5) empties the selected tracks there, copying
+     * nothing and moving nothing, and says when there was nothing. */
+    CHECK_EQ(song_erase(&song, 1U << 3 | 1U, 1920U, 2U * 1920U), 0);
+    CHECK(count(3) == 8 && song_event_start(at(3, 0)) == 2U * 1920U);
+    CHECK(count(0) == 1 && song_event_start(at(0, 0)) == 5U * 1920U);
+    CHECK_EQ(clip.length, 1920);
+    CHECK_EQ(song_erase(&song, 1U << 3, 1920U, 2U * 1920U), -1);
+    CHECK_EQ(song_erase(&song, 1U << 3, 1920U, 1920U), -1);
+    /* Near the end the song grows to hold a duplicate or a paste. */
+    from = 14U * 1920U, end = 16U * 1920U;
+    song_add_note(&song, 3, from, 60, 100, 240);
+    CHECK_EQ(song_duplicate(&song, 1U << 3, &from, &end), 0);
+    CHECK_EQ(song.bars, 18);
+    CHECK_EQ(song_paste(&song, &clip, 18U * 1920U + 960U, 3, 0), 0);
+    CHECK_EQ(song.bars, 20);
     /* A paste that doesn't fit changes nothing. */
     while (song.events < SONG_EVENTS) song_add_note(&song, 0, song.events * 30U, 60, 100, 30);
     uint64_t full = fingerprint(&song);

@@ -83,6 +83,16 @@ SONG_SMALL int song_cut(struct song *s, struct song_clip *clip, unsigned tracks,
     clear(s, tracks, from, to);
     return 0;
 }
+SONG_SMALL int song_erase(struct song *s, unsigned tracks, uint32_t from, uint32_t to)
+{
+    if (from >= to || !in_range(s, tracks, from, to)) return -1;
+    clear(s, tracks, from, to);
+    return 0;
+}
+SONG_SMALL void song_grow(struct song *s, uint32_t to)
+{
+    while (!s->open && s->bars < SONG_MAX_BARS && song_bar_clock(s, s->bars) < to) ++s->bars;
+}
 SONG_SMALL int song_paste(struct song *s, const struct song_clip *clip, uint32_t at, unsigned track, unsigned insert)
 {
     unsigned single = clip->tracks && !(clip->tracks & (clip->tracks - 1U)), targets = single ? 1U << track : clip->tracks;
@@ -90,7 +100,10 @@ SONG_SMALL int song_paste(struct song *s, const struct song_clip *clip, uint32_t
     unsigned freed = insert ? 0 : in_range(s, targets, at, at + clip->length);
     if (s->events - freed + clip->count > SONG_EVENTS) return -1;
     if (insert) { if (song_insert_time(s, at, clip->length)) return -1; }
-    else clear(s, targets, at, at + clip->length);
+    else {
+        clear(s, targets, at, at + clip->length);
+        song_grow(s, at + clip->length);
+    }
     for (unsigned i = 0; i < clip->count; ++i) {
         struct song_event e = song_board_event(s, clip, i, at);
         (void)song_add_event(s, single ? track : clip->track[i], &e);
@@ -110,7 +123,10 @@ SONG_SMALL struct song_event song_board_event(struct song *s, const struct song_
 SONG_SMALL int song_duplicate(struct song *s, unsigned tracks, uint32_t *from, uint32_t *to)
 {
     uint32_t a = *from, b = *to, length = b - a;
-    if (a >= b || s->events + in_range(s, tracks, a, b) > SONG_EVENTS || song_insert_time(s, b, length)) return -1;
+    if (a >= b || b + length > SONG_MAX_CLOCK ||
+        s->events - in_range(s, tracks, b, b + length) + in_range(s, tracks, a, b) > SONG_EVENTS) return -1;
+    clear(s, tracks, b, b + length); /* over what follows, which stays where it is (0.5.5) */
+    song_grow(s, b + length);
     struct start_values v = {s, NULL, a, b, 0, 2};
     for (unsigned t = 0; t < SONG_TRACKS; ++t) {
         if (!(tracks >> t & 1U)) continue;

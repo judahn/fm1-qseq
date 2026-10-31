@@ -20,7 +20,7 @@ the metronome is on. The key lights work as described below.
 | | SEL | Markers, delete, open a clip, depending on the page. SHIFT+SEL switches REC between REPLACE and OVERDUB |
 | | ENV, LFO | Loop and metronome, picking, depending on the page |
 | | EDIT | Sound editing, as in the stock firmware. SHIFT+EDIT opens the edit jobs |
-| | GLO | Song settings. A hold is still the stock mixer |
+| | GLO | Song settings. A hold opens the stock mixer, which stays when GLO is let go. A GLO tap there goes back |
 | | HOME, SAVE | Leave to the stock overview, and the song list |
 | | ARP | The arpeggiator, as on the stock pages: a tap turns it on or off, a hold opens its settings. In step entry, the glitch layer's pages |
 | | SEQ | The song view, and from there the clip grid |
@@ -138,11 +138,10 @@ SHIFT plus a key:
 |---|---|
 | F3 | Copy the selection |
 | G3 | Cut |
-| A3 | Paste at the playhead, inserting (later bars move right) |
-| B3 | Paste at the playhead, over what's there |
-| C4 | Duplicate: paste right after the selection and move the selection onto the copy |
+| A3, B3 | Paste at the playhead, over what's there. Nothing after it moves |
+| C4 | Duplicate: paste right after the selection, over what's there, and move the selection onto the copy |
 | D4 | Insert empty bars the length of the selection |
-| E4 | Delete the selected bars (later bars move left) |
+| E4 | Delete the selection: the notes, clip blocks and automation that start in it, on the selected tracks only. Nothing moves, and the other tracks are left alone |
 | D#4 | Clear the clipboard, and the paste outline with it |
 | F#3 | Mangle: scramble the 16ths in the selection |
 | G#3 | Mangle: reverse the note order |
@@ -550,7 +549,7 @@ the whole take is one undo step. SEQ waits while a performance is armed or runni
 
 **By hand.** Copy a cell in the grid (SHIFT+F3), go to the song view, and paste with SHIFT+A3 or SHIFT+B3. The
 block lands at the playhead, the clip's length long, and becomes the selection. SHIFT+C4 (Duplicate) then
-extends it. Copy, paste, insert and delete bars carry blocks as they carry notes. A grid copy only pastes
+extends it. Copy, paste, delete and insert bars carry blocks as they carry notes. A grid copy only pastes
 as a block into the song it came from.
 
 **Expand.** The EXPAND CLIPS job turns the blocks starting in its range into plain notes on their tracks, so
