@@ -2,6 +2,20 @@
 
 The version is `FM1_QY_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.5.6
+
+- SEL is the select button. Hold it and tap F3 to F4 to pick tracks in the song view and the edit jobs, G4
+  for all, and in step entry hold it and turn PRESETS to sweep or tap keys to pick pitches. LFO did all of
+  this before. In the automation view a SEL press still deletes the change at the playhead, so tracks are
+  picked in the song view, and the picks carry over.
+- LFO adds and removes markers in the song view, as SEL did, the same way: stopped it adds one at the
+  playhead or removes the one there, playing it adds one at the nearest snap step. SHIFT+LFO still opens the
+  automation view.
+- In step entry ENV deletes the selected notes, which SEL did, and LFO back-deletes, which ENV did. A SEL tap
+  does nothing in the song view or step entry now, so SEL never has to wait for its release.
+- SEL in the grid still opens the clip, and SHIFT+SEL still switches REPLACE and OVERDUB. The bottom-line
+  hints follow: `SEL + F3-F4 TRACKS  G4 ALL`, `SEL: KEYS PICK  PRESETS SWEEPS` and `ENV DEL  LFO BACK DEL`.
+
 ## 0.5.5
 
 - SHIFT+E4 in the song view deletes what's selected: the notes, clip blocks and automation that start in the

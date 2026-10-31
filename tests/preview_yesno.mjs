@@ -109,7 +109,7 @@ export async function phaseYesNo(browser, root) {
     r.held(B.FX, () => r.tap(B.SAVE));             // the list again (0.5.1)
     r.tap(B.NO);                                   // nothing open: back to the song view
     o.noBack = r.page();
-    r.tap(B.SCL);                                  // SEL: a marker at the playhead, a change
+    r.tap(B.LFO);                                  // LFO: a marker at the playhead, a change
     o.changed = store(17);
     r.held(B.FX, () => r.tap(B.SAVE));
     r.turn(2, 1);

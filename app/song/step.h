@@ -45,7 +45,7 @@ int step_delete(struct song_step *st);
 int step_back_delete(struct song_step *st);
 void step_move(struct song_step *st, int steps);    /* by the step length */
 void step_jump(struct song_step *st, int direction); /* note to note */
-/* PRESETS with LFO held (0.5.0, K4 until 0.5.2): the pointer moves, by
+/* PRESETS with SEL held (0.5.0, K4 until 0.5.2, LFO until 0.5.6): the pointer moves, by
  * steps or note to note, and the selection runs from where the sweep began
  * (step_range.c). */
 void step_sweep(struct song_step *st, int steps, unsigned jump);

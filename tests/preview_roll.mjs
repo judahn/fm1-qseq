@@ -6,8 +6,8 @@
 // roll (4 bars, 2 bars, 1 bar, half a bar), named in the header, with bar,
 // beat and 16th or 32nd lines where they are 4 px apart, bar numbers at 2
 // and 4 bars, and notes 1 px short. ARP steps the glitch pages, where ALGO
-// still zooms. LFO and PRESETS sweep a selection, both ends in, keys toggle pitches in it,
-// VELOCITY changes it relatively, and SEL deletes it in one undo step.
+// still zooms. SEL and PRESETS sweep a selection, both ends in, keys toggle pitches in it,
+// VELOCITY changes it relatively, and ENV deletes it in one undo step (0.5.6, LFO and SEL before).
 // Saves docs/step-roll-2bars.png and docs/step-sweep.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
 
@@ -74,7 +74,7 @@ export async function phaseRoll(browser, root) {
     pl.playhead = green;
     render(60);
     pl.moved = info(8) > p0 + 100;
-    key(9); key(11); held(B.LFO, () => key(14));     // picking is no entry either
+    key(9); key(11); held(B.SCL, () => key(14));     // picking is no entry either
     pl.keys = info(0, 0) - before;
     held(B.FX, () => key(8));                       // SHIFT+C#: no rest while playing
     pl.rest = info(17) - pointer;
@@ -97,7 +97,7 @@ export async function phaseRoll(browser, root) {
     tk.ended = [pageNow(), info(29, 0, 0), info(7)];
     tap(B.PLAY);
     tk.back = info(8) - p0;
-    held(B.LFO, () => turn(6, 1));                  // nothing to do with the take: a sweep of one step
+    held(B.SCL, () => turn(6, 1));                  // nothing to do with the take: a sweep of one step
     turn(6, 3);                                     // and the pointer on, which ends the sweep
     const left = info(17);
     r.step();
@@ -128,7 +128,7 @@ export async function phaseRoll(browser, root) {
     const bar = info(17);
     const inBar = () => notes(0).filter(n => n.clock >= bar && n.clock < bar + 1920);
     sw.entered = inBar().length;
-    c.sim_control(0, B.LFO, 1);
+    c.sim_control(0, B.SCL, 1);
     turn(6, 15);                                    // the pointer on the bar's last 16th
     sw.all = [swept(), info(58, 0, 3) & 1, info(58, 0, 4) - bar];
     key(7);
@@ -141,11 +141,14 @@ export async function phaseRoll(browser, root) {
     render(4);
     o.sweepPng = r.png();
     sw.band = [at(60, 60), at(100, 60)];          /* the band over the first beats */
-    c.sim_control(0, B.LFO, 0);
+    c.sim_control(0, B.SCL, 0);
     const v0 = inBar().map(n => n.velocity);
     turn(3, 5);                                     // K2: VELOCITY on the C4s
     sw.velocity = inBar().map((n, i) => n.velocity - v0[i]).join();
-    tap(B.SCL);
+    const kept = inBar().length;
+    tap(B.SCL);                                     // a SEL tap: nothing, SEL selects (0.5.6)
+    sw.selTap = inBar().length - kept;
+    tap(B.ENV);
     sw.deleted = inBar().map(n => n.pitch).join();
     held(B.HOME, () => tap(B.SAVE));
     sw.undone = inBar().length;
@@ -198,14 +201,15 @@ export async function phaseRoll(browser, root) {
   t.eq('ARP on to off', q.glitch.off, 0);
   const s = q.sweep;
   t.eq('a bar of alternating 16ths entered', s.entered, 16);
-  t.eq('LFO and PRESETS sweep the bar: 16 notes, from where it began', s.all, [16, 1, 0]);
-  t.eq('LFO and C4 in the sweep: the C4s alone', s.c4, 8);
-  t.eq('LFO and E4: the E4s in too', s.both, 16);
-  t.eq('LFO and E4 again: out', s.again, 8);
+  t.eq('SEL and PRESETS sweep the bar: 16 notes, from where it began', s.all, [16, 1, 0]);
+  t.eq('SEL and C4 in the sweep: the C4s alone', s.c4, 8);
+  t.eq('SEL and E4: the E4s in too', s.both, 16);
+  t.eq('SEL and E4 again: out', s.again, 8);
   t.eq('the band shades the sweep, beats still alternating', s.band, [0x0884, 0x10a6]);
   t.eq('VELOCITY lifts the C4s by 5 and leaves the E4s', s.velocity, Array.from({ length: 16 }, (_, i) => (i % 2 ? 0 : 5)).join());
-  t.eq('SEL deletes the C4s', s.deleted, Array(8).fill(64).join());
+  t.eq('a SEL tap deletes nothing', s.selTap, 0);
+  t.eq('ENV deletes the C4s', s.deleted, Array(8).fill(64).join());
   t.eq('one undo brings them back', s.undone, 16);
-  t.eq('the pointer moved without LFO: no sweep', s.cleared, 0);
+  t.eq('the pointer moved without SEL: no sweep', s.cleared, 0);
   return { phase: 'roll', checks: t.list, out };
 }

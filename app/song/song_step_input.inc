@@ -5,9 +5,10 @@
  * length, F longest to E shortest, as K1 does turning right (0.5.1), and
  * the black ones are triplet, dots, rest, tie and repeat. PRESETS steers
  * the pointer, SHIFT+PRESETS note to note, and K4 is the pitch knob (0.5.2,
- * the other way round before). Holding LFO picks notes in a chord, and
+ * the other way round before). Holding SEL picks notes in a chord, and
  * turning PRESETS meanwhile sweeps a selection, where keys toggle pitches
- * (0.5.0). In chord mode the roots enter their chords, F4 to E5 pick the
+ * (0.5.0, LFO until 0.5.6). ENV deletes the selected notes and LFO
+ * back-deletes (0.5.6, SEL and ENV before). In chord mode the roots enter their chords, F4 to E5 pick the
  * type, and F5 to G5 enter the last chord again, an octave down and an
  * octave up (song_chord_keys). PLAY plays from the pointer's bar and stays
  * here, and while it plays the keys only sound. REC records a take here as
@@ -98,7 +99,7 @@ static void step_shift_key(struct song_step *st, unsigned name, unsigned playing
 static int song_step_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
 {
     struct song_step *st = song_port_step();
-    unsigned shift = (c->buttons & BUTTON(FX)) != 0, picking = (c->buttons & BUTTON(LFO)) != 0;
+    unsigned shift = (c->buttons & BUTTON(FX)) != 0, picking = (c->buttons & BUTTON(SCL)) != 0;
     unsigned playing = song_port_player()->playing, taking = song_port_recording() != 0;
     if (st->track != track && !taking) { step_begin(st, track, st->pointer); step_held = 0; } /* the record settings' SELECT */
     if (*pressed & BUTTON(REC)) { /* a take ends as REC goes down, SHIFT+REC leaves, a tap records (song_rec_held) */
@@ -122,8 +123,8 @@ static int song_step_input(const struct fm1_controls *c, uint32_t *pressed, uint
         step_held = 0;
         return 1;
     }
-    if (*pressed & BUTTON(SCL)) step_refused(step_delete(st), now);
-    if (*pressed & BUTTON(ENV)) step_back_delete(st);
+    if (*pressed & BUTTON(ENV)) step_refused(step_delete(st), now);
+    if (*pressed & BUTTON(LFO)) step_back_delete(st);
     if (*pressed & BUTTON(ARP)) song_glitch_layer = (uint8_t)((song_glitch_layer + 1U) % 4U); /* pages 1 to 3, then off */
     *pressed &= ~(BUTTON(PLAY) | BUTTON(FX) | BUTTON(SCL) | BUTTON(ENV) | BUTTON(LFO) | BUTTON(ARP));
     if (*pressed & (BUTTON(HOME) | BUTTON(EDIT) | BUTTON(GLO) | BUTTON(SAVE))) { step_preview_stop(st); return 0; }
@@ -143,7 +144,7 @@ static int song_step_input(const struct fm1_controls *c, uint32_t *pressed, uint
         if (c->encoders[3]) step_refused(step_set_velocity(st, c->encoders[3]), now);
         if (c->encoders[4]) step_refused(step_set_gate(st, c->encoders[4]), now);
     }
-    if (c->encoders[6]) { /* PRESETS, the pointer (0.5.2): with LFO held, a sweep */
+    if (c->encoders[6]) { /* PRESETS, the pointer (0.5.2): with SEL held, a sweep */
         if (picking) step_sweep(st, c->encoders[6], shift);
         else if (shift) step_jump(st, c->encoders[6] > 0 ? 1 : -1);
         else step_move(st, c->encoders[6]);

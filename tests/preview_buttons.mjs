@@ -30,9 +30,9 @@ export async function phaseButtons(browser, root) {
     o.saved = info(38, 0, 0) - songs;
     r.tap(B.HOME);
     o.back = r.page();
-    // The combos, after an edit (SEL: the marker at the playhead goes).
+    // The combos, after an edit (LFO: the marker at the playhead goes).
     const combo = {}, base = markers();
-    r.tap(B.SCL);
+    r.tap(B.LFO);
     combo.edited = markers() - base;
     combo.homeFirst = steps([[B.HOME, 1], [B.SAVE, 1], [B.SAVE, 0], [B.HOME, 0]]);
     combo.afterUndo = markers() - base;
@@ -126,7 +126,7 @@ export async function phaseButtons(browser, root) {
   t.eq('undone again', cb.afterUndo2, 0);
   t.yes('SHIFT+HOME+SAVE, HOME first: no list, the song view', !cb.redoHomeFirst.includes(25) && cb.redoHomeFirst.at(-1) === 19, cb.redoHomeFirst);
   t.eq('redone again', cb.afterRedo2, cb.edited);
-  t.eq('the edit undone and redone: SEL removed the marker at the top', cb.edited, -1);
+  t.eq('the edit undone and redone: LFO removed the marker at the top', cb.edited, -1);
   t.yes('on the grid, SAVE first: no list, back on the grid', !cb.grid.includes(25) && cb.grid.at(-1) === 27, cb.grid);
   t.eq('and undone', cb.afterGrid, 0);
   t.eq('FX tapped in the song view: the effects page', fx.songView, 10);

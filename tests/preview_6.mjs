@@ -148,7 +148,7 @@ export async function phase6(browser, root) {
     const plain = rig(), baked = rig();
     setup(plain); setup(baked);
     o.glitched = plain.notes(0).filter(n => n.glitch).length;
-    o.normalizeShown = baked.job(18, () => baked.held(B.LFO, () => baked.key(14))); // all tracks
+    o.normalizeShown = baked.job(18, () => baked.held(B.SCL, () => baked.key(14))); // all tracks
     o.normalizePng = baked.png();
     baked.tap(B.HOME);
     o.bakedClean = [0, 1, 2, 3, 4, 5, 6, 7].every(t => baked.notes(t).every(n => !n.glitch)) &&

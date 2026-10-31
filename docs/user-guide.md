@@ -17,8 +17,8 @@ the metronome is on. The key lights work as described below.
 | Control | Name in this guide | In song mode |
 |---|---|---|
 | Buttons | FX | SHIFT on every song page while held. A tap opens the effects page from the song view, the grid, the automation view and the settings |
-| | SEL | Markers, delete, open a clip, depending on the page. SHIFT+SEL switches REC between REPLACE and OVERDUB |
-| | ENV, LFO | Loop and metronome, picking, depending on the page |
+| | SEL | Held, it selects: tracks in the song view and the edit jobs, notes in step entry. A tap opens a clip in the grid and deletes a change in the automation view. SHIFT+SEL switches REC between REPLACE and OVERDUB |
+| | ENV, LFO | Loop and markers in the song view, delete and back-delete in step entry. SHIFT+ENV is the metronome, SHIFT+LFO the automation view |
 | | EDIT | Sound editing, as in the stock firmware. SHIFT+EDIT opens the edit jobs |
 | | GLO | Song settings. A hold opens the stock mixer, which stays when GLO is let go. A GLO tap there goes back |
 | | HOME, SAVE | Leave to the stock overview, and the song list |
@@ -101,15 +101,15 @@ once when stopped or with the launch quantize off.
 | K4 | Loop end |
 | ENV | Loop on or off |
 | SHIFT+ENV | Metronome: off, on, or only while recording |
-| SEL | Stopped: add a marker at the playhead, or remove the one already there. Playing: add one at the nearest snap step |
+| LFO | Stopped: add a marker at the playhead, or remove the one already there. Playing: add one at the nearest snap step |
 | SHIFT+SEL | REC's mode: REPLACE or OVERDUB (from PUNCH or LOOP, OVERDUB) |
 | SHIFT+LFO | The automation view |
 | SHIFT+EDIT | The edit jobs |
-| Hold LFO, tap F3 to F4 | Add or remove tracks 1 to 8 from the selection |
-| Hold LFO, tap G4 | All tracks, or back to just the current one |
+| Hold SEL, tap F3 to F4 | Add or remove tracks 1 to 8 from the selection |
+| Hold SEL, tap G4 | All tracks, or back to just the current one |
 
 New markers are named M1, M2 and so on, taking the first free number, 16 at most. To remove one, go to it
-with SHIFT+PRESETS, which lands on it exactly, and press SEL. Removing only happens while stopped. HOME+SAVE
+with SHIFT+PRESETS, which lands on it exactly, and press LFO. Removing only happens while stopped. HOME+SAVE
 brings a removed marker back.
 
 **Tempo.** K1 changes the tempo in effect at the playhead, the number in the header. Before the song's first
@@ -240,10 +240,10 @@ time signature and, at the right, the span ALGO has zoomed to.
 | K3 | Gate: 50, 90, 99 or 100% |
 | K4 | Pitch: move the selected notes by scale step, by octave with SHIFT. On drum tracks, from pad to pad. The footer says PITCH, OCTAVE or PAD |
 | PRESETS | Move the pointer one step. SHIFT+PRESETS jumps note to note |
-| Hold LFO, turn PRESETS | Sweep a selection (below) |
-| SEL | Delete the selected notes |
-| ENV | Back-delete: move back one step and delete there |
-| Hold LFO, tap keys | Pick which notes at the pointer K1 to K3 and delete act on. In a sweep, pick pitches in it |
+| Hold SEL, turn PRESETS | Sweep a selection (below) |
+| ENV | Delete the selected notes |
+| LFO | Back-delete: move back one step and delete there |
+| Hold SEL, tap keys | Pick which notes at the pointer K1 to K3 and delete act on. In a sweep, pick pitches in it |
 | ALGO | Zoom the roll: 4 bars, 2 bars, 1 bar or half a bar |
 | ARP | The glitch layer's pages: 1, 2, 3, then off (below) |
 | PLAY | Play from the start of the pointer's bar, staying here. PLAY again stops back at that bar |
@@ -270,7 +270,7 @@ short, so two in a row on one pitch read as two.
 **Playing.** PLAY plays from the start of the pointer's bar and stays in step entry: the song, or in a clip
 the clip with the grid's launched clips, as the clip editor plays it. A green playhead runs across the roll,
 which turns its pages to follow it, and the header says PLAY. While it plays the keys only sound: nothing is
-entered, SHIFT still sets the length, triplet and dots, and rest, tie and repeat wait for a stop. SEL, the
+entered, SHIFT still sets the length, triplet and dots, and rest, tie and repeat wait for a stop. ENV, the
 knobs and the pitch knob still edit. PLAY again stops, back at the pointer's bar, the start point (Song view),
 with the pointer where it was.
 
@@ -284,22 +284,22 @@ automation view, the clip editor or the grid. Stopped, the playhead follows the 
 next. Playing goes on: in the song view the song plays on, and in the grid the clip stays launched. Leaving
 ends a sweep.
 
-**Sweeping a selection.** Hold LFO and turn PRESETS: the pointer moves as usual, and the selection becomes every
+**Sweeping a selection.** Hold SEL and turn PRESETS: the pointer moves as usual, and the selection becomes every
 note that starts from where the sweep began to the pointer, both included, at every pitch. A lighter band
-shows the range, the selected notes are white, and the SEL line counts them, for example `16 NOTES`. With LFO
+shows the range, the selected notes are white, and the SEL line counts them, for example `16 NOTES`. With SEL
 still held, a key picks its pitch alone, and later keys toggle theirs in or out, across the whole range. On
 a drum track that picks one pad, every hi-hat in two bars, say. Then:
 
 | Control | On a sweep |
 |---|---|
-| SEL | Delete every selected note |
+| ENV | Delete every selected note |
 | K2 | Velocity, by the same amount for every note, so accents stay |
 | K1, K3 | Length and gate: each note's length scales as the entry's does, 1/16 to 1/8 doubling them |
 | Glitch layer K1 to K3 | That field on every note |
 | K4 | Move every note, by scale step, octave or pad. A note whose new pitch is taken at its clock stays |
 
 Each is one undo step. A change undo couldn't hold (about 630 notes on the device) is refused with a notice,
-and nothing changes. The sweep ends when the pointer moves without LFO, a note goes in, or step entry is left.
+and nothing changes. The sweep ends when the pointer moves without SEL, a note goes in, or step entry is left.
 
 The glitch layer gives each new or selected note glitch attributes. ARP steps through its three pages and
 back off, and ALGO still zooms, PRESETS moves the pointer and K4 the pitch:
@@ -396,7 +396,7 @@ SHIFT+EDIT in the song view. K1 picks the job. K2 to K4 set its settings, ALGO t
 SHIFT moves a setting by ten. YES (OCT+) asks first, with how many events the job takes on
 (`QUANTIZE 120 EVENTS?`), and says when it is too big to undo. YES again runs it as one undo step. NO cancels
 the question, and so does changing the job, a setting, the track or the picked tracks. With no question open
-NO goes back to the song view, as HOME and EDIT do. SAVE opens the song list. PLAY plays. Hold LFO and tap keys to
+NO goes back to the song view, as HOME and EDIT do. SAVE opens the song list. PLAY plays. Hold SEL and tap keys to
 pick tracks, as in the song view. RANGE is the selection or the whole song.
 
 Jobs: QUANTIZE, VELOCITY, CRESCENDO, GATE TIME, TRANSPOSE, FIT TO SCALE, SHIFT CLOCK, CHORD SORT, STRUM,

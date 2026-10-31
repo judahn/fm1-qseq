@@ -86,7 +86,7 @@ export async function phase2(browser, root) {
     const p1 = r.info(17), count = r.info(0, 0);
     r.key(8);
     o.snapped = { added: r.info(0, 0) - count, at: r.info(1, 0, count) - p1, pitch: r.info(2, 0, count) };
-    r.tap(B.ENV);                                  // back-delete removes it again
+    r.tap(B.LFO);                                  // LFO back-deletes it again (ENV until 0.5.6)
     o.backDeleted = { added: r.info(0, 0) - count, pointer: r.info(17) - p1 };
     r.step();
     r.held(B.FX, () => r.tap(B.GLO));

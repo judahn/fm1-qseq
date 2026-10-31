@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* Step entry's swept selection (0.5.0). Holding LFO and turning PRESETS moves
+/* Step entry's swept selection (0.5.0). Holding SEL and turning PRESETS moves
  * the pointer from an anchor, and the selection becomes every note that
  * starts from the anchor to the pointer, both included (a bar swept ends
  * with the pointer on its last step, in the span shown), at every pitch
- * until keys pick some (step_pick). SEL, the knobs and glitch then change all of it,
+ * until keys pick some (step_pick). ENV, the knobs and glitch then change all of it,
  * each change one undo step. A change undo couldn't hold is refused whole:
  * the edit jobs reckon 24 bytes a note and 512 to spare, and a glitch
  * table change adds the maps. See step.h. */

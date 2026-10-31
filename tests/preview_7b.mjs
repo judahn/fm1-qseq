@@ -97,7 +97,7 @@ export async function phase7b(browser, root) {
     held(B.FX, () => tap(B.EDIT));
     o.jobPage = pageNow();
     turn(2, 40);                                    // the last job
-    held(B.LFO, () => key(14));                     // all tracks
+    held(B.SCL, () => key(14));                     // all tracks
     turn(3, 1);                                     // the whole song
     o.jobKnobs = r.knobs();
     tap(B.YES); render(2); tap(B.YES);

@@ -240,7 +240,7 @@ function knobRun() {
   n.turn(2, -127); n.turn(2, -127); n.turn(2, -127); tp.bottom = tempo();
   n.turn(2, 100);
   const marks = info(12);
-  n.tap(B.SCL);                                     // SEL: a marker step before the run of turns
+  n.tap(B.LFO);                                     // LFO: a marker step before the run of turns
   n.turn(2, 1); n.turn(2, 1); n.held(B.HOME, () => n.tap(B.SAVE));
   tp.undone = [tempo(), info(12) !== marks];        /* the run undone in one step, the marker left */
   n.held(B.HOME, () => n.tap(B.SAVE)); tp.undone.push(info(12) - marks);
@@ -337,8 +337,8 @@ function knobRun() {
   n.turn(5, 1); st.k4 = pitchAt(p0);
   shifted(() => n.turn(5, 1)); st.octave = pitchAt(p0);
   shifted(() => n.turn(6, 1)); st.jumped = info(17) - p0;
-  c.sim_control(0, B.LFO, 1); n.turn(6, -1); st.sweep = [info(58, 0, 3) & 1, info(58, 0, 5)];
-  n.turn(5, 1); c.sim_control(0, B.LFO, 0);
+  c.sim_control(0, B.SCL, 1); n.turn(6, -1); st.sweep = [info(58, 0, 3) & 1, info(58, 0, 5)];
+  n.turn(5, 1); c.sim_control(0, B.SCL, 0);
   st.swept = [pitchAt(p0), pitchAt(p0 + 120)];
   n.turn(0, 7); st.drums = knobs()[3];
   n.step();
@@ -404,7 +404,7 @@ function knobChecks(t, k) {
   t.eq('K4 moves the note up a step', st.k4, 61);
   t.eq('SHIFT+K4 an octave', st.octave, 73);
   t.eq('SHIFT+PRESETS jumps to the next note', st.jumped, 120);
-  t.eq('LFO+PRESETS sweeps both notes', st.sweep, [1, 2]);
+  t.eq('SEL+PRESETS sweeps both notes', st.sweep, [1, 2]);
   t.eq('K4 moves every swept note', st.swept, [74, 65]);
   t.eq('on the 808 K4 reads PAD', st.drums, 'PAD < >');
 }

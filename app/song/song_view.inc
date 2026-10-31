@@ -294,7 +294,7 @@ static void song_draw(void)
         if (picked >> t & 1U) { strcat(selection, " T"); decimal(part, (int)t + 1, 1); strcat(selection, part); }
     const char *hint = notice ? notice : song_now.jumping ? "JUMP WAITS FOR THE NEXT BAR"
         : song_now.shift ? "F3-E4 EDIT  F#-A# MANGLE  PRESETS MARK" /* 38 characters, as wide as the line */
-        : (previous_buttons & BUTTON(LFO)) ? "LFO + F3-F4 TRACKS  G4 ALL" : selection;
+        : (previous_buttons & BUTTON(SCL)) && !s->open ? "SEL + F3-F4 TRACKS  G4 ALL" : selection;
     if (hint == selection) song_hint_mode(selection);
     else song_hint(hint);
 }

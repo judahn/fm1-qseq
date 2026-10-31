@@ -107,25 +107,26 @@ export async function phase1(browser, root) {
     controls.clockAfterJump = r.info(8);
     r.tap(B.PLAY);
     controls.balancedAfterStop = r.balanced(r.heard());
-    // SEL toggles a marker while stopped: on marker 2 (GROOVE, bar 3) it
-    // removes it and HOME+SAVE undoes that. Removed again, SEL adds M1 there,
-    // the first free name. Playing from there, SEL adds one at the nearest bar
-    // line (zoomed out, the snap is a bar) and leaves bar 3's alone, and SEL
+    // LFO toggles a marker while stopped (SEL until 0.5.6): on marker 2 (GROOVE, bar 3) it
+    // removes it and HOME+SAVE undoes that. Removed again, LFO adds M1 there,
+    // the first free name. Playing from there, LFO adds one at the nearest bar
+    // line (zoomed out, the snap is a bar) and leaves bar 3's alone, and LFO
     // again on that spot adds nothing.
     const marks = () => Array.from({ length: r.info(12) }, (_, i) => r.info(13, 0, i));
     const markName = i => String.fromCharCode(...[0, 8, 16, 24].map(b => r.info(13, 1, i) >>> b & 255).filter(Boolean));
     const toggle = {};
     r.held(B.FX, () => r.key(KEY_G4));             // G4: marker 2
     toggle.before = marks();
-    r.tap(B.SCL); toggle.removed = marks();
+    r.tap(B.LFO); toggle.removed = marks();
     r.held(B.HOME, () => r.tap(B.SAVE)); toggle.undone = marks();
-    r.tap(B.SCL); r.tap(B.SCL); toggle.added = marks();
+    r.tap(B.LFO); r.tap(B.LFO); toggle.added = marks();
     toggle.addedName = markName(1);
     r.tap(B.PLAY); r.render(600);
     toggle.clock = r.info(8);
-    r.tap(B.SCL); toggle.whilePlaying = marks();
+    r.tap(B.LFO); toggle.whilePlaying = marks();
     toggle.playedName = markName(2);
-    r.tap(B.SCL); toggle.again = marks();
+    r.tap(B.LFO); toggle.again = marks();
+    r.tap(B.SCL); toggle.selTap = marks();         // SEL alone, a tap: no markers now (0.5.6)
     r.tap(B.PLAY);
     controls.toggle = toggle;
     // SEQ: the song view to the clip grid and back (phase 7). The stock sync
@@ -158,12 +159,13 @@ export async function phase1(browser, root) {
   t.eq('PRESETS moves by the snap (an 8th zoomed in)', k.afterK1, loopStart + 240);
   t.eq('SHIFT+PRESETS goes to the next marker', k.afterShiftK1, 6 * 1920);
   const g = k.toggle, nearest = Math.round(g.clock / 1920 - 0.001) * 1920;
-  t.eq('SEL on a marker, stopped, removes it', g.removed, g.before.filter(c => c !== 2 * 1920));
+  t.eq('LFO on a marker, stopped, removes it', g.removed, g.before.filter(c => c !== 2 * 1920));
   t.eq('HOME+SAVE brings a removed marker back', g.undone, g.before);
-  t.eq('SEL off a marker adds one there, named M1', [g.added, g.addedName], [g.before, 'M1']);
-  t.eq('SEL while playing adds at the nearest bar line, named M2', [g.whilePlaying, g.playedName],
+  t.eq('LFO off a marker adds one there, named M1', [g.added, g.addedName], [g.before, 'M1']);
+  t.eq('LFO while playing adds at the nearest bar line, named M2', [g.whilePlaying, g.playedName],
     [[...g.added, nearest].sort((a, b) => a - b), 'M2']);
-  t.eq('SEL while playing never removes', g.again, g.whilePlaying);
+  t.eq('LFO while playing never removes', g.again, g.whilePlaying);
+  t.eq('a SEL tap leaves the markers alone, since SEL selects (0.5.6)', g.selTap, g.again);
   t.eq('K3 and K4 move the loop edges by snap', k.loopEdges, [loopStart - 240, loopEnd + 480]);
   t.yes('a jump asked for while playing waits', k.pendingAfterRequest);
   t.yes('the jump lands on the bar line', k.atBreak.length > 0 && JSON.stringify(k.inBlock) === JSON.stringify(k.atBreak),

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* song-mode: the selection and arranging in the song view (design 6a). The
  * loop region is the selection. It covers the current track and follows it,
- * until tracks are picked by hand: hold LFO and tap F3 to F4 for tracks 1
+ * until tracks are picked by hand: hold SEL and tap F3 to F4 for tracks 1
  * to 8, G4 for all (again for just the current one). SHIFT plus the lower
  * white keys copy, cut, paste (A3 and B3 both, over what's there),
  * duplicate, insert bars and delete the selection, and SHIFT+D#4 clears
@@ -110,7 +110,7 @@ static void song_undo_key(uint32_t buttons, uint32_t now)
     else { notice = redo ? "REDONE" : "UNDONE"; song_port_recorder()->taken = 0; } /* the take can't be requantized now */
     notice_until = now + 1500U;
 }
-/* SCL, stopped: removes the markers at the playhead (SHIFT+PRESETS lands
+/* LFO (SEL until 0.5.6), stopped: removes the markers at the playhead (SHIFT+PRESETS lands
  * on one exactly), or drops one there. Playing: drops one at the snap step
  * nearest where the song is, and never removes. A new one takes the first
  * free name of M1 to M16. */

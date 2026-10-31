@@ -30,10 +30,10 @@ export async function phase3(browser, root) {
     r.render(32);
     r.tap(B.SEQ);
 
-    // 1. Selection: LFO + G3 adds track 2, K4 pulls the loop end in to bars
+    // 1. Selection: SEL + G3 adds track 2, K4 pulls the loop end in to bars
     // 3 and 4. SHIFT+F3 copies, PRESETS moves to bar 5, SHIFT+A3 pastes over
     // what's there, and nothing later moves (0.5.5).
-    r.held(B.LFO, () => r.key(2));
+    r.held(B.SCL, () => r.key(2));
     r.turn(5, -2);
     a.loop = [info(14), info(15)];
     const original = song(), [from, to] = a.loop;
@@ -72,7 +72,7 @@ export async function phase3(browser, root) {
     undoKey(0);
     const back = song(); back.tracks = back.tracks.map(byClock);
     a.deleteUndoOk = same(back, pasted);
-    r.tap(B.SCL);                                  // a marker at the playhead, then undo it
+    r.tap(B.LFO);                                  // a marker at the playhead, then undo it
     a.markersAdded = info(12) - pasted.markers.length;
     undoKey(0);
     a.markersAfterUndo = info(12) - pasted.markers.length;
@@ -192,7 +192,7 @@ export async function phase3(browser, root) {
   savePng(root, 'phase3-recording', out.take, 'recordingPng');
   await page.close();
   const k = checker('3'), { arrange: a, take: t, loopTake: l } = out;
-  k.eq('LFO+G3 and K3: the selection is bars 3 and 4', a.loop, [3840, 7680]);
+  k.eq('SEL+G3 and K4: the selection is bars 3 and 4', a.loop, [3840, 7680]);
   k.eq('SHIFT+F3 copies the selection on two tracks', a.clip, [3840, 3]);
   k.eq('PRESETS moves the playhead to bar 5', a.playhead, 7680);
   k.yes('SHIFT+A3 pastes over at bar 5, nothing later moving', a.pasteOk, a.pasteDiff);
@@ -205,7 +205,7 @@ export async function phase3(browser, root) {
   k.eq('SHIFT+E4 deletes the selection on tracks 1 and 2 alone, nothing moving',
     a.deleted, { end: 0, tempo: 0, markers: 0, tracks: true });
   k.yes('undo puts the deleted notes back', a.deleteUndoOk);
-  k.eq('SEL adds a marker', a.markersAdded, 1);
+  k.eq('LFO adds a marker', a.markersAdded, 1);
   k.eq('undo takes the marker back', a.markersAfterUndo, 0);
   k.eq('REC held opens the record settings', t.chooserPage, 23);
   k.eq('record settings: overdub, a bar of count-in, 1/16 at 100%, metronome while recording', t.settings, [2, 1, 5, 100, 2]);

@@ -118,7 +118,7 @@ static void song_step_draw(void)
         if (cache->seq_cache != 0x57e9U + step_now.take) {
             cache->seq_cache = 0x57e9U + step_now.take;
             paint_fill(0, 168, 240, 24, BACK);
-            text(8, 170, step_now.take ? "ALGO ZOOM  K1-K4 RECORD THEIR LANES" : "SEL DEL  ENV BACK DEL  ALGO ZOOM", 1, DIM, BACK);
+            text(8, 170, step_now.take ? "ALGO ZOOM  K1-K4 RECORD THEIR LANES" : "ENV DEL  LFO BACK DEL  ALGO ZOOM", 1, DIM, BACK);
             if (!step_now.take) text(8, 181, "SHIFT+ C# REST  D# TIE  A# REPEAT", 1, DIM, BACK);
         }
     }
@@ -129,7 +129,7 @@ static void song_step_draw(void)
         song_hint(notice ? notice : step_take_hint());
         return;
     }
-    unsigned shift = (previous_buttons & BUTTON(FX)) != 0, picking = (previous_buttons & BUTTON(LFO)) != 0;
+    unsigned shift = (previous_buttons & BUTTON(FX)) != 0, picking = (previous_buttons & BUTTON(SCL)) != 0;
     char length[8], velocity[12], gate[8];
     step_length_name(st, length);
     if (st->random_level) { strcpy(velocity, "R1"); velocity[1] = (char)('0' + st->random_level); }
@@ -154,7 +154,7 @@ static void song_step_draw(void)
     if (song_glitch_layer == 1) strcpy(page_hint, "GLITCH 1/3  SHIFT+K2 SCALE  ARP NEXT");
     uint32_t from, to;
     const char *hint = notice ? notice : song_glitch_layer ? page_hint : shift ? "SHIFT: F-E LENGTH  F# TRIP  G# DOT"
-        : picking ? step_range(st, &from, &to) ? "LFO: KEYS TOGGLE PITCHES IN THE SWEEP" : "LFO: KEYS PICK  PRESETS SWEEPS"
+        : picking ? step_range(st, &from, &to) ? "SEL: KEYS TOGGLE PITCHES IN THE SWEEP" : "SEL: KEYS PICK  PRESETS SWEEPS"
         : step_clock != ~0U ? "PLAYING: KEYS ONLY SOUND  PLAY STOPS" : "SHIFT+REC LEAVES  PRESETS MOVES";
     song_hint(hint);
 }

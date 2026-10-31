@@ -52,8 +52,8 @@ static void song_job_draw(void)
         else knob(k + 1U, "-", "", colors[k + 1U]);
     }
     song_notice_expire();
-    const char *hint = notice ? notice : (previous_buttons & BUTTON(LFO)) ? "LFO + F3-F4 TRACKS  G4 ALL"
-        : song_asking() ? "OCT+ RUN IT   OCT- CANCEL" : d->count > 3 ? "OCT+ RUN  ALGO MORE  HOME BACK" : "OCT+ RUN  HOME BACK  LFO TRACKS";
+    const char *hint = notice ? notice : (previous_buttons & BUTTON(SCL)) ? "SEL + F3-F4 TRACKS  G4 ALL"
+        : song_asking() ? "OCT+ RUN IT   OCT- CANCEL" : d->count > 3 ? "OCT+ RUN  ALGO MORE  HOME BACK" : "OCT+ RUN  HOME BACK  SEL TRACKS";
     song_hint(hint);
 }
 
@@ -175,10 +175,10 @@ static int song_job_input(const struct fm1_controls *c, uint32_t *pressed, uint3
         song_job_value[song_job][p] = (int16_t)clamp(song_job_value[song_job][p] + c->encoders[3 + k] * (shift ? 10 : 1),
                                                      q->low, high);
     }
-    unsigned picked = (c->buttons & BUTTON(LFO)) && (key_down & ~blocked_keys);
+    unsigned picked = (c->buttons & BUTTON(SCL)) && (key_down & ~blocked_keys); /* SEL held picks tracks (0.5.6, LFO before) */
     if (song_job != before || picked || c->encoders[0] || c->encoders[1] || c->encoders[3] || c->encoders[4] || c->encoders[5])
         song_ask_close(); /* the job, a setting or the range changed */
-    if (c->buttons & BUTTON(LFO)) { song_pick_tracks(key_down & ~blocked_keys); blocked_keys |= key_down; }
+    if (c->buttons & BUTTON(SCL)) { song_pick_tracks(key_down & ~blocked_keys); blocked_keys |= key_down; }
     if (answer > 0) song_job_yes(now);
     return 1;
 }

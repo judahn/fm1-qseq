@@ -74,9 +74,9 @@ QY70's function keys:
 | Button | Action |
 |---|---|
 | FX | SHIFT |
-| SEL | Delete the selected notes at the pointer |
+| SEL | Held, it selects (0.5.6): keys pick which notes at the pointer to edit, PRESETS sweeps. Until 0.5.6 a tap deleted the selected notes, now ENV's job, and LFO back-deletes |
 | ENV | Back-delete: move back one length and delete there |
-| LFO | SELECT: hold it and press keys to choose which notes at the pointer to edit |
+| LFO | Back-delete (0.5.6). Until then, held, it picked notes, SEL's job now |
 
 **Rest and tie on keys.** The FM-1 has 27 keys, two more than the QY70's 25. In step mode all 27 enter notes,
 and the functions sit on SHIFT plus a key, by the key's note name in any octave (Judah, 10/28). The first plan
@@ -103,7 +103,7 @@ glitch layer's pages (0.5.0, below).
 
 **Editing what's there.** The pointer is the selection. When it lands on existing notes, they're selected
 (the whole chord by default), and K1, K2 and K3 change their length, velocity and gate in place. On an empty
-position the same knobs set the values for the next note entered. To narrow a chord, hold SELECT (LFO) and
+position the same knobs set the values for the next note entered. To narrow a chord, hold SEL (LFO until 0.5.6) and
 press the keys of the notes you want. Delete removes whatever is selected. Range edits across many bars, like
 softening a whole hi-hat part, belonged to the edit jobs in phase 6, and since 0.5.0 a sweep does them in
 step entry too (below).
@@ -153,9 +153,9 @@ acceleration, so a turn always moves by exactly one snap step. Long jumps use ma
 by bars. Step mode is separate: its pointer moves by the note length.
 | SELECT | Track |
 | FX | SHIFT |
-| SEL | Stopped: add a marker at the playhead, or remove the one there. Playing: add one at the nearest snap step, never remove |
+| SEL | Held, it picks tracks (0.5.6, LFO's job before). A tap does nothing. Until 0.5.6 it was the marker key, LFO's job now |
 | ENV | Loop on or off. With SHIFT, metronome |
-| LFO | SELECT: hold and tap track keys to choose which tracks the selection covers (6a). With SHIFT, automation view on or off |
+| LFO | Stopped: add a marker at the playhead, or remove the one there. Playing: add one at the nearest snap step, never remove (0.5.6, SEL before). With SHIFT, automation view on or off |
 | SHIFT + upper white keys F4 to G5 | Jump to markers 1 to 9 |
 
 **Screen:** tracks as rows, bars across, notes as small marks, markers as flags along the top, and the loop
@@ -169,7 +169,7 @@ Two shortcuts make selecting quick:
   Turning further adds the next section.
 - The selection shows as a shaded band across the timeline, with its length in bars.
 
-**Which tracks** (Judah's scheme, 10/27). The selection starts as the track you're on. Hold SELECT (LFO) and:
+**Which tracks** (Judah's scheme, 10/27). The selection starts as the track you're on. Hold SEL (LFO until 0.5.6) and:
 - Tap a track key to add or remove that track. The first 8 white keys, F3 to F4, are tracks 1 to 8.
 - Tap the 9th white key, G4, for all tracks. If all tracks are already selected, it goes back to just the
   track you're on, like a select-all checkbox.
@@ -214,7 +214,7 @@ QY's ENTER. The question says how many events the job takes on, and warns when i
 goes back, SAVE saves the song, PLAY plays, and HOME+SAVE undoes as everywhere. Every job is one undo step.
 
 **Range.** Most jobs start with RANGE: the selection (the loop region on the 6a tracks, picked here too by
-holding LFO and tapping F3 to G4) or the whole song. The screen always shows it as bars and tracks. Copy,
+holding SEL and tapping F3 to G4, LFO until 0.5.6) or the whole song. The screen always shows it as bars and tracks. Copy,
 merge, clear and normalize work on whole tracks. An event belongs to the range by its start.
 
 | Job | What it does |
@@ -584,8 +584,8 @@ Clip events come out of the song's shared event pool, and a block costs a few by
   from the start of the song or clip. The dashes follow (8ths, 16ths, 32nds or 64ths, at least 2 px), bar
   numbers sit over the roll at 2 and 4 bars, and lines mark bars, beats and 16ths (32nds at half a bar), each
   level only where its lines are 4 px apart. Notes are drawn 1 px short.
-- A sweep (LFO held, K4 turned) selects every note from where it began to the pointer, both ends in, at every
-  pitch. Keys with LFO then pick and toggle pitches across it. SEL, velocity (relative), length and gate
+- A sweep (SEL held since 0.5.6, LFO before, and PRESETS turned, K4 until 0.5.2) selects every note from where it began to the pointer, both ends in, at every
+  pitch. Keys with SEL held then pick and toggle pitches across it. ENV (SEL until 0.5.6), velocity (relative), length and gate
   (scaled as the entry's length is), glitch and the pitch knob act on all of it as one undo step each, and a
   change too big for undo is refused, reckoned as the edit jobs do (24 bytes a note, 512 to spare) plus the
   maps. The glitch layer's pages moved from ALGO to ARP.
@@ -604,7 +604,7 @@ Clip events come out of the song's shared event pool, and a block costs a few by
 **The knobs on the song pages, as built in 0.5.2** (Judah, 10/30):
 - PRESETS and ALGO, side by side, are where you are and how wide you see on every page with a playhead:
   PRESETS moves the playhead in the song view, the clip editor and the automation view (SHIFT marker to
-  marker, or change to change), and the pointer in step entry (SHIFT note to note, LFO held a sweep). ALGO
+  marker, or change to change), and the pointer in step entry (SHIFT note to note, SEL held a sweep). ALGO
   zooms, with the span and snap in a notice now that the footer doesn't show them. During a take PRESETS does
   nothing.
 - The K row: TEMPO, QUANTIZE, LOOP IN and LOOP OUT (CLIP END in the clip editor), and in the automation view

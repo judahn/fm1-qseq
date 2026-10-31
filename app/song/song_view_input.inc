@@ -27,7 +27,7 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
     struct song *s = song_port_song();
     struct song_player *p = song_port_player();
     unsigned shift = (c->buttons & BUTTON(FX)) != 0, clip = s->open != 0; /* a clip in the editor: no markers */
-    unsigned picking = (c->buttons & BUTTON(LFO)) != 0 && !clip;
+    unsigned picking = (c->buttons & BUTTON(SCL)) != 0 && !clip && page == SONG; /* SEL held picks tracks (0.5.6, LFO before) */
     if (*pressed & BUTTON(SAVE)) { /* SAVE, and SHIFT+SAVE: the song list, as SAVE comes up */
         *pressed &= ~BUTTON(SAVE);
         song_save_press();
@@ -64,7 +64,7 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
         return 1;
     }
     if ((*pressed & BUTTON(SCL)) && shift) song_rec_toggle(now); /* SHIFT+SEL: REPLACE or OVERDUB (0.4.0) */
-    else if ((*pressed & BUTTON(SCL)) && !clip) song_marker_key(now);
+    if ((*pressed & BUTTON(LFO)) && !clip && page == SONG) song_marker_key(now); /* LFO: markers (0.5.6, SEL before) */
     if ((*pressed & BUTTON(EDIT)) && shift) { /* SHIFT+EDIT: the edit jobs (EDIT alone stays sound editing) */
         *pressed &= ~BUTTON(EDIT);
         song_job_open();
