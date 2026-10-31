@@ -7,9 +7,10 @@
 // And a page change while the song view's playhead moves every frame (2-bar
 // zoom) paints the whole new page with the LCD at the device's pace, one
 // band per control poll: the footer comes out as it does at full speed.
-// This fork's release (the probe, and CHANGELOG.md's latest) is on the boot
-// screen between the bars and M-VAVE, the same line heads the song list, and
-// the page's version badge carries it. Under it on the list, the battery:
+// QSEQ's release (the probe, and CHANGELOG.md's latest) is on the boot
+// screen under the name, the song list's header has it after QSEQ, and the
+// page's version badge carries it. The boot's clip grid (0.6.1) lights a
+// track's column in its color at each step, with a playhead after them. Under it on the list, the battery:
 // the simulator's 900 as BAT 900, and its bar, and right of it the free
 // heap, a dash in the browser, which has no heap (0.4.0). A held REC opens
 // the record settings, and HOME there goes back. The mix page has a tile a
@@ -64,16 +65,24 @@ export async function phasePanel(browser, root) {
           }
       return box;
     };
-    const mask = (lcd, x, y) => Array.from({ length: 7 }, (_, row) =>
-      Array.from({ length: 6 * line.length }, (_, col) => (lcd[(y + row) * 240 + x + col] ? 1 : 0)).join('')).join('/');
+    const mask = (lcd, x, y, n) => Array.from({ length: 7 }, (_, row) =>
+      Array.from({ length: 6 * n }, (_, col) => (lcd[(y + row) * 240 + x + col] ? 1 : 0)).join('')).join('/');
     const b = previewRig();
     b.c.sim_boot(2);                                 // the boot screen, as the device starts
     b.render(32);
-    const boot = b.pixels(), left = (240 - 6 * line.length) >> 1;
-    const shown = drawn(boot, 188, 207);             // the rows between the bars and M-VAVE
-    const last = left + 6 * (line.length - 1);       // the last letter's cell, which a narrow one (a 1) doesn't fill
+    const n = o.version.length, boot = b.pixels(), left = (240 - 6 * n) >> 1;
+    const shown = drawn(boot, 80, 95);               // the release, under the name (0.6.1)
+    const last = left + 6 * (n - 1);                 // the last letter's cell, which a narrow one (a 1) doesn't fill
     o.bootBox = { left: shown.left, endsInLastCell: shown.right >= last && shown.right <= last + 4, top: shown.top, bottom: shown.bottom };
-    o.bootWant = { left, endsInLastCell: true, top: 194, bottom: 200 };
+    o.bootWant = { left, endsInLastCell: true, top: 84, bottom: 90 };
+    o.bootName = drawn(boot, 36, 72);
+    /* The grid's cells, column by column, and the column the playhead's gap is after. */
+    const cells = lcd => Array.from({ length: 8 }, (_, i) => [0, 1, 2].map(r => lcd[(120 + 18 * r) * 240 + 56 + 18 * i]));
+    const playhead = lcd => [1, 2, 3, 4, 5, 6, 7].filter(k => lcd[140 * 240 + 46 + 18 * k] === 0xef5d);
+    const grid = lcd => ({ cells: cells(lcd), playhead: playhead(lcd) });
+    o.bootGrid = [grid(boot)];
+    b.render(155); o.bootGrid.push(grid(b.pixels()));   // about halfway
+    b.render(160); o.bootGrid.push(grid(b.pixels()));   // the last step, before the boot ends
     o.bootPng = b.png();
     r.render(400);
     const mix = r.state();                           // with no project to restore, nothing starts muted or soloed (0.3.2)
@@ -107,7 +116,7 @@ export async function phasePanel(browser, root) {
     /* Right of the battery, the free heap: the browser has none, so a dash. */
     o.heapBox = drawn(Array.from(list, (v, i) => (i % 240 >= 150 && (i / 240 | 0) >= 13 && (i / 240 | 0) < 25 ? v : 0)), 13, 25);
     o.heapDash = [15, 16, 17, 18, 19, 20, 21].map(y => [226, 227, 228, 229, 230, 231].map(x => (list[y * 240 + x] ? 1 : 0)).join('')).join('/');
-    o.sameLine = mask(list, 76, 5) === mask(boot, left, 194);
+    o.sameLine = mask(list, 76 + 6 * 5, 5, n) === mask(boot, left, 84, n);
     o.battery = r.info(55);
     const box = { left: 240, right: -1, top: 240, bottom: -1 };   /* what is drawn left of the bar, under the release */
     for (let y = 13; y < 25; y++)
@@ -169,8 +178,18 @@ export async function phasePanel(browser, root) {
   t.yes('the song played through the page changes', q.playingThrough);
   t.eq('device-paced LCD: the song view\'s footer painted after the page change, as at full speed', q.footer, 0);
   t.eq('the firmware\'s release is CHANGELOG.md\'s latest', q.version, latest);
-  t.eq('the boot screen shows QSEQ and the release, centered between the bars and M-VAVE', q.bootBox, q.bootWant);
-  t.yes('the song list\'s header shows the same line', q.sameLine);
+  t.eq('the boot screen: QSEQ large and centered', q.bootName, { left: 72, right: 163, top: 40, bottom: 67 });
+  t.eq('the release centered under it', q.bootBox, q.bootWant);
+  t.yes('the song list\'s header shows the same release after QSEQ', q.sameLine);
+  { /* the boot's grid: two rows of each track's column lit in its color, column by column (0.6.1) */
+    const PANEL = 0x18e3, colors = [0x3c9f, 0x07bf, 0x4eae, 0x06d4, 0xac9f, 0xed18, 0xff06, 0xfba5], rows = [3, 5, 6, 3, 5, 6, 3, 5];
+    const want = lit => Array.from({ length: 8 }, (_, i) => [0, 1, 2].map(r => (i < lit && rows[i] >> r & 1 ? colors[i] : PANEL)));
+    const [start, middle, end] = q.bootGrid, k = middle.cells.findIndex(c => c.every(v => v === PANEL));
+    t.eq('at the start every cell is dark, no playhead', start, { cells: want(0), playhead: [] });
+    t.yes('halfway: the first columns lit, the rest dark, the playhead in the gap after the lit ones',
+      k >= 2 && k <= 6 && JSON.stringify(middle) === JSON.stringify({ cells: want(k), playhead: [k] }), { k, middle });
+    t.eq('at the last step all 8 columns lit, the playhead gone', end, { cells: want(8), playhead: [] });
+  }
   t.eq('the battery: the simulator\'s reading, smoothed', q.battery, 900);
   t.eq('BAT 900 under the release, 7 letters wide', q.batteryBox, { left: 76, right: 76 + 6 * 7 - 2, top: 15, bottom: 21 });
   t.eq('its bar: the frame and all 22 lit, 900 being past full (622)', q.batteryBar, [true, true, true, true, true]);

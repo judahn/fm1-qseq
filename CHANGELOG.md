@@ -2,6 +2,13 @@
 
 The version is `QSEQ_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.6.1
+
+- A new boot screen in the full build: QSEQ in large letters with the release under it, and a small clip
+  grid that lights one track's column in its color at each step of the start-up, two of its three rows, like
+  scenes launching, with a playhead moving after them. Under it, `ON FM1 OPEN V14` and `M-VAVE FM-1`. The
+  hardware test build keeps FM1 Open's screen.
+
 ## 0.6.0
 
 - The project is QSEQ now, FM1 QY until this release. The boot screen and the song list's header say

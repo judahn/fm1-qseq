@@ -1348,15 +1348,32 @@ static __attribute__((noinline)) void edit_page_draw(unsigned visible)
 }
 static __attribute__((noinline, cold, minsize)) void boot_draw(void)
 {
+#if SONG_UI /* song-mode: QSEQ's boot (0.6.1). The name and release, a clip grid, and what it runs on */
+    if (cache->title_cache != 0) {
+        cache->title_cache = 0;
+        text(72, 40, "QSEQ", 4, TEXT, BACK);
+        text((240 - 6 * (sizeof QSEQ_VERSION - 1)) / 2, 84, QSEQ_VERSION, 1, ACCENT, BACK);
+        text((240 - 6 * (sizeof "ON FM1 OPEN " FM1_RELEASE_VERSION - 1)) / 2, 200, "ON FM1 OPEN " FM1_RELEASE_VERSION,
+             1, DIM, BACK);
+        text((240 - 6 * (sizeof "M-VAVE FM-1" - 1)) / 2, 214, "M-VAVE FM-1", 1, DIM, BACK);
+    }
+    if (cache->middle_cache == boot_phase) return;
+    cache->middle_cache = boot_phase;
+    /* Each step of the boot lights one track's column in its color, two of its three rows, like scenes
+     * launching, with a playhead in the gap after the lit columns until the last. */
+    static const uint8_t rows[8] = {3, 5, 6, 3, 5, 6, 3, 5};
+    paint_fill(46, 108, 150, 58, BACK);
+    for (unsigned i = 0; i < 8; ++i)
+        for (unsigned r = 0; r < 3; ++r)
+            paint_fill(48 + 18 * i, 112 + 18 * r, 16, 16, i < boot_phase && (rows[i] >> r & 1U) ? colors[i] : PANEL);
+    if (boot_phase && boot_phase < 8) paint_fill(46 + 18 * boot_phase, 108, 1, 58, TEXT);
+#else
     if (cache->title_cache != 0) {
         cache->title_cache = 0;
         text(86, 48, "FM1", 4, TEXT, BACK);
         text(81, 98, "OFFICIAL OPEN", 1, ACCENT, BACK);
         text((240 - 12 * (sizeof FM1_RELEASE_VERSION - 1)) / 2, 120,
              FM1_RELEASE_VERSION, 2, TEXT, BACK);
-#if SONG_UI /* song-mode: this fork's release, between the bars and M-VAVE */
-        text((240 - 6 * (sizeof "QSEQ " QSEQ_VERSION - 1)) / 2, 194, "QSEQ " QSEQ_VERSION, 1, ACCENT, BACK);
-#endif
         text(102, 208, "M-VAVE", 1, DIM, BACK);
     }
     if (cache->middle_cache == boot_phase) return;
@@ -1365,6 +1382,7 @@ static __attribute__((noinline, cold, minsize)) void boot_draw(void)
     for (unsigned i = 0; i < 8; ++i)
         paint_fill(58 + 16 * i, 166 - height[i] / 2, 12, height[i],
                    i < boot_phase ? colors[i] : PANEL);
+#endif
 }
 static void draw_page_body(const struct fm1_ble_status *ble)
 {
