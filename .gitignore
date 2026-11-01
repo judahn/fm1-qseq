@@ -29,3 +29,8 @@ id_ed25519
 /fm1-open-publish.md
 /.codex-sinco/
 .DS_Store
+
+# Kits built from recordings the project doesn't own: only the recipe is kept (kits/README.md)
+/kits/amen/*
+!/kits/amen/kit.json
+/kits/*.png

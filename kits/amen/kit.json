@@ -1,0 +1,51 @@
+{
+  "name": "AMEN",
+  "source": "The Winstons, \"Amen, Brother\" (1969): the break in Wikipedia's excerpt, https://upload.wikimedia.org/wikipedia/en/8/80/The_Amen_Break%2C_in_context.ogg . The recording is under copyright, so the audio stays out of the repo: save that file here as amen.ogg (git ignores it), then node tools/make-kit.mjs kits/amen. Slices are one hit each, from its attack to just before the next, except KICK KICK (bar 2's double kick) and FLAM (bar 3's flammed snare). The crash at the end of bar 4 runs into the horns, so it's left out.",
+  "defaults": {
+    "file": "amen.ogg",
+    "normalize": true,
+    "fadeOut": 8
+  },
+  "pads": [
+    {
+      "name": "KICK",
+      "start": 8.0998,
+      "end": 8.3126
+    },
+    {
+      "name": "SNARE",
+      "start": 5.0385,
+      "end": 5.2483
+    },
+    {
+      "name": "RIDE",
+      "start": 5.2583,
+      "end": 5.3657
+    },
+    {
+      "name": "KICK KICK",
+      "start": 6.35,
+      "end": 6.7793
+    },
+    {
+      "name": "GHOST",
+      "start": 10.5994,
+      "end": 10.6956
+    },
+    {
+      "name": "KICK 2",
+      "start": 6.5687,
+      "end": 6.7793
+    },
+    {
+      "name": "SNARE 2",
+      "start": 9.6019,
+      "end": 9.8194
+    },
+    {
+      "name": "FLAM",
+      "start": 10.2559,
+      "end": 10.4682
+    }
+  ]
+}

@@ -306,6 +306,8 @@ doesn't churn them.
 | `app/song/song_config.h` | What each build includes |
 | `app/screen.c` and other stock files | FM1 Open's code. Our changes there are small hooks with a `song-mode` comment |
 | `web/workbench/` | The workbench's Songs and kits section |
+| `kits/` | Drum kits to load from the workbench, and how to make them (`kits/README.md`) |
+| `tools/make-kit.mjs` | Makes a kit file from a folder of one-shots or a sliced break, with the workbench's own encoder |
 | `tests/` | Host tests (`test_*.c`), the workbench test and the preview phases (`preview_*.mjs`) |
 | `docs/song-mode-design.md` | The design, with the decisions behind it |
 | `docs/file-formats.md` | The song and kit files and the transfer commands |
