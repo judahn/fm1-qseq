@@ -6,7 +6,8 @@
 // list: K2 picks the action and YES does it, the questions (a box over the
 // page) and what cancels them, SAVE ignored while one is open, renaming kept
 // with YES and dropped with NO, LOAD and NEW asking only over unsaved
-// changes, the note keys doing nothing, NO going back. Saves docs/yesno-*.png.
+// changes, the note keys doing nothing, NO going back. A song loaded after
+// another drawn as itself (0.6.3). Saves docs/yesno-*.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
 
 export async function phaseYesNo(browser, root) {
@@ -132,6 +133,37 @@ export async function phaseYesNo(browser, root) {
     o.newNo = asking();
     r.tap(B.SAVE);                                 // nothing open: SAVE saves it
     o.saveKey = { songs: store(0), unsaved: store(17) };
+    // 6. A loaded song is drawn as itself (0.6.3). Every load started the
+    // song's revision afresh, so the song view could keep the song before's
+    // pitch range for each row, which it finds only when the revision moves,
+    // and draw the new song's notes squashed or off their row: a track
+    // sounded but looked empty. Song 1 is the test song, song 2 a new one
+    // with one low note on track 1, far below the test song's.
+    const L = previewRig(), Li = L.info, LB = L.B, ld = o.loadDraw = {};
+    const listed = i => Li(38, 0, i);
+    const range = () => { const v = Li(58, 0, 7); return [v & 255, v >> 8 & 255]; };
+    const pitches = () => Array.from({ length: Li(0, 0) }, (_, i) => i).filter(i => Li(30, 0, i) === 0).map(i => Li(2, 0, i));
+    const row1 = () => { /* track 1's note marks: its color in its row, right of the number box */
+      const px = L.pixels(); let n = 0;
+      for (let y = 48; y < 64; y++) for (let x = 22; x < 238; x++) if (px[y * 240 + x] === 0x3c9f) n++;
+      return n;
+    };
+    L.render(32);
+    L.tap(LB.SEQ);
+    L.tap(LB.SAVE); L.tap(LB.SAVE);                // song 1
+    L.turn(3, 3); L.tap(LB.YES); L.tap(LB.NO);     // NEW, then back to the song view
+    L.step(); L.held(LB.FX, () => L.key(0)); L.tap(LB.NO); L.tap(LB.NO); L.key(0); L.step(); /* step entry: a whole note, two octaves down, F3: F1 */
+    L.render(8);
+    ld.note = [Li(0, 0), Li(2, 0, 0), ...range()];
+    L.tap(LB.SAVE); L.tap(LB.SAVE);                // song 2
+    ld.songs = listed(0);
+    L.turn(2, -5); L.turn(3, -10); L.tap(LB.YES);  // LOAD song 1
+    L.render(8);
+    const p1 = pitches();
+    ld.first = { page: L.page(), range: range(), want: [Math.min(...p1), Math.max(...p1)] };
+    L.tap(LB.SAVE); L.turn(2, 1); L.turn(3, -10); L.tap(LB.YES); /* LOAD song 2 */
+    L.render(8);
+    ld.second = { page: L.page(), events: Li(0, 0), range: range(), marks: row1() };
     return o;
   });
   for (const [name, key] of [['list', 'listPng'], ['ask', 'askPng'], ['load-ask', 'loadAskPng'], ['jobs-ask', 'jobAskPng']])
@@ -186,5 +218,11 @@ export async function phaseYesNo(browser, root) {
   t.yes('list: NEW asks over a new song not saved yet', q.newAsks);
   t.no('list: NO cancels it', q.newNo);
   t.eq('list: SAVE with nothing open saves', q.saveKey, { songs: 3, unsaved: 0 });
+  const ld = out.loadDraw;
+  t.eq('song 2 has one note on track 1, F1, and the song view ranges its row there', ld.note, [1, 29, 29, 29]);
+  t.eq('two songs on the list', ld.songs, 2);
+  t.eq('song 1 loaded: track 1\'s row ranged over its own notes', ld.first.range, ld.first.want);
+  t.eq('song 2 loaded after it: its row ranged on F1 again', ld.second.range, [29, 29]);
+  t.yes('and its note drawn in track 1\'s row', ld.second.page === 19 && ld.second.events === 1 && ld.second.marks > 0, ld.second);
   return { phase: 'yes/no', checks: t.list, out };
 }

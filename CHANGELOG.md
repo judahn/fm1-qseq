@@ -2,6 +2,13 @@
 
 The version is `QSEQ_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.6.3
+
+- A loaded song is drawn as itself. Every load, and every new song, started the song's revision count afresh,
+  so the song view could keep the song before's pitch range for each row, which it finds again only when the
+  revision moves. A track's notes were then squashed flat or drawn off its row: it sounded but looked empty.
+  The count now carries on from the song before.
+
 ## 0.6.2
 
 - Knob recording latches. From its first turn in a take a knob writes its lane until the take ends, holding

@@ -14,7 +14,12 @@
 
 SONG_SMALL void song_clear(struct song *s, unsigned bars, unsigned bpm100)
 {
+    /* The revision counts on, so a song loaded or started in another's place
+     * never looks unchanged to what keys on it (0.6.3). It started at 0, and
+     * the song view kept the last song's pitch range for each row. */
+    uint32_t revision = s->revision;
     memset(s, 0, sizeof *s);
+    s->revision = revision + 1U;
     s->bars = (uint16_t)(bars < 1 ? 1 : bars > SONG_MAX_BARS ? SONG_MAX_BARS : bars);
     s->tempo[0].bpm100 = (uint16_t)(bpm100 < SONG_TEMPO_MIN || bpm100 > SONG_TEMPO_MAX ? 12000 : bpm100);
     s->tempos = 1;

@@ -174,6 +174,7 @@ uint32_t song_panel_probe(unsigned what)
     case 4: return st->anchor;
     case 5: return step_count(st);
     case 6: return song_zoom;
+    case 7: return song_low[0] | (uint32_t)song_high[0] << 8; /* track 1's pitch range in the song view (0.6.3) */
     default: return 0;
     }
 }
