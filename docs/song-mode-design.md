@@ -242,7 +242,8 @@ merge, clear and normalize work on whole tracks. An event belongs to the range b
 ## 7. Automation
 
 - While recording, K1 to K4 record parameter moves on the selected track. Each knob shows which parameter it
-  controls.
+  controls. A knob latches from its first turn until the take ends, replacing what its lane had under the
+  playhead, and in a loop each pass replaces the one before (0.6.2, touch style with a 300 ms let-go before).
 - Automation travels the same path as notes: controller messages each track's engine already understands.
   All engines take volume, pan, expression, reverb send and LFO depth. The 303 adds cutoff, envelope mod and
   slide, and the PSG and pluck engines add their tone controls.

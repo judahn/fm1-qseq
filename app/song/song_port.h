@@ -128,10 +128,9 @@ unsigned song_port_engine(unsigned track);
 unsigned song_knob_lane(unsigned track, unsigned knob);
 unsigned song_knob_value(unsigned track, unsigned knob); /* what it is at or setting now */
 unsigned song_knob_held(unsigned knob);
-void song_knob_turn(unsigned knob, int delta, uint32_t now);
-void song_knobs_poll(uint32_t now);      /* lets go of knobs that stopped moving */
+void song_knob_turn(unsigned knob, int delta); /* it latches until the take ends (0.6.2) */
 void song_knobs_release(uint32_t clock); /* lets go of every knob: the take ends */
-void song_knobs_wrap(uint32_t loop_end); /* a loop pass ends */
+void song_knobs_wrap(uint32_t loop_end); /* a loop pass ends, latched knobs go on from its start */
 /* Storage (song_store.c, phase 5a): songs, kits and the recovery copy in
  * the flash pool. Writes happen only while stopped. 0, or an error. */
 enum { SONG_STORE_FULL = -20, SONG_STORE_PLAYING = -21, SONG_STORE_BUSY = -22 };

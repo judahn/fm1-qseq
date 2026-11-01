@@ -110,6 +110,18 @@ static int song_input_pages(const struct fm1_controls *c, uint32_t *pressed, uin
     if (page < SONG) {
         if ((*pressed & BUTTON(PLAY)) && song_port_player()->playing) { song_port_stop(); *pressed &= ~BUTTON(PLAY); }
 #if SONG_UI
+        /* PLAY on a stock page plays the song from the start point, as in the
+         * song view, or the launched clips on a page opened from the grid or
+         * with a clip open (0.6.2). It started the stock step sequencer, which
+         * the full build empties, so nothing played. The preview's stock step
+         * page keeps its own. */
+        if ((*pressed & BUTTON(PLAY)) && (SONG_DROP_STEPS || page != STEPS)) {
+            struct song_player *p = song_port_player();
+            unsigned grid = music_page == SONG_GRID || song_port_song()->open;
+            if (grid != (p->home == SONG_FROM_STOP)) song_player_view(p, grid);
+            *pressed &= ~BUTTON(PLAY);
+            song_start(now);
+        }
         /* SAVE on the stock pages opens the song list too, as it comes up,
          * never a stock project slot, which now lies in the song pool. */
         if ((*pressed & BUTTON(SAVE)) && page != PROJECT && page != BLE && page != SOURCE && page != ACTIONS) {

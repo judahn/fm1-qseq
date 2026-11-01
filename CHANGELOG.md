@@ -2,6 +2,17 @@
 
 The version is `QSEQ_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.6.2
+
+- Knob recording latches. From its first turn in a take a knob writes its lane until the take ends, holding
+  its value when it stops turning and replacing what the lane had under the playhead. When the take ends the
+  lane goes back to its older values. In a LOOP take, or a take into a clip or a grid cell, each pass replaces
+  the one before, and a take ended partway keeps the pass before for the rest of the loop. Before, a knob let
+  go 300 ms after its last turn and the older values came back, so passes mixed and the lane jumped about.
+- PLAY on a stock page, such as the stock overview, plays the song from the start point, as in the song view.
+  It started FM1 Open's step sequencer, which the full build leaves empty, so nothing sounded. On a stock page
+  opened from the grid, or with a clip open, PLAY plays the grid's launched clips. PLAY again stops.
+
 ## 0.6.1
 
 - A new boot screen in the full build: QSEQ in large letters with the release under it, and a small clip

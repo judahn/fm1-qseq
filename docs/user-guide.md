@@ -76,6 +76,7 @@ These work on every song page:
 | HOME+SAVE | Undo, up to 64 steps (fewer when steps are large). HOME or SAVE can go down first, and the song list doesn't open |
 | SHIFT+HOME+SAVE | Redo |
 | HOME+PLAY | Stop everything and go to the stock overview |
+| PLAY on a stock page | Play the song from the start point, as in the song view, or the grid's launched clips on a page opened from the grid or with a clip open. PLAY again stops |
 | SELECT | The track |
 | OCT- / OCT+ | The keyboard's octave. NO and YES on the song list, the edit jobs and while naming |
 
@@ -226,6 +227,14 @@ During a take:
 | K1 to K4 | Record their parameters on the take track. Which parameter each knob drives is on settings page 3 |
 | ALGO | Zoom the roll |
 | PRESETS | Nothing: the playhead stays with the take |
+
+**A turned knob latches until the take ends.** From its first turn, a knob writes its parameter all the way to
+the end of the take, whether it's turning or not: when it stops, its value holds, and whatever the lane had
+under the playhead is replaced. When the take ends, the lane goes back to its older values from there on. In a
+LOOP take, or a take into a clip or a grid cell, each pass replaces the one before, so the last pass is what
+stays, and a take ended partway through a pass keeps the pass before for the rest of the loop. Knobs that
+aren't turned leave their lanes alone. Before 0.6.2 a knob let go 300 ms after its last turn and the older
+values came back, which mixed passes together.
 
 **A take shows the roll.** A take into one track, from the song view, the clip editor, a grid cell or step
 entry, shows that track (the clip, for a clip) as step entry's roll while it is armed or running: the count-in,

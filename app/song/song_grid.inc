@@ -144,7 +144,7 @@ static int song_grid_input(const struct fm1_controls *c, uint32_t *pressed, uint
         octave = clamp(octave + !!(*pressed & BUTTON(OCT_UP)) - !!(*pressed & BUTTON(OCT_DOWN)), -2, 2);
         step_zoom_turn(c->encoders[1]);
         for (unsigned k = 0; k < 4; ++k)
-            if (c->encoders[2 + k]) song_knob_turn(k, fm_encoder_delta(2 + k, c->encoders[2 + k]), now);
+            if (c->encoders[2 + k]) song_knob_turn(k, fm_encoder_delta(2 + k, c->encoders[2 + k]));
         if (shift && down) { notice = "STOP RECORDING FIRST"; notice_until = now + 1500U; }
         return 1;
     }

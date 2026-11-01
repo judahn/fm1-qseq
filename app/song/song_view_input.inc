@@ -79,7 +79,7 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
     else if (c->encoders[1]) song_zoom_turn(c->encoders[1], now);
     if (song_port_recorder()->active) { /* K1 to K4 record parameters on the take track */
         for (unsigned k = 0; k < 4; ++k)
-            if (c->encoders[2 + k]) song_knob_turn(k, fm_encoder_delta(2 + k, c->encoders[2 + k]), now);
+            if (c->encoders[2 + k]) song_knob_turn(k, fm_encoder_delta(2 + k, c->encoders[2 + k]));
         return 1;
     }
     int move = c->encoders[6]; /* PRESETS, beside ALGO: where the playhead is (0.5.2) */

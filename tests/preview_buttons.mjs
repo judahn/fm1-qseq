@@ -8,6 +8,8 @@
 // and step entry keeps it. The engine's tempo follows the song's: the
 // settings' tempo, rounded, and the conductor's change at bar 9 as playing
 // crosses it. A tempo set on the effects page's delay goes into the song.
+// PLAY on a stock page plays the song, or the grid's clips on a page opened
+// from the grid (0.6.2).
 // Saves docs/buttons-effects.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
 
@@ -110,6 +112,32 @@ export async function phaseButtons(browser, root) {
     tp.stock = engine();
     r.tap(B.FX);
     tp.adopted = [info(6, 0, 0), engine(), r.page()];
+
+    // 4. PLAY on a stock page (0.6.2), on a fresh simulator. On the stock
+    // overview it plays the song, as the song view does. On the effects page
+    // opened from the grid it plays the grid's launched clips, none here, so
+    // the transport runs and no song note sounds. PLAY again stops.
+    const h = previewRig(), sp = o.stockPlay = {};
+    const ons = () => h.heard().filter(x => x.kind === 0 && x.b).length;
+    h.render(32);
+    h.tap(B.SEQ);
+    h.tap(B.HOME);
+    sp.home = h.page();
+    h.c.sim_song_capture(1);
+    h.tap(B.PLAY);
+    h.render(400);
+    sp.homePlay = { playing: h.info(7), page: h.page(), notes: ons() };
+    h.tap(B.PLAY);
+    sp.homeStop = h.info(7);
+    h.tap(B.SEQ); h.tap(B.SEQ);                     // the song view, then the grid
+    h.tap(B.FX);
+    sp.fx = h.page();
+    h.c.sim_song_capture(1);
+    h.tap(B.PLAY);
+    h.render(400);
+    sp.fxPlay = { playing: h.info(7), page: h.page(), notes: ons() };
+    h.tap(B.PLAY);
+    sp.fxStop = h.info(7);
     return o;
   });
   savePng(root, 'buttons-effects', out, 'effectsPng');
@@ -147,5 +175,12 @@ export async function phaseButtons(browser, root) {
   t.eq('stopped back before bar 9: 126 again', tp.stoppedBack, 126);
   t.eq('the delay page\'s tempo knob: the engine at 128', tp.stock, 128);
   t.eq('and the song\'s starting tempo follows it, back on the song view', tp.adopted, [12800, 128, 19]);
+  const sp = out.stockPlay;
+  t.eq('HOME: the stock overview', sp.home, 0);
+  t.yes('PLAY there plays the song, and it sounds', sp.homePlay.playing === 1 && sp.homePlay.page === 0 && sp.homePlay.notes > 0, sp.homePlay);
+  t.eq('PLAY again stops', sp.homeStop, 0);
+  t.yes('PLAY on the effects page opened from the grid plays the grid: no song notes', sp.fxPlay.playing === 1 &&
+    sp.fxPlay.page === sp.fx && sp.fxPlay.notes === 0, sp.fxPlay);
+  t.eq('and PLAY again stops', sp.fxStop, 0);
   return { phase: 'buttons', checks: t.list, out };
 }

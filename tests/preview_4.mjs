@@ -3,7 +3,8 @@
 // recording knobs page, a knob sweep recorded thinned and played back on
 // exact blocks, chase when stopped, playing and jumping, the conductor lane
 // (tempo and time signature), a program change, undo of each, and clearing
-// a lane in the selection. Saves docs/phase4-*.png.
+// a lane in the selection, and a knob latched across a LOOP take's passes
+// (0.6.2). Saves docs/phase4-*.png.
 import { simPage, savePng, checker } from './preview_lib.mjs';
 
 export async function phase4(browser, root) {
@@ -53,9 +54,11 @@ export async function phase4(browser, root) {
     s.quietLane = info(33, 0, 0);                  // touch track | lane << 8
     r.render(4);
     s.png = r.png();
-    r.render(120);                                 // 350 ms: the knob lets go
+    r.render(120);                                 // 350 ms: the knob stays latched (0.6.2, it let go here before)
     s.heldAfter = info(31, 1, 0) >> 16 & 1;
-    r.tap(B.PLAY); r.tap(B.PLAY);                  // PLAY ends the take, PLAY again stops
+    r.tap(B.PLAY);                                 // PLAY ends the take, and lets go
+    s.heldEnded = info(31, 1, 0) >> 16 & 1;
+    r.tap(B.PLAY);                                 // PLAY again stops
     const grid = new Map();
     for (const t of turns) grid.set(t.clock - t.clock % 60, t.value);
     const expected = [...grid].map(([clock, value]) => ({ clock, value })).filter((e, i, a) => !i || e.value !== a[i - 1].value);
@@ -168,6 +171,41 @@ export async function phase4(browser, root) {
     o.cleared = lane(1, 74).length;
     undoKey();
     o.restored = lane(1, 74).length;
+
+    // 9. Latch in a LOOP take (0.6.2), on a fresh simulator: the 303's
+    // cutoff turned down early in pass 1 and up later in pass 2, and the
+    // take ended early in pass 3. Each pass replaces the one before, so pass
+    // 1's turn is gone, pass 2 holds pass 1's value until its own turn, and
+    // pass 3 holds pass 2's value up to where the take ended.
+    const g = previewRig(), gi = g.info, L9 = o.latch = {};
+    const glane = () => Array.from({ length: gi(0, 1) }, (_, i) => i)
+      .filter(i => gi(30, 1, i) === 1 && gi(2, 1, i) === 74).map(i => ({ clock: gi(1, 1, i), value: gi(18, 1, i) }));
+    const until = done => { for (let i = 0; i < 4000 && !done(); i++) g.render(1); };
+    g.render(32);
+    g.tap(B.SEQ);
+    g.turn(0, 1);                                  // track 2, the 303
+    g.turn(4, -20); g.turn(5, -20);                // the loop as short as it goes, from the top
+    const ls = gi(14), le = gi(15), len = le - ls;
+    L9.before = glane().length;
+    g.long(B.REC); g.turn(2, 2); g.turn(3, -1); g.tap(B.REC); /* the record settings: LOOP, no count-in, and go */
+    L9.mode = gi(29, 0, 3);
+    const passes = () => gi(29, 0, 2), at = () => gi(28);
+    const first = passes();
+    until(() => at() >= ls + len / 4);
+    const t1 = at(); g.turn(2, -20); const v1 = gi(31, 1, 0) >> 8 & 255;
+    until(() => passes() === first + 1 && at() >= ls + len / 2);
+    const t2 = at(); g.turn(2, 30); const v2 = gi(31, 1, 0) >> 8 & 255;
+    g.render(150);                                 // past where the knob used to let go
+    L9.heldInPass2 = gi(31, 1, 0) >> 16 & 1;
+    until(() => passes() === first + 2 && at() >= ls + len / 8);
+    const end = at();
+    g.tap(B.REC);                                  // REC ends the take, playing goes on
+    g.tap(B.PLAY);
+    const g32 = x => x - x % 60;
+    L9.lane = glane();
+    L9.want = [{ clock: ls, value: v2 }, { clock: g32(end), value: v1 }, { clock: g32(t2), value: v2 }];
+    L9.pass1Gone = !L9.lane.some(e => e.clock === g32(t1));
+    L9.span = { ls, le, t1, t2, end, v1, v2 };
     return o;
   });
   savePng(root, 'phase4-knobs', out.knobs, 'png');
@@ -183,7 +221,8 @@ export async function phase4(browser, root) {
   t.eq('the sweep is recording', s.recording, 1);
   t.eq('the knob is held while turning', s.heldWhileTurning, 1);
   t.eq('the song\'s own cutoff lane goes quiet on the take track', s.quietLane, 1 | 74 << 8);
-  t.eq('the knob lets go after it stops', s.heldAfter, 0);
+  t.eq('the knob stays latched after it stops turning', s.heldAfter, 1);
+  t.eq('and lets go when the take ends', s.heldEnded, 0);
   t.yes('the sweep is recorded as turned, a 32nd apart', s.recordedOk, { recorded: s.recorded, first: s.first, last: s.last });
   t.yes('the recording is thinned to whole 32nds', s.thinned);
   t.under('fewer changes stored than turns made', s.recorded, s.turns);
@@ -205,5 +244,11 @@ export async function phase4(browser, root) {
   t.eq('undo takes the tempo back', co.temposAfterUndo, 2);
   t.eq('SHIFT+SEL clears the shown lane in the selection', out.cleared, 0);
   t.eq('undo brings the lane back', out.restored, s.recorded);
+  const L9 = out.latch;
+  t.eq('a LOOP take', L9.mode, 4);
+  t.eq('the cutoff lane started empty', L9.before, 0);
+  t.eq('the knob stays latched across the pass', L9.heldInPass2, 1);
+  t.yes('pass 1\'s turn is gone, replaced by pass 2', L9.pass1Gone, L9.lane);
+  t.eq('the loop holds pass 2\'s value from its start, pass 2 after the take\'s end, then its turn', L9.lane, L9.want);
   return { phase: '4', checks: t.list, out };
 }

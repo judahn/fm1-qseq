@@ -122,7 +122,6 @@ SONG_SMALL void song_port_poll(void)
     song_takes_poll();
     song_perf_poll();
     song_tempo_follow(0);
-    song_knobs_poll(fm1_millis());
     song_store_poll(fm1_millis());
 #endif
 }

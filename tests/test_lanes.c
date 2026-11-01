@@ -285,12 +285,67 @@ static void test_hold(void)
     song_player_stop(&player);
 }
 
+/* Latch in a loop take (0.6.2): each pass replaces the one before, a take
+ * ending partway keeps the pass before for the rest of the loop, and the
+ * song's own value comes back after the loop. A bar's loop, 0 to 1920. */
+static void test_latch_loop(void)
+{
+    /* The lane had 40 from the top and 70 after the loop. Pass 1 turns to 90
+     * at beat 2, pass 2 to 20 at beat 3, and the take ends at 1200. */
+    fresh_song();
+    cc(3, 0, 74, 40); cc(3, 1920, 74, 70);
+    struct song_touch t = {0};
+    song_touch_move(&song, 3, &t, 74, 90, 480);
+    song_touch_wrap(&song, 3, &t, 1920, 1);
+    song_touch_settle(&song, 3);
+    song_touch_again(&song, 3, &t, 74, 90, 0);
+    song_touch_move(&song, 3, &t, 74, 20, 960);
+    CHECK_EQ(song_touch_release(&song, 3, &t, 1200), 90);
+    CHECK_EQ(song_lane_at(&song, 3, 74, 100), 90);   /* pass 2 held pass 1's value from the loop's start */
+    CHECK_EQ(song_lane_at(&song, 3, 74, 1000), 20);  /* pass 2's turn */
+    CHECK_EQ(song_lane_at(&song, 3, 74, 1500), 90);  /* past the take's end, pass 1 */
+    CHECK_EQ(song_lane_at(&song, 3, 74, 2000), 70);  /* after the loop, the song's own */
+    CHECK_EQ(song_lane_find(&song, 3, 74, 480), -1); /* pass 1's turn itself is gone */
+
+    /* Three passes, the take ending at 240 in pass 3, which held 20 from the
+     * loop's start. After it comes pass 2, which held 90 until its turn. */
+    fresh_song();
+    cc(3, 0, 74, 40); cc(3, 1920, 74, 70);
+    struct song_touch u = {0};
+    song_touch_move(&song, 3, &u, 74, 90, 480);
+    song_touch_wrap(&song, 3, &u, 1920, 1); song_touch_settle(&song, 3); song_touch_again(&song, 3, &u, 74, 90, 0);
+    song_touch_move(&song, 3, &u, 74, 20, 960);
+    song_touch_wrap(&song, 3, &u, 1920, 0); song_touch_settle(&song, 3); song_touch_again(&song, 3, &u, 74, 20, 0);
+    CHECK_EQ(song_touch_release(&song, 3, &u, 240), 90);
+    CHECK_EQ(song_lane_at(&song, 3, 74, 100), 20);
+    CHECK_EQ(song_lane_at(&song, 3, 74, 500), 90);
+    CHECK_EQ(song_lane_at(&song, 3, 74, 1000), 20);
+    CHECK_EQ(song_lane_at(&song, 3, 74, 2000), 70);
+
+    /* A lane with nothing before: nothing goes in after the loop, and the
+     * last value holds on past it. */
+    fresh_song();
+    struct song_touch v = {0};
+    song_touch_move(&song, 3, &v, 7, 30, 480);
+    song_touch_wrap(&song, 3, &v, 1920, 1); song_touch_settle(&song, 3); song_touch_again(&song, 3, &v, 7, 30, 0);
+    CHECK_EQ(song_lane_find(&song, 3, 7, 1920), -1);
+    song_touch_move(&song, 3, &v, 7, 50, 960);
+    song_touch_wrap(&song, 3, &v, 1920, 0); song_touch_settle(&song, 3); song_touch_again(&song, 3, &v, 7, 50, 0);
+    CHECK_EQ(song_touch_release(&song, 3, &v, 300), 30);
+    CHECK_EQ(song_lane_at(&song, 3, 7, 100), 50);
+    CHECK_EQ(song_lane_at(&song, 3, 7, 500), 30);
+    CHECK_EQ(song_lane_at(&song, 3, 7, 1000), 50);
+    CHECK_EQ(song_lane_at(&song, 3, 7, 5000), 50);
+    CHECK_EQ(lane_count(3, 7), 3);
+}
+
 int main(void)
 {
     test_catalog();
     test_reading();
     test_playback();
     test_touch();
+    test_latch_loop();
     test_integration();
     test_hold();
     return report("test_lanes");

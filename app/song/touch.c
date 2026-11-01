@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
-/* Knob recording in touch style. See touch.h. */
+/* Knob recording in latch style. See touch.h. */
 #include "touch.h"
 #include "song_config.h"
 #if SONG_UI
@@ -22,7 +22,9 @@ SONG_SMALL void song_touch_move(struct song *s, unsigned track, struct song_touc
                                 uint32_t clock)
 {
     uint32_t grid = clock - clock % SONG_TOUCH_GRID;
-    if (!t->active || t->lane != lane || grid < t->from) { t->active = 1; t->lane = (uint8_t)lane; t->from = grid; }
+    if (!t->active || t->lane != lane || grid < t->from) {
+        t->active = 1; t->lane = (uint8_t)lane; t->from = grid; t->under = -1;
+    }
     t->last = grid;
     t->value = (uint8_t)value;
     unsigned count;
@@ -30,6 +32,15 @@ SONG_SMALL void song_touch_move(struct song *s, unsigned track, struct song_touc
     int at = song_lane_find(s, track, lane, grid);
     if (before(s, track, t, grid) != (int)value) (void)song_lane_set(s, track, lane, grid, value, 1);
     else if (at >= 0 && fresh(&e[at])) (void)song_remove(s, track, (unsigned)at); /* back where it was */
+}
+/* The older changes from the touch's start to `end`, and at it if
+ * `inclusive`, go. */
+SONG_SMALL static void clear(struct song *s, unsigned track, const struct song_touch *t, uint32_t end, int inclusive)
+{
+    unsigned count, stop = song_find(s, track, inclusive ? end + 1U : end);
+    const struct song_event *e = song_track(s, track, &count);
+    for (unsigned i = stop, first = song_find(s, track, t->from); i-- > first;)
+        if (on_lane(&e[i], t->lane) && !fresh(&e[i])) (void)song_remove(s, track, i);
 }
 SONG_SMALL int song_touch_release(struct song *s, unsigned track, struct song_touch *t, uint32_t clock)
 {
@@ -39,17 +50,48 @@ SONG_SMALL int song_touch_release(struct song *s, unsigned track, struct song_to
     if (end < t->last) end = t->last;
     unsigned count, stop = song_find(s, track, end + 1U);
     const struct song_event *e = song_track(s, track, &count);
-    /* The older curve at the end, before anything goes. */
+    /* The older curve at the end, before anything goes. On a loop pass after
+     * the first that's the pass before: its changes since the loop's start,
+     * or what it had there (under), which this pass wrote over. */
     int old = -1;
     for (unsigned i = stop; i-- > 0 && old < 0;)
-        if (on_lane(&e[i], t->lane) && !fresh(&e[i])) old = (int)song_event_value(&e[i]);
+        if (on_lane(&e[i], t->lane) && !fresh(&e[i]) && (t->under < 0 || song_event_start(&e[i]) >= t->from))
+            old = (int)song_event_value(&e[i]);
+    if (old < 0) old = t->under;
     for (unsigned i = stop; i < count && old < 0; ++i)
         if (on_lane(&e[i], t->lane) && !fresh(&e[i])) old = (int)song_event_value(&e[i]);
-    for (unsigned i = stop, first = song_find(s, track, t->from); i-- > first;)
-        if (on_lane(&e[i], t->lane) && !fresh(&e[i])) (void)song_remove(s, track, i);
+    clear(s, track, t, end, 1);
     if (old < 0 || old == t->value) return old;
     uint32_t back = end > t->last ? end : end + SONG_TOUCH_GRID;
     if (song_lane_find(s, track, t->lane, back) < 0) (void)song_lane_set(s, track, t->lane, back, (unsigned)old, 1);
     return old;
+}
+SONG_SMALL void song_touch_wrap(struct song *s, unsigned track, struct song_touch *t, uint32_t end, int first)
+{
+    if (!t->active) return;
+    if (first) { /* the lane's older value at the loop's end goes on after it */
+        unsigned count, stop = song_find(s, track, end + 1U);
+        const struct song_event *e = song_track(s, track, &count);
+        int old = -1;
+        for (unsigned i = stop; i-- > 0 && old < 0;)
+            if (on_lane(&e[i], t->lane) && !fresh(&e[i])) old = (int)song_event_value(&e[i]);
+        if (old >= 0 && song_lane_find(s, track, t->lane, end) < 0) (void)song_lane_set(s, track, t->lane, end, (unsigned)old, 0);
+    }
+    clear(s, track, t, end, 0);
+}
+SONG_SMALL void song_touch_settle(struct song *s, unsigned track)
+{
+    unsigned count;
+    song_track(s, track, &count);
+    for (struct song_event *e = s->event + s->first[track]; count--; ++e)
+        if (!song_is_note(e)) e->at &= ~SONG_FRESH;
+}
+SONG_SMALL void song_touch_again(struct song *s, unsigned track, struct song_touch *t, unsigned lane, unsigned value,
+                                 uint32_t start)
+{
+    int under = song_lane_at(s, track, lane, start);
+    t->active = 0;
+    song_touch_move(s, track, t, lane, value, start);
+    t->under = (int16_t)under;
 }
 #endif
