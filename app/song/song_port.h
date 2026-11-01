@@ -122,6 +122,22 @@ unsigned song_chord_waiting(void); /* strum notes still to go */
 void song_chord_forget(void); /* a song loaded or new */
 void song_port_chord_take(unsigned track, const uint8_t *pitch, const uint8_t *offset, unsigned count);
 void song_port_chord_drop(unsigned track, unsigned pitch);
+/* Per-note pitch on sampler tracks (song_tune.c, 0.6.6). A note about to
+ * start sets its pad's tune to the user's setting plus its semitones, when
+ * the pad has something else. Stopped, the pads go back to the user's
+ * settings two blocks after the last sampler note (settle, each poll, 1
+ * while it waits), and at once before the sounds are captured or replaced
+ * (restore, and forget, which also drops what it knew of the edited
+ * marks). clean: the tracks whose edited mark only our changes set, while
+ * nothing else has been edited. A live key tunes its pad too, and a take
+ * gets its semitones (taken, once). */
+void song_tune_note(unsigned track, unsigned pitch, int semitones);
+void song_tune_restore(void);
+unsigned song_tune_settle(void);
+void song_tune_forget(void);
+unsigned song_tune_clean(void);
+void song_tune_live(unsigned track, unsigned pitch, int semitones);
+int song_tune_taken(void);
 /* K1 to K4 while recording (song_knobs.c): each drives a lane on the take
  * track, chosen per track (lanes.h), recorded in touch style. */
 unsigned song_port_engine(unsigned track);

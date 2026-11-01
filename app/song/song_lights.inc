@@ -65,10 +65,33 @@ static int song_chord_panel(uint32_t keys, unsigned mode)
     return took;
 }
 #endif
-/* Out-of-scale keys snap up to the next scale note on pitched tracks. */
+#if SONG_UI
+/* Chromatic mode (0.6.6): on a sampler track with it on, every key on the
+ * song pages plays the chosen pad, at the key's semitones from C4 after
+ * the octave, at most 24 either way. */
+static unsigned song_chromatic(void)
+{
+    return page >= SONG && song_chromatic_on(song_port_song(), track) && groove_source_type(track) == GROOVE_SAMPLE;
+}
+static int song_key_semitones(unsigned key)
+{
+    int n = (int)key - 7 + 12 * octave; /* F3 is 7 below C4 */
+    return n < -GLITCH_TUNE_MAX ? -GLITCH_TUNE_MAX : n > GLITCH_TUNE_MAX ? GLITCH_TUNE_MAX : n;
+}
+/* A key going down: its pad tuned to the key's semitones, or to none. */
+static void song_key_tune(unsigned key, unsigned note)
+{
+    song_tune_live(track, note, song_chromatic() ? song_key_semitones(key) : 0);
+}
+#else
+#define song_key_tune(key, note) ((void)0)
+#endif
+/* Out-of-scale keys snap up to the next scale note on pitched tracks, and
+ * in chromatic mode every key is the chosen pad. */
 static unsigned song_key_note(unsigned note)
 {
 #if SONG_UI
+    if (song_chromatic()) return groove_pad_note(track, song_chromatic_pad(song_port_song(), track));
     if (note > 127 || page < SONG || groove_pad_count(track)) return note;
     return song_scale_snap(song_port_song(), note);
 #else

@@ -330,8 +330,9 @@ static void test_step(void)
     CHECK(count == 9 && e[6].length + 0U == e[7].length + 30U && e[7].length + 30U == e[8].length + 60U && e[6].length > gate);
 }
 
-/* Song files: the settings and types round trip in version 4, a version 3
- * file loads with chord mode off, and settings out of range are refused. */
+/* Song files: the settings and types round trip (version 4 on), a version 3
+ * file loads with chord mode off, and settings out of range are refused.
+ * Version 5's chromatic bytes come after them. */
 enum { SECTORS = 8, BYTES = SECTORS * POOL_SECTOR };
 static uint8_t flash[BYTES], file[BYTES];
 static int f_read(uint32_t at, void *data, size_t n) { if (at + n > BYTES) return -1; memcpy(data, flash + at, n); return 0; }
@@ -363,21 +364,21 @@ static void test_file(void)
         song.chord[t] = song_chord_setting(t & 1U, t % 3U, t % 5U, t % 4U);
         song.chord_type[t] = (uint8_t)(t * 3U % CHORD_TYPES);
     }
-    uint32_t bytes = write_song(&song);
-    CHECK(bytes > 0 && file[0] == 4);
+    uint32_t bytes = write_song(&song), chords = bytes - 3U * SONG_TRACKS; /* chords, types, then chromatic */
+    CHECK(bytes > 0 && file[0] == SONG_FILE_VERSION);
     CHECK_EQ(song_file_read(&other, file, bytes, &sounds, &n), 0);
     CHECK(!memcmp(other.chord, song.chord, sizeof song.chord) && !memcmp(other.chord_type, song.chord_type, sizeof song.chord_type));
     CHECK_EQ(write_song(&other), bytes);
     file[0] = 3;                                               /* version 3: no chord bytes, chord mode off */
-    CHECK_EQ(song_file_read(&other, file, bytes - 16U, &sounds, &n), 0);
+    CHECK_EQ(song_file_read(&other, file, chords, &sounds, &n), 0);
     unsigned any = 0;
     for (unsigned t = 0; t < SONG_TRACKS; ++t) any |= other.chord[t] | other.chord_type[t];
     CHECK_EQ(any, 0);
     CHECK_EQ(song_file_check(file, bytes, &sounds, &n), -1);   /* version 3 with chord bytes after */
-    file[0] = 4;
+    file[0] = SONG_FILE_VERSION;
     unsigned refused = 0, bad = 0;
     for (unsigned v = 0; v < 256; ++v) { /* each value of track 2's settings byte, and of its type */
-        file[bytes - 16U + 2U] = (uint8_t)v;
+        file[chords + 2U] = (uint8_t)v;
         unsigned valid = (v >> 1 & 3U) < 3U && (v >> 3 & 7U) < 5U;
         int r = song_file_check(file, bytes, &sounds, &n);
         refused += r != 0;
@@ -385,9 +386,9 @@ static void test_file(void)
     }
     CHECK_EQ(bad, 0);
     CHECK_EQ(refused, 256 - 2 * 3 * 5 * 4);
-    file[bytes - 16U + 2U] = song.chord[2];
+    file[chords + 2U] = song.chord[2];
     for (unsigned v = 0; v < 256; ++v) {
-        file[bytes - 8U + 5U] = (uint8_t)v;
+        file[chords + SONG_TRACKS + 5U] = (uint8_t)v;
         bad += (song_file_check(file, bytes, &sounds, &n) != 0) != (v >= CHORD_TYPES);
     }
     CHECK_EQ(bad, 0);

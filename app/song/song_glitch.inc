@@ -7,17 +7,17 @@
 #include "mangle.h"
 
 static const char *const song_glitch_names[GLITCH_FIELDS] = {
-    "REPEATS", "DRIFT", "SCALE", "FADE", "CHANCE", "OCTAVE", "RANGE", "ACCENT", "FLAM", "PAD SWAP"};
+    "REPEATS", "DRIFT", "SCALE", "FADE", "CHANCE", "OCTAVE", "RANGE", "ACCENT", "FLAM", "PAD SWAP", "TUNE"};
 
 static void song_glitch_value(uint32_t w, unsigned field, char out[12])
 {
     unsigned v = song_glitch_field(w, field);
     if (field == GLITCH_REPEATS) { if (v) { out[0] = 'X'; decimal(out + 1, (int)song_glitch_repeats(w), 1); } else strcpy(out, "OFF"); }
-    else if (field == GLITCH_DRIFT) {
-        int d = song_glitch_drift(w);
+    else if (field == GLITCH_DRIFT || field == GLITCH_TUNE) { /* semitones, or for drift scale steps */
+        int d = field == GLITCH_TUNE ? song_glitch_tune(w) : song_glitch_drift(w);
         out[0] = d < 0 ? '-' : '+';
         decimal(out + 1, d < 0 ? -d : d, 1);
-        strcat(out, song_glitch_field(w, GLITCH_SCALE) ? " SC" : " ST");
+        if (field == GLITCH_DRIFT) strcat(out, song_glitch_field(w, GLITCH_SCALE) ? " SC" : " ST");
     } else if (field == GLITCH_RANGE) { decimal(out, (int)v + 1, 1); strcat(out, " OCT"); }
     else if (field == GLITCH_ACCENT || field == GLITCH_FLAM) strcpy(out, v ? "ON" : "OFF");
     else if (field != GLITCH_CHANCE && !v) strcpy(out, "OFF");

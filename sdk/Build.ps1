@@ -243,6 +243,14 @@ function Package-Firmware {
                 $bytes = [IO.File]::ReadAllBytes((Join-Path $generated "$section.bin"))
                 $image.Write($bytes,0,$bytes.Length)
             }
+            # song-mode (0.6.6): the full build's code area has one size, the most the settings area's
+            # 32 KB minimum leaves (Package.cs), so every release has the same layout and installs with
+            # Start update. Zeros after the last section fill it, and the device never reads them.
+            if ($deviceFull) {
+                $area = 0xff000 - $variant.user_bytes - 4096 - 32768 - 0x4000 - 0x120 - 383 - 64
+                if ($image.Length -gt $area) { throw "The full build's code is $($image.Length) bytes, over its fixed area of $area." }
+                $image.Write((New-Object byte[] ($area - $image.Length)),0,$area - $image.Length)
+            }
             Add-Type -Path (Join-Path $sdk 'Package.cs')
             $layout = [FM1.Package]::Create($image.ToArray(),(Join-Path $sdk 'tools/pack'),$output,$variant.user_bytes,$firmwareProduct)
         } finally { $image.Dispose() }

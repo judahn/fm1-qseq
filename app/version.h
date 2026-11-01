@@ -5,6 +5,6 @@
 #define FM1_RELEASE_VERSION "V14"
 #define FM1_UPDATE_PRODUCT "FM-1_8000014"
 /* song-mode: QSEQ's release (semver), FM1 QY before 0.6.0. The two above are FM1 Open's upstream base. */
-#define QSEQ_VERSION "0.6.5"
+#define QSEQ_VERSION "0.6.6"
 
 #endif

@@ -15,9 +15,12 @@
  *   the clips: cell, length, event count and events. Version 3 lets the
  *   tracks hold clip blocks (blocks.h), the layout unchanged. Version 4
  *   adds each track's chord settings and chord type (chords.h) at the end.
- *   Older versions still load: version 3 with chord mode off, version 2
- *   with no blocks, and version 1 with an empty grid. */
-enum { SONG_FILE_VERSION = 4 };
+ *   Version 5 (0.6.6) adds each track's chromatic setting after them. A
+ *   note's glitch word can carry TUNE (glitch.h) in any version, its bits
+ *   unused before. Older versions still load: version 4 with chromatic mode
+ *   off, version 3 with chord mode off too, version 2 with no blocks, and
+ *   version 1 with an empty grid. */
+enum { SONG_FILE_VERSION = 5 };
 /* Streams the song into a writer, or with a writer that has no pool,
  * just counts it and takes its CRC. */
 void song_file_write(struct pool_writer *w, const struct song *s, const uint8_t *sounds, uint32_t sounds_bytes);

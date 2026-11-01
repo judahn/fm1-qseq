@@ -261,7 +261,7 @@ static void test_file(void)
     data = write_song(&song, &length);
     CHECK(data != NULL);
     memcpy(first, data, length);
-    CHECK_EQ(first[0], 4);
+    CHECK_EQ(first[0], SONG_FILE_VERSION);
     song_clip_open(&song, cells[1]);                       /* open in the editor: the same bytes */
     data = write_song(&song, &bytes);
     CHECK(bytes == length && !memcmp(data, first, length));
@@ -278,12 +278,12 @@ static void test_file(void)
     for (unsigned i = 0; i < 4; ++i) while (song.count[song_cell_part(cells[i])]) song_remove(&song, song_cell_part(cells[i]), 0);
     data = write_song(&song, &length);
     memcpy(first, data, length);
-    first[0] = 1;                                          /* version 4's chord bytes go too */
-    CHECK_EQ(song_file_read(&other, first, length - 3U - 2U * SONG_TRACKS, &block, &n), 0);
+    first[0] = 1;                                          /* version 4's chord and 5's chromatic bytes go too */
+    CHECK_EQ(song_file_read(&other, first, length - 3U - 3U * SONG_TRACKS, &block, &n), 0);
     CHECK(other.launch_q == 2 && other.events == 8 && consistent(&other));
     for (unsigned c = 0; c < SONG_CELLS; ++c) CHECK_EQ(other.clip_length[c], 0);
     CHECK_EQ(song_file_check(first, length, &block, &n), -1); /* version 1 with the grid's bytes after */
-    first[0] = 5;
+    first[0] = SONG_FILE_VERSION + 1;
     CHECK_EQ(song_file_check(first, length, &block, &n), -1);
     /* Cells out of order, and a clip with no length, are refused. */
     song.clip_length[song_cell(1, 0)] = 480;
@@ -291,7 +291,7 @@ static void test_file(void)
     data = write_song(&song, &length);
     memcpy(first, data, length);
     CHECK_EQ(song_file_check(first, length, &block, &n), 0);
-    const uint32_t last = length - 5U - 2U * SONG_TRACKS;   /* the last clip (cell, length, count 0), then the chords */
+    const uint32_t last = length - 5U - 3U * SONG_TRACKS;   /* the last clip (cell, length, count 0), then the chords and chromatic */
     first[last] = (uint8_t)song_cell(1, 0);
     CHECK_EQ(song_file_check(first, length, &block, &n), -1);
     first[last] = (uint8_t)song_cell(1, 1);

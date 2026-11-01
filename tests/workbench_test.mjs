@@ -77,7 +77,7 @@ const file2 = S.wrap(payload2);
 check(file2[4] === 2 && B.same(S.unwrap(file2), payload2), 'a version 2 file');
 const v1 = song(); v1.version = 1;
 const payload1 = S.encode(v1);
-check(payload1[0] === 1 && payload1.length === payload.length - 3 - 16 && B.same(S.encode(S.decode(payload1)), payload1), 'version 1 writes back as version 1');
+check(payload1[0] === 1 && payload1.length === payload.length - 3 - 24 && B.same(S.encode(S.decode(payload1)), payload1), 'version 1 writes back as version 1');
 const back1 = S.decode(payload1);
 check(back1.clips.length === 0 && back1.rows.length === 0 && back1.launchQ === 2, 'version 1 reads with an empty grid');
 const file1 = S.wrap(payload1);
@@ -88,7 +88,7 @@ const noLength = song(); noLength.clips = [{ cell: 9, length: 0, events: [] }];
 throws(() => S.decode(S.encode(noLength)), 'a clip with no length is refused');
 const tooMany = song(); tooMany.clips = [{ cell: 0, length: 480, events: Array.from({ length: 4096 }, (_, i) => S.event(i, S.KIND.NOTE, 60, 1, 1)) }];
 throws(() => S.decode(S.encode(tooMany)), 'clips over the event pool are refused');
-const future = payload2.slice(); future[0] = 4;
+const future = payload2.slice(); future[0] = S.VERSION + 1;
 throws(() => S.decode(future), 'a newer version is refused');
 check(SM.exportMidi(withClips).skipped.clips === 2, 'MIDI export reports the clips it leaves out');
 
@@ -103,24 +103,41 @@ withBlocks.clips = [{ cell: 2, length: 960, events: [S.event(0, S.KIND.NOTE, 72,
 withBlocks.tracks[0] = withBlocks.tracks[0].concat([S.block(1920, 2400, 2)]).sort(byClock);
 withBlocks.tracks[3] = [S.event(0, S.KIND.NOTE, 40, 100, 3000), S.block(960, 960, 15), S.block(2880, 100000, 16)];
 const payload3 = S.encode(withBlocks), back3 = S.decode(payload3);
-check(payload3[0] === 4 && B.same(S.encode(back3), payload3) && back3.tracks[0].filter(S.isBlock).length === 1 &&
+check(payload3[0] === S.VERSION && B.same(S.encode(back3), payload3) && back3.tracks[0].filter(S.isBlock).length === 1 &&
   S.blockLength(back3.tracks[3][2]) === 100000 && back3.tracks[3][2].a === 0xff, 'the blocks round trip, long ones and stops');
 const asThree = S.encode({ ...withBlocks, version: 3 });
-check(asThree[0] === 3 && asThree.length === payload3.length - 16 && B.same(S.encode(S.decode(asThree)), asThree), 'version 3 still reads and writes back as itself');
+check(asThree[0] === 3 && asThree.length === payload3.length - 24 && B.same(S.encode(S.decode(asThree)), asThree), 'version 3 still reads and writes back as itself');
 // Version 4 (phase 8): each track's chord settings and type, at the end. Version 3 reads with
 // chord mode off. Settings out of range are refused.
 const withChords = song();
 withChords.chords = Uint8Array.of(1, 1 | 1 << 1 | 4 << 3 | 2 << 6, 0, 2 << 1 | 3 << 6, 0, 0, 0, 1 | 3 << 3);
 withChords.chordTypes = Uint8Array.of(0, 11, 0, 5, 0, 0, 0, 2);
 const payload4 = S.encode(withChords), back4 = S.decode(payload4);
-check(payload4[0] === 4 && B.same(back4.chords, withChords.chords) && B.same(back4.chordTypes, withChords.chordTypes) &&
+check(payload4[0] === S.VERSION && B.same(back4.chords, withChords.chords) && B.same(back4.chordTypes, withChords.chordTypes) &&
   B.same(S.encode(back4), payload4), 'chord settings round trip');
 const chordsOff = S.decode(S.encode({ ...withChords, version: 3 }));
 check(chordsOff.chords.every(c => !c) && chordsOff.chordTypes.every(t => !t), 'version 3 reads with chord mode off');
 for (const [what, chords, types] of [['a voicing past smooth', Uint8Array.of(3 << 1, 0, 0, 0, 0, 0, 0, 0), new Uint8Array(8)],
   ['a strum past an 8th', Uint8Array.of(5 << 3, 0, 0, 0, 0, 0, 0, 0), new Uint8Array(8)], ['a type past add9', new Uint8Array(8), Uint8Array.of(0, 12, 0, 0, 0, 0, 0, 0)]])
   throws(() => S.decode(S.encode({ ...withChords, chords, chordTypes: types })), 'chord settings refused: ' + what);
-throws(() => S.decode(Uint8Array.from([...payload4.slice(0, payload4.length - 16), 0])), 'version 4 cut short is refused');
+throws(() => S.decode(Uint8Array.from([...payload4.slice(0, payload4.length - 16), 0])), 'a payload cut short is refused');
+const asFour = S.encode({ ...withChords, version: 4 }), backFour = S.decode(asFour);
+check(asFour[0] === 4 && asFour.length === payload4.length - 8 && B.same(S.encode(backFour), asFour) && B.same(backFour.chords, withChords.chords),
+  'version 4 still reads and writes back as itself');
+// Version 5 (0.6.6): each track's chromatic setting, after the chords: on in bit 3, the pad in bits 0 to 2.
+// Version 4 reads with it off, a value past 15 is refused, and a note's TUNE (glitch word bits 20 to 25)
+// travels with the glitch table as any attribute does. MIDI export counts a tuned note among the glitched.
+check(backFour.chromatic.every(c => !c), 'version 4 reads with chromatic mode off');
+const withChromatic = song();
+withChromatic.chromatic = Uint8Array.of(0, 0, 0, 0, 8 | 3, 0, 5, 0);
+withChromatic.glitch = [{ index: 2, word: 0x12345 }, { index: 3, word: (-5 & 63) << 20 }];
+withChromatic.tracks[5] = [{ at: (0 | 3 << 26) >>> 0, a: 36, b: 100, length: 120 }, ...withChromatic.tracks[5]];
+const payload5 = S.encode(withChromatic), back5 = S.decode(payload5);
+check(payload5[0] === 5 && payload5.length === payload4.length + 5 + 8 && B.same(back5.chromatic, withChromatic.chromatic) &&
+  B.same(S.encode(back5), payload5), 'chromatic settings round trip');
+check(back5.glitch[1].word === (-5 & 63) << 20 && S.glitchOf(back5.tracks[5][0]) === 3, 'a tuned note keeps its TUNE word');
+check(SM.exportMidi(back5).skipped.glitched === SM.exportMidi(withChords).skipped.glitched + 1, 'MIDI export leaves TUNE out, counted as glitch');
+throws(() => S.decode(S.encode({ ...withChromatic, chromatic: Uint8Array.of(16, 0, 0, 0, 0, 0, 0, 0) })), 'a chromatic setting past 15 is refused');
 const badCc = song(); badCc.tracks[2] = [S.event(0, S.KIND.CONTROL, 200, 5, 0)];
 throws(() => S.decode(S.encode(badCc)), 'a controller number past 127 is refused');
 const badVelocity = song(); badVelocity.tracks[2] = [S.event(0, S.KIND.NOTE, 60, 130, 10)];

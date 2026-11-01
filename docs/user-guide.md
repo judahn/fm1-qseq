@@ -272,6 +272,7 @@ time signature and, at the right, the span ALGO has zoomed to.
 | K2 | Velocity, 1 to 127, named by the nearest of PPP to FFFF. Past the top: random R1 to R4 |
 | K3 | Gate: 50, 90, 99 or 100% |
 | K4 | Pitch: move the selected notes by scale step, by octave with SHIFT. On drum tracks, from pad to pad. The footer says PITCH, OCTAVE or PAD |
+| SHIFT+K4 | On a sampler track: the selected notes' TUNE, a semitone at a time (below). The footer says TUNE and the value |
 | PRESETS | Move the pointer one step. SHIFT+PRESETS jumps note to note |
 | Hold SEL, turn PRESETS | Sweep a selection (below) |
 | ENV | Delete the selected notes |
@@ -330,9 +331,20 @@ a drum track that picks one pad, every hi-hat in two bars, say. Then:
 | K1, K3 | Length and gate: each note's length scales as the entry's does, 1/16 to 1/8 doubling them |
 | Glitch layer K1 to K3 | That field on every note |
 | K4 | Move every note, by scale step, octave or pad. A note whose new pitch is taken at its clock stays |
+| SHIFT+K4 | On a sampler track, TUNE on every note |
 
 Each is one undo step. A change undo couldn't hold (about 630 notes on the device) is refused with a notice,
 and nothing changes. The sweep ends when the pointer moves without SEL, a note goes in, or step entry is left.
+
+**Tuning sampler notes.** On a sampler track a note can play its pad higher or lower, up to 24 semitones
+either way. SHIFT+K4 turns the selected notes' TUNE a semitone at a time, or on an empty spot the next
+entry's. The footer says TUNE and the value, for example `TUNE +3`, and the SEL line shows it after the note,
+as in `C2+3`. Landing on a tuned note plays it at its pitch. A note with TUNE has the glitch mark on the roll,
+because TUNE is kept with the glitch attributes and counts toward the 31 settings a song holds. Other tracks
+ignore it, and on them SHIFT+K4 stays OCTAVE or PAD. Chromatic mode enters notes with TUNE from the keys
+(Chromatic mode).
+
+<img src="tune-step.png" width="300" alt="Step entry on a sampler track: SEL C2+3, pad 1 tuned 3 up">
 
 <img src="step-sweep.png" width="300" alt="A sweep with one pitch picked: PICK 8 NOTES"> <img src="phase4b-step-glitch.png" width="300" alt="The glitch layer's page 1: repeats, drift and fade">
 
@@ -356,6 +368,7 @@ Tap GLO on a song page. ALGO turns the five pages. They're saved with the song.
 | 3 | The parameter K1 records | ...K2 records | ...K3 records | ...K4 records |
 | 4 | Humanize timing, up to 30 clocks | Humanize velocity, up to 30 | | |
 | 5 | Chord mode on or off | Voicing | Strum | Direction |
+| 5, a sampler track | Chromatic mode on or off | The pad | | |
 
 <img src="phase2-settings.png" width="300" alt="Settings page 1: tempo, time signature, swing and length"> <img src="phase4-knobs.png" width="300" alt="Settings page 3: the parameters K1 to K4 record on track 2">
 
@@ -409,7 +422,8 @@ to 8/4, 1/8 to 16/8 and 1/16 to 16/16.
 
 ## Glitch
 
-Per-note glitch is in step entry: ARP there steps through the glitch layer's pages (see Step entry). Mangle is
+Per-note glitch is in step entry: ARP there steps through the glitch layer's pages (see Step entry). A sampler
+note's TUNE is there too, on SHIFT+K4 (Step entry, Chromatic mode). Mangle is
 SHIFT+F#3, G#3 and A#3 in the song view: scramble the 16ths, reverse the note order, or shuffle notes between
 the selected tracks. Humanize per track is on settings page 4. Swing is on page 1.
 
@@ -628,7 +642,8 @@ expands every block.
 ## Chord mode
 
 Chord mode is a setting per instrument track on settings page 5. It works on the song pages. The stock pages
-play single notes as before, and drum tracks ignore it.
+play single notes as before, and drum tracks ignore it. On a sampler track page 5 is chromatic mode instead
+(below).
 
 With it on, the keyboard splits:
 
@@ -661,7 +676,7 @@ Settings on page 5:
 
 | Knob | Setting |
 |---|---|
-| K1 | On or off. A drum track shows DRUMS |
+| K1 | On or off. An 808 track shows DRUMS, and a sampler track has chromatic mode here |
 | K2 | Voicing. CLOSE is the shape on the root. SPREAD lifts its second note an octave. SMOOTH picks the inversion nearest the last chord |
 | K3 | Strum, from the first note to the last: off, 1/64, 1/32, 1/16 or 1/8. It follows the tempo |
 | K4 | Direction: up, down, alternating (up first) or random |
@@ -670,6 +685,30 @@ One chord sounds at a time, at velocity 100, while its key is held. A chord reco
 strum. Input quantize moves a strummed chord as a whole, by its first note. In step entry a root enters its
 chord at the pointer, strummed when strum is on, and F5, F#5 and G5 enter the last chord again, an octave down
 or an octave up. Rest, tie and repeat stay on SHIFT there.
+
+## Chromatic mode
+
+Chromatic mode plays one sampler pad across the keys. It's a setting per sampler track on settings page 5,
+where other tracks have chord mode: K1 turns it on or off, K2 picks the pad, 1 to 8, and the page names its
+sound. It's saved with the song.
+
+<img src="tune-chromatic.png" width="300" alt="Settings page 5 on the sampler track: chromatic mode on, pad 3">
+
+With it on, every key on the song pages plays that pad. C4 plays it at the pad's own tune, and each key is a
+semitone from there, so F3 is 7 down and G5 is 19 up. OCT- and OCT+ move the keys an octave, and a key past 24
+semitones either way plays at 24. A take records the pad with each key's pitch as its TUNE, and in step entry
+a key enters the pad with its pitch (Step entry). The stock pages play the pads as before.
+
+**How it plays.** The FM-1's sampler has no pitch for a note, only each pad's tune, the setting on the sound
+pages. So just before a tuned note plays, its pad's tune is set to the pad's setting plus the note's TUNE. Once
+playing stops the setting comes back, two blocks (about 6 ms) after the last note, and at once before the
+song is saved, another is loaded or the kit changes. So a tuned note never changes a saved song. A tune turned
+on the sound pages meanwhile is kept as the new setting. A hit keeps its pitch once it has started, but a pad has
+one tune at a time: two hits of the same pad that start in the same 2.9 ms audio block both play at the later
+one's pitch, and now and then two a block apart do, when the first goes out a block late.
+
+MIDI export leaves TUNE out, as it does the other glitch attributes, since a drum note in a MIDI file has no
+pitch of its own. Normalize keeps it.
 
 ## The workbench
 

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* Time jobs: stretch, and normalize over the player's capture. See jobs.h. */
 #include "jobs.h"
+#include "glitch.h"
 #include "player.h"
 #include "song_config.h"
 #include <stdlib.h>
@@ -75,7 +76,8 @@ SONG_SMALL int song_job_stretch(struct song *s, const struct song_range *r, unsi
 }
 
 /* Normalize: the capture replaces the tracks' notes. Automation and the FX
- * lane stay. Its 36 KB come from the heap only while it runs. */
+ * lane stay. A sampler note keeps its TUNE, which no plain note can hold
+ * (0.6.6). Its 36 KB come from the heap only while it runs. */
 SONG_SMALL static int normalize(struct song *s, unsigned tracks, const struct song_player *live, struct song_event *baked,
                                 uint8_t *baked_track)
 {
@@ -92,7 +94,12 @@ SONG_SMALL static int normalize(struct song *s, unsigned tracks, const struct so
             if (s->swing) s->swing_tracks &= (uint8_t)~(1U << t);
             s->humanize_time[t] = s->humanize_velocity[t] = 0;
         }
-    for (int i = 0; i < n; ++i) (void)song_add_event(s, baked_track[i], &baked[i]);
+    for (int i = 0; i < n; ++i) {
+        int tune = (int)(baked[i].at >> SONG_GLITCH_SHIFT), at = 0;
+        if (tune) at = song_glitch_intern(s, song_glitch_turn(0, GLITCH_TUNE, tune > 31 ? tune - 64 : tune));
+        baked[i].at = (baked[i].at & 0xffffffU) | (uint32_t)(at > 0 ? at : 0) << SONG_GLITCH_SHIFT;
+        (void)song_add_event(s, baked_track[i], &baked[i]);
+    }
     return n;
 }
 SONG_SMALL int song_job_normalize(struct song *s, unsigned tracks, const struct song_player *live)

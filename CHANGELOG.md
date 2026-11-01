@@ -2,6 +2,32 @@
 
 The version is `QSEQ_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.6.6
+
+- A sampler note can play its pad at its own pitch, up to 24 semitones up or down. In step entry on a sampler
+  track, SHIFT+K4 turns the selected notes' TUNE a semitone at a time (the next entry's on an empty spot), the
+  footer saying TUNE and the value, for example `TUNE +3`, and the SEL line showing it after the note, as in
+  `C2+3`. Other tracks ignore TUNE, and SHIFT+K4 stays OCTAVE or PAD there.
+- Chromatic mode, on settings page 5 of a sampler track, where other tracks have chord mode: K1 turns it on, K2
+  picks the pad. Every key on the song pages then plays that pad, C4 at the pad's own tune and each key a
+  semitone from it, 24 at most either way. Takes record the pad with each key's pitch, and in step entry a key
+  enters the pad with its pitch.
+- How it plays: the sampler has no pitch per note, so a pad's tune is set to its setting plus the note's TUNE just
+  before the note plays. Once stopped the setting comes back two blocks after the last note, and before a
+  save, a load or a kit change, so a saved song never holds a note's tune. A tune turned on the sound pages
+  meanwhile is kept. Two hits of one pad starting in the same audio block share the later one's pitch.
+- Song files are version 5: each track's chromatic setting at the end. Older songs load with it off. TUNE sits
+  in bits of a note's glitch word that were unused, so it needs no version. MIDI export leaves it out with the
+  other glitch attributes. Normalize keeps it.
+- A kit's pad settings (level, tune, length, choke, variation, filter) apply when it goes on the pads, and a kit
+  made from the stock sample bank keeps the pads' settings. Both read the engine's count of copied settings as
+  a failure, so neither ever happened.
+- The full build's code area has one size from now on, 565,248 bytes, the most the settings area's 32 KB
+  minimum leaves, padded past the code. 0.6.4 and 0.6.5 needed one sector more than 0.6.3 had, which moved the
+  settings area, and Start update won't move it, so they never installed. Install this release once with
+  Force flash (the MIDI, clock and Bluetooth settings start from their defaults once, and songs and kits stay).
+  After that every release installs with Start update. The code has 13,497 bytes of room.
+
 ## 0.6.5
 
 - SHIFT+B3 pastes and moves on: it pastes over at the playhead, as SHIFT+A3 does, then moves the playhead and

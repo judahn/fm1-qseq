@@ -15,13 +15,16 @@ struct song_output {
     /* Automation: a controller (status 0xb0, number, value) or a program
      * change (0xc0, program). NULL leaves it out. */
     void (*control)(void *context, unsigned track, unsigned status, unsigned a, unsigned b);
+    /* A sampler track's note about to start (0.6.6): the semitones its pad
+     * plays at, from the note's TUNE, 0 for none. NULL leaves it out. */
+    void (*tune)(void *context, unsigned track, unsigned pitch, int semitones);
 #endif
 };
 enum { SONG_HELD = 16 }; /* sounding notes tracked per track */
 struct song_held { uint32_t end; uint8_t pitch; };
 /* A glitched note's repeats still to come (player_glitch.inc). */
 enum { SONG_HITS = 4 };
-struct song_hit { uint32_t start; uint16_t length; uint8_t pitch, velocity, repeats, next, fade, scale; int8_t drift; };
+struct song_hit { uint32_t start; uint16_t length; uint8_t pitch, velocity, repeats, next, fade, scale; int8_t drift, tune; };
 struct song_player {
     struct song *song;
     struct song_output out;
@@ -47,9 +50,10 @@ struct song_player {
      * program: the last program change sent per track, 0xff for none. */
     uint8_t touch_track, touch_lane[4], program[SONG_TRACKS];
     /* Glitch: repeats due per track, the pass count that seeds the random
-     * choices, and each drum track's pads (set by the port). */
+     * choices, each drum track's pads, and the sampler tracks, whose notes
+     * play their TUNE (set by the port). */
     struct song_hit hit[SONG_TRACKS][SONG_HITS];
-    uint8_t hits[SONG_TRACKS], pad_count[SONG_TRACKS], pads[SONG_TRACKS][16];
+    uint8_t hits[SONG_TRACKS], pad_count[SONG_TRACKS], pads[SONG_TRACKS][16], samplers;
     uint32_t pass;
     /* Clips (design 8f, player_clips.inc): what each track plays, a row of
      * the grid, SONG_FROM_SONG or SONG_FROM_STOP, a launch waiting for its
@@ -124,7 +128,9 @@ struct song_place { uint64_t inside; uint32_t at, rate; };
 #if SONG_UI
 /* Normalize's capture (player_bake.inc): the notes the tracks in the mask
  * would send from the top, rolled as the next start of `live` would roll
- * them, as plain notes with their tracks. How many, or -1 past `room`. */
+ * them, as plain notes with their tracks. A sampler note's TUNE, which no
+ * plain note can hold, rides in bits 26 to 31 of its `at` (0.6.6). How
+ * many, or -1 past `room`. */
 int song_player_bake(const struct song_player *live, struct song *s, unsigned tracks, struct song_event *out,
                      uint8_t *track, unsigned room);
 /* Launching (design 8f): a track to a row of the grid, back to the song or

@@ -29,7 +29,9 @@ static int default_name(const char name[12]);
 static void next_number(char name[12]);
 
 /* The sounds block: the 8 sound setups, mute and solo, the shared effects,
- * the arpeggiators and the tuning, as the stock project holds them. */
+ * the arpeggiators and the tuning, as the stock project holds them. Never
+ * with a note's tune on a pad (0.6.6), and a track that only those changes
+ * marked edited is captured clean (song_tune.c). */
 enum { SOUNDS = 1 + GROOVE_TRACKS * sizeof(struct groove_preset) + 2 + 4 + GROOVE_TRACKS * 2 +
                 GROOVE_TRACKS * sizeof(struct groove_tuning) };
 static uint8_t sounds[SOUNDS];
@@ -38,7 +40,10 @@ SONG_SMALL static void capture(void)
     struct groove_project *p = groove_project_scratch();
     struct groove_tuning tuning[GROOVE_TRACKS];
     uint8_t *at = sounds;
+    song_tune_restore();
     (void)groove_project_capture(p);
+    for (unsigned t = 0, clean = song_tune_clean(); t < GROOVE_TRACKS; ++t)
+        if (clean >> t & 1U) p->preset[t].modified = 0;
     memset(tuning, 0, sizeof tuning);
     (void)groove_arrangement_tuning_capture(tuning);
     *at++ = 1;
@@ -84,6 +89,7 @@ SONG_SMALL static void programs(struct song *s)
 SONG_SMALL static void bind(unsigned id)
 {
     struct kit k;
+    song_tune_restore(); /* the user's tunes before the kit's settings */
     if (kit_read(&pool, id, &k)) memset(&k, 0, sizeof k), id = 0;
     fm1_engine_pause();
     groove_samples_stop();
@@ -97,7 +103,7 @@ SONG_SMALL static void bind(unsigned id)
         if (groove_source_type(t) == GROOVE_SAMPLE)
             for (unsigned pad = 0; pad < KIT_PADS; ++pad) {
                 uint8_t now[GROOVE_TONE_PARAMS];
-                if (groove_tone_copy(t, pad, now)) continue;
+                if (groove_tone_copy(t, pad, now) < 0) continue; /* it returns how many it copied (0.6.6, 0 was taken as success) */
                 for (unsigned i = 0; i < KIT_PARAMS; ++i)
                     if (now[i] != k.params[pad][i]) groove_tone_edit(t, pad, i, (int)k.params[pad][i] - (int)now[i]);
             }
@@ -166,6 +172,7 @@ SONG_SMALL static int load_from(unsigned type, unsigned id)
     uint32_t bytes = 0;
     if (song_port_player()->playing) return SONG_STORE_PLAYING;
     if (!e || pool_check(&pool, e) || song_file_read(s, data, e->length, &block, &bytes)) return -1;
+    song_tune_forget(); /* the pads back before their sounds go */
     int r = apply(block, bytes);
     memcpy(sounds, block, SOUNDS);
     song_undo_init(song_port_undo());
@@ -183,6 +190,7 @@ SONG_SMALL int song_store_new(int factory)
 {
     struct song *s = song_port_song();
     if (song_port_player()->playing) return SONG_STORE_PLAYING;
+    song_tune_forget();
     if (factory >= 0) {
         struct groove_project *p = groove_project_scratch();
         if (groove_factory_build((unsigned)factory, p) || groove_project_apply(p)) return -1;

@@ -14,13 +14,17 @@
  *   CHANCE   plays 100, 87, 75, 62, 50, 37, 25 or 12% of the time
  *   OCTAVE   0, 25, 50 or 100% chance of an octave jump, RANGE 1 or 2
  *   ACCENT   a velocity boost, FLAM a grace hit a 64th before
- *   SWAP     0, 25, 50 or 100% chance of another pad, on drum tracks */
+ *   SWAP     0, 25, 50 or 100% chance of another pad, on drum tracks
+ *   TUNE     -24..24 semitones on the pad, on sampler tracks (0.6.6). Bits
+ *            20 to 25, two's complement. Other tracks ignore it */
 enum { GLITCH_REPEATS, GLITCH_DRIFT, GLITCH_SCALE, GLITCH_FADE, GLITCH_CHANCE, GLITCH_OCTAVE, GLITCH_RANGE,
-       GLITCH_ACCENT, GLITCH_FLAM, GLITCH_SWAP, GLITCH_FIELDS };
+       GLITCH_ACCENT, GLITCH_FLAM, GLITCH_SWAP, GLITCH_TUNE, GLITCH_FIELDS };
+enum { GLITCH_TUNE_MAX = 24 };
 enum { GLITCH_FLAM_CLOCKS = SONG_PPQ / 16, GLITCH_ACCENT_BOOST = 32, GLITCH_ENTRIES = 32 };
 unsigned song_glitch_field(uint32_t word, unsigned field);          /* raw value */
 uint32_t song_glitch_turn(uint32_t word, unsigned field, int delta); /* clamped */
 int song_glitch_drift(uint32_t word);
+int song_glitch_tune(uint32_t word); /* -24..24, a word from outside clamped */
 unsigned song_glitch_repeats(uint32_t word);
 unsigned song_glitch_percent(uint32_t word, unsigned field); /* FADE, CHANCE, OCTAVE, SWAP */
 uint32_t song_glitch_word(const struct song *s, const struct song_event *e);

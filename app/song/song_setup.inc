@@ -4,8 +4,8 @@
  * the metronome and the clips' launch quantize (8f). ALGO turns between the knob pages, and
  * the first eight white keys switch swing per track. The third page picks
  * the parameter each of K1 to K4 records on a track, the fourth sets the
- * track's humanize, and the fifth its chord mode (8g), SELECT for the track
- * on all three. */
+ * track's humanize, and the fifth its chord mode (8g), or on a sampler track
+ * its chromatic mode (0.6.6), SELECT for the track on all three. */
 
 static unsigned song_setup_page, song_setup_back = SONG, song_glo_from;
 static const char *const song_launch_names[5] = {"OFF", "BEAT", "BAR", "2 BARS", "4 BARS"};
@@ -48,37 +48,43 @@ static void song_humanize_draw(void)
     knob(3, "-", "--", colors[3]);
     song_hint("SELECT TRACK  ALGO PAGE  GLO BACK");
 }
-/* Page 5: chord mode for the current track (design 8g). The type is picked
- * on the keys, F4 to E5. */
+/* Page 5: chord mode for the current track (design 8g), the type picked on
+ * the keys, F4 to E5. On a sampler track, chromatic mode (0.6.6): on or
+ * off, and the pad every key plays. */
 static void song_chords_draw(void)
 {
     const struct song *s = song_port_song();
     static const char *const voicings[CHORD_VOICINGS] = {"CLOSE", "SPREAD", "SMOOTH"};
     static const char *const strums[CHORD_STRUMS] = {"OFF", "1/64", "1/32", "1/16", "1/8"};
     static const char *const directions[CHORD_DIRECTIONS] = {"UP", "DOWN", "ALTERNATE", "RANDOM"};
-    unsigned drums = groove_pad_count(track) != 0;
+    static const char *const labels[2][4] = {{"MODE", "VOICING", "STRUM", "DIRECTION"}, {"MODE", "PAD", "-", "-"}};
+    unsigned drums = groove_pad_count(track) != 0, pads = groove_source_type(track) == GROOVE_SAMPLE, pad = song_chromatic_pad(s, track);
+    char pad_text[12];
+    decimal(pad_text, (int)pad + 1, 1);
     const char *v[4] = {drums ? "DRUMS" : song_chord_on(s, track) ? "ON" : "OFF", voicings[song_chord_voicing(s, track) % 3U],
                         strums[song_chord_strum_of(s, track) % 5U], directions[song_chord_direction(s, track)]};
-    uint32_t sig = 0xc402U ^ track << 4 ^ (uint32_t)s->chord[track] << 8 ^ (uint32_t)s->chord_type[track] << 16 ^ drums << 24;
+    if (pads) { v[0] = song_chromatic_on(s, track) ? "ON" : "OFF"; v[1] = pad_text; v[2] = v[3] = "--"; }
+    uint32_t sig = 0xc402U ^ track << 4 ^ (uint32_t)s->chord[track] << 8 ^ (uint32_t)s->chord_type[track] << 16 ^ drums << 24 ^
+                   (uint32_t)s->chromatic[track] << 25 ^ pads << 31;
     if ((!paint_rendering || (paint_top < 192 && paint_top + PAINT_ROWS > 30)) && sig != cache->middle_cache) {
         cache->middle_cache = sig;
         paint_fill(0, 30, 240, 162, BACK);
         if (paint_rendering) {
-            static const char *const labels[4] = {"MODE", "VOICING", "STRUM", "DIRECTION"};
-            text(8, 40, "CHORDS", 1, DIM, BACK);
+            text(8, 40, pads ? "CHROMATIC" : "CHORDS", 1, DIM, BACK);
             text(92, 37, "T", 2, colors[track], BACK);
             number(106, 37, (int)track + 1, 1, 2, colors[track], BACK);
-            for (unsigned k = 0; k < 4; ++k) song_setup_row(68 + k * 24, labels[k], v[k], !drums);
-            text(8, 170, "TYPE", 1, DIM, BACK);
-            text(84, 170, song_chord_names[s->chord_type[track] % CHORD_TYPES], 1, TEXT, BACK);
+            for (unsigned k = 0; k < 4U - 2U * pads; ++k) song_setup_row(68 + k * 24, labels[pads][k], v[k], pads || !drums);
+            if (pads) {
+                text(8, 128, "EVERY KEY PLAYS THE PAD,", 1, DIM, BACK);
+                text(8, 140, "C4 AT ITS OWN PITCH", 1, DIM, BACK);
+            }
+            text(8, 170, pads ? "SOUND" : "TYPE", 1, DIM, BACK);
+            text(84, 170, pads ? groove_pad_label(track, pad) : song_chord_names[s->chord_type[track] % CHORD_TYPES], 1, TEXT, BACK);
         }
     }
     if (paint_rendering && paint_top + PAINT_ROWS <= 195) return;
-    knob(0, "MODE", v[0], colors[0]);
-    knob(1, "VOICING", v[1], colors[1]);
-    knob(2, "STRUM", v[2], colors[2]);
-    knob(3, "DIRECTION", v[3], colors[3]);
-    song_hint("SELECT TRACK  F4-E5 PICK THE TYPE");
+    for (unsigned k = 0; k < 4; ++k) knob(k, labels[pads][k], v[k], colors[k]);
+    song_hint(pads ? "SELECT TRACK  ALGO PAGE  GLO BACK" : "SELECT TRACK  F4-E5 PICK THE TYPE");
 }
 /* Page 3: the recording knobs of the current track. */
 static void song_knobs_draw(void)
@@ -184,10 +190,13 @@ static int song_setup_input(const struct fm1_controls *c, uint32_t *pressed, uin
     const int16_t *k = c->encoders + 2;
     if (song_setup_page == 4) {
         select_track(c->encoders[0]);
-        s->chord[track] = song_chord_setting((unsigned)clamp((int)song_chord_on(s, track) + k[0], 0, 1),
-                                             (unsigned)clamp((int)song_chord_voicing(s, track) + k[1], 0, CHORD_VOICINGS - 1),
-                                             (unsigned)clamp((int)song_chord_strum_of(s, track) + k[2], 0, CHORD_STRUMS - 1),
-                                             (unsigned)clamp((int)song_chord_direction(s, track) + k[3], 0, CHORD_DIRECTIONS - 1));
+        if (groove_source_type(track) == GROOVE_SAMPLE) /* chromatic mode (0.6.6) */
+            s->chromatic[track] = (uint8_t)(clamp((int)song_chromatic_on(s, track) + k[0], 0, 1) * SONG_CHROMATIC_ON |
+                                            clamp((int)song_chromatic_pad(s, track) + k[1], 0, 7));
+        else s->chord[track] = song_chord_setting((unsigned)clamp((int)song_chord_on(s, track) + k[0], 0, 1),
+                                                  (unsigned)clamp((int)song_chord_voicing(s, track) + k[1], 0, CHORD_VOICINGS - 1),
+                                                  (unsigned)clamp((int)song_chord_strum_of(s, track) + k[2], 0, CHORD_STRUMS - 1),
+                                                  (unsigned)clamp((int)song_chord_direction(s, track) + k[3], 0, CHORD_DIRECTIONS - 1));
     } else if (song_setup_page == 3) {
         select_track(c->encoders[0]);
         s->humanize_time[track] = (uint8_t)clamp(s->humanize_time[track] + k[0], 0, 30);

@@ -144,7 +144,7 @@ SONG_SMALL int groove_samples_finish(void)
         if (groove_source_type(t) == GROOVE_SAMPLE) {
             for (unsigned pad = 0; pad < KIT_PADS; ++pad) {
                 uint8_t values[GROOVE_TONE_PARAMS];
-                if (!groove_tone_copy(t, pad, values)) memcpy(import.kit.params[pad], values, KIT_PARAMS);
+                if (groove_tone_copy(t, pad, values) >= 0) memcpy(import.kit.params[pad], values, KIT_PARAMS); /* a count, not 0 (0.6.6) */
             }
             import.kit.has_params = 1;
         }

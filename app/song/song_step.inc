@@ -16,9 +16,11 @@ static const uint8_t song_glitch_pages[3][3] = {
 static const char *grid_hint(void); /* song_grid_draw.inc */
 #include "song_roll.inc"
 
-/* The selection: note names, as many as fit, or a sweep's count. */
+/* The selection: note names, as many as fit, or a sweep's count. A sampler
+ * note's TUNE follows its name, as in C2+3 (0.6.6). */
 static void step_names(const struct song_step *st, char out[40])
 {
+    unsigned sampler = groove_source_type(st->track) == GROOVE_SAMPLE;
     unsigned index[STEP_CHORD], n = step_selection(st, index);
     uint32_t from, to;
     out[0] = 0;
@@ -30,10 +32,12 @@ static void step_names(const struct song_step *st, char out[40])
     }
     if (!n) { strcpy(out, "EMPTY"); return; }
     for (unsigned i = 0; i < n && strlen(out) < 28; ++i) {
-        char name[12];
+        char name[12], tune[12];
+        uint32_t word = song_glitch_word(st->song, &st->song->event[index[i]]);
         note_name(st->song->event[index[i]].a, name);
         if (i) strcat(out, " ");
         strcat(out, name);
+        if (sampler && song_glitch_tune(word)) { song_glitch_value(word, GLITCH_TUNE, tune); strcat(out, tune); }
     }
 }
 /* A take's line: armed for a clip's next pass, the count-in, or its mode. */
@@ -148,7 +152,10 @@ static void song_step_draw(void)
         knob(1, "VELOCITY", velocity, colors[1]);
         knob(2, "GATE", gate, colors[2]);
     }
-    knob(3, groove_pad_count(step_now.track) ? "PAD" : shift ? "OCTAVE" : "PITCH", "< >", colors[3]); /* the pitch knob (0.5.2) */
+    char tune[12] = "< >";
+    unsigned tuning = shift && groove_source_type(step_now.track) == GROOVE_SAMPLE; /* SHIFT+K4 on a sampler: TUNE (0.6.6) */
+    if (tuning) song_glitch_value(st->glitch, GLITCH_TUNE, tune);
+    knob(3, tuning ? "TUNE" : groove_pad_count(step_now.track) ? "PAD" : shift ? "OCTAVE" : "PITCH", tune, colors[3]); /* the pitch knob (0.5.2) */
     char page_hint[40] = "GLITCH 1/3  ARP NEXT";
     page_hint[7] = (char)('0' + song_glitch_layer);
     if (song_glitch_layer == 1) strcpy(page_hint, "GLITCH 1/3  SHIFT+K2 SCALE  ARP NEXT");

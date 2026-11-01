@@ -126,6 +126,10 @@ struct song {
     /* Chord mode (design 8g, chords.h): each track's settings and the type
      * picked last. */
     uint8_t chord[SONG_TRACKS], chord_type[SONG_TRACKS];
+    /* Chromatic mode (0.6.6): on a sampler track the keys play one pad at
+     * their pitch. Bit 3 on, bits 0 to 2 the pad. A preference, like the
+     * chord settings, so undo leaves it. */
+    uint8_t chromatic[SONG_TRACKS];
 #endif
 };
 #if SONG_UI
@@ -139,6 +143,9 @@ static inline unsigned song_owner(const struct song *s, unsigned part)
 static inline unsigned song_editing(const struct song *s) { return s->open ? (s->open - SONG_TRACKS) / SONG_GRID_ROWS : 0xffU; }
 /* Bars on the timeline: the song's, or a clip's longest while one is open. */
 static inline unsigned song_bars(const struct song *s) { return s->open ? SONG_CLIP_BARS : s->bars; }
+enum { SONG_CHROMATIC_ON = 8 };
+static inline unsigned song_chromatic_on(const struct song *s, unsigned t) { return s->chromatic[t] >> 3 & 1U; }
+static inline unsigned song_chromatic_pad(const struct song *s, unsigned t) { return s->chromatic[t] & 7U; }
 #else
 static inline unsigned song_bars(const struct song *s) { return s->bars; }
 #endif

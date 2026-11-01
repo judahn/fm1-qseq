@@ -95,6 +95,19 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     case 57: { uint32_t v; memcpy(&v, song.name, 4); return v; } /* the working song's name (0.3.1) */
     case 58: return song_panel_probe(index); /* 0.5.0: the roll's zoom, the glitch page, what shows, the sweep, and the song view's zoom (0.5.2) */
     case 59: return track ? player.start_song : player.start_at; /* the start point (0.5.0) */
+    case 60: { /* a pad's tune as the engine has it, and the track's edited mark (0.6.6) */
+        uint8_t v[GROOVE_TONE_PARAMS];
+        struct groove_view g = {0};
+        groove_get_view(track & 7U, 0, &g);
+        return groove_tone_copy(track & 7U, index, v) < 0 ? 0xffffU : v[SAMPLE_DRUM_TUNE] | (uint32_t)g.modified << 8;
+    }
+    case 63: { /* a pad's six settings, the first four bytes (index 0 to 7) or the last two (8 to 15) (0.6.6) */
+        uint8_t v[GROOVE_TONE_PARAMS] = {0};
+        if (groove_tone_copy(track & 7U, index & 7U, v) < 0) return 0xffffffffU;
+        return index < 8 ? v[0] | (uint32_t)v[1] << 8 | (uint32_t)v[2] << 16 | (uint32_t)v[3] << 24 : v[4] | (uint32_t)v[5] << 8;
+    }
+    case 61: return song.chromatic[track & 7U]; /* chromatic mode (0.6.6) */
+    case 62: return step.glitch; /* step entry's entry word */
 #endif
     case 18: return index < count ? e[index].b : 0;
     case 19: return song.swing | (uint32_t)song.swing_grid << 8 | (uint32_t)song.swing_tracks << 16;
@@ -117,6 +130,13 @@ SONG_EXPORT("sim_song_kit_copy") int sim_song_kit_copy(void) { return sim_song_k
 /* A tempo change set as an import or an old song can bring it, hundredths
  * and all, which the tempo knobs snap to their grid (0.5.2). */
 SONG_EXPORT("sim_song_tempo") int sim_song_tempo(unsigned clock, unsigned bpm100) { return song_port_set_tempo(clock, bpm100); }
+/* For the TUNE checks (0.6.6): a pad's tune turned as on the sound pages,
+ * and a note's glitch word as a song file can bring it, on any track. */
+SONG_EXPORT("sim_song_tone") void sim_song_tone(unsigned track, unsigned pad, int delta) { groove_tone_edit(track, pad, SAMPLE_DRUM_TUNE, delta); }
+SONG_EXPORT("sim_song_glitch") int sim_song_glitch(unsigned track, unsigned index, uint32_t word)
+{
+    return song_glitch_apply(&song, track, index, word);
+}
 /* Phase 5b: the page's stock sample loader sends its bank through the
  * transfer calls, so it lands in the pool as a kit, and templates are
  * songs made from the factory sound sets, saved so they can be read out. */

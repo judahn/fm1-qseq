@@ -2585,7 +2585,7 @@ controls_done:
 #endif
     for (unsigned key = 0; key < 27; ++key) {
         unsigned note = groove_key_note(track, key, octave);
-        note = song_key_note(note); /* song-mode: scale */
+        note = song_key_note(note); /* song-mode: scale, and chromatic mode's pad (0.6.6) */
         if (key_note[key] != 0xff &&
             (mode || !(keys & (1U << key)) ||
              (key_note[key] != note && !(project_keys & (1U << key))) || key_track[key] != track)) {
@@ -2595,6 +2595,7 @@ controls_done:
             project_keys &= ~(1U << key);
         }
         if (!mode && note < 128 && (keys & (1U << key)) && key_note[key] == 0xff) {
+            song_key_tune(key, note); /* song-mode: chromatic mode's pitch on the pad (0.6.6) */
             if (!post((uint8_t)(0x90 + groove_midi_input_channel(track)), (uint8_t)note, 100, 3))
                 return 0;
             key_note[key] = (uint8_t)note;

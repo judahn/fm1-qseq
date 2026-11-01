@@ -18,7 +18,7 @@ uploading the file gives the device the same bytes back, so device to file to de
 | Offset | Size | Field |
 |---|---|---|
 | 0 | 4 | Magic `FMSG` (`46 4D 53 47`) |
-| 4 | 2 | File version, the payload's: 1 to 4 |
+| 4 | 2 | File version, the payload's: 1 to 5 |
 | 6 | 2 | Flags, 0 |
 | 8 | 4 | Payload length |
 | 12 | 4 | CRC-32 of the payload |
@@ -115,7 +115,37 @@ The type is 0 in key, 1 major, 2 minor, 3 7, 4 m7, 5 maj7, 6 6, 7 sus2, 8 sus4, 
 voicing past smooth, a strum past an 8th or a type past add9 is refused. A version 3 song loads with chord
 mode off on every track.
 
-The device saves every song as version 4 and reads all four. The workbench reads all four, writes a song back
+### Song payload, version 5 (0.6.6, chromatic mode)
+
+Version 5 is version 4 with the payload version byte 5 and 8 bytes at the very end, after the chord types:
+each track's chromatic setting.
+
+| Bits of the setting | Field |
+|---|---|
+| 0 to 2 | The pad, 0 to 7 for pads 1 to 8 |
+| 3 | Chromatic mode on |
+
+A setting past 15 is refused. A version 4 song, or older, loads with chromatic mode off on every track.
+
+A note's glitch word can hold TUNE in bits 20 to 25, in any version: its semitones on a sampler pad, two's
+complement, -24 to 24. Those bits were unused before 0.6.6 and the loader has always taken any word, so no
+version is needed for it. A value past 24 either way plays as 24. Only sampler tracks play TUNE.
+
+| Bits of a glitch word | Field |
+|---|---|
+| 0 to 2 | Repeats: 1, 2, 3, 4, 6 or 8 |
+| 3 to 6 | Drift, -8 to 7 |
+| 7 | Drift by scale steps |
+| 8 and 9 | Fade |
+| 10 to 12 | Chance |
+| 13 and 14 | Octave jump |
+| 15 | Octave range |
+| 16 | Accent |
+| 17 | Flam |
+| 18 and 19 | Pad swap |
+| 20 to 25 | Tune (0.6.6) |
+
+The device saves every song as version 5 and reads all five. The workbench reads all five, writes a song back
 in the version it came in, and wraps each payload in a file of the same version, so an older song file keeps
 its bytes.
 
@@ -197,8 +227,9 @@ Tracks 2 to 9 are the FM-1 tracks 1 to 8 on MIDI channels 1 to 8, named after th
 controllers and program changes, and a program change at the start when the track's saved program is known
 and nothing else sits there. Every track ends at the end of the last bar. Clip blocks are expanded into what
 they play, as the device's Expand job does: the clip pass after pass from the block's start, cut off at its
-end, the track's own events inside it gone, and the controllers set at its edges. Glitch attributes, an older
-file's FX lane, humanize and the clip grid itself are left out (the workbench says how many), and stay in the song file.
+end, the track's own events inside it gone, and the controllers set at its edges. Glitch attributes (a sampler
+note's TUNE among them, since a drum note in MIDI has no pitch of its own), an older file's FX lane, humanize
+and the clip grid itself are left out (the workbench says how many), and stay in the song file.
 
 The workbench also lists the open song's clips, and copies one into a cell of a song on the device. Its glitch
 attributes move to that song's glitch table, and a note whose attributes don't fit there plays plain.

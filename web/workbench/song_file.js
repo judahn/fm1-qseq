@@ -7,8 +7,9 @@
  * quantize, the row names and the clips. Version 3 lets the tracks hold
  * clip blocks (an FX event with bit 7 of `a` set, the row or 0xff for a
  * stop, and a 24-bit length, bits 16 to 23 in `b`). Version 4 (phase 8)
- * adds each track's chord settings and chord type at the end. Older
- * versions still read and write back as themselves. */
+ * adds each track's chord settings and chord type at the end, and version 5
+ * (0.6.6) each track's chromatic setting after them. Older versions still
+ * read and write back as themselves. */
 (function (root) {
   'use strict';
   const ns = root.FM1SongWorkbench = root.FM1SongWorkbench || {};
@@ -16,7 +17,7 @@
 
   const LIMITS = { tracks: 8, events: 4096, tempos: 32, meters: 32, markers: 16, bars: 999, clock: 0xffffff,
     tempoMin: 2000, tempoMax: 30000, sounds: 1999, preset: 223, rows: 16, cells: 128 };
-  const VERSION = 4;
+  const VERSION = 5;
   const KIND = { NOTE: 0, CONTROL: 1, PROGRAM: 2, FX: 3 };
   const ENGINES = ['DX7', '303', '808', 'PSG', 'PLUCK', 'SAMPLER'];
   const MAGIC = 0x47534d46; /* "FMSG" */
@@ -124,6 +125,11 @@
       song.chordTypes = r.take(8).slice();
       check(song.chords.every(c => (c >> 1 & 3) < 3 && (c >> 3 & 7) < 5) && song.chordTypes.every(t => t < 12), 'Chord settings out of range');
     }
+    song.chromatic = new Uint8Array(8);
+    if (version > 4) {
+      song.chromatic = r.take(8).slice();
+      check(song.chromatic.every(c => c < 16), 'Chromatic settings out of range');
+    }
     check(eventCount(song) <= LIMITS.events, 'More events than a song holds');
     check(!r.left, 'Song data has extra bytes');
     return song;
@@ -150,6 +156,7 @@
       for (const c of clips) { w.u8(c.cell).u16(c.length); putEvents(w, c.events); }
     }
     if (version > 3) w.put(song.chords || new Uint8Array(8)).put(song.chordTypes || new Uint8Array(8));
+    if (version > 4) w.put(song.chromatic || new Uint8Array(8));
     return w.done();
   }
   const eventCount = song => song.tracks.reduce((n, list) => n + list.length, 0) +

@@ -7,23 +7,35 @@
 #if SONG_UI
 
 static const struct { uint8_t shift, max; } fields[GLITCH_FIELDS] = {
-    {0, 5}, {3, 15}, {7, 1}, {8, 3}, {10, 7}, {13, 3}, {15, 1}, {16, 1}, {17, 1}, {18, 3}};
+    {0, 5}, {3, 15}, {7, 1}, {8, 3}, {10, 7}, {13, 3}, {15, 1}, {16, 1}, {17, 1}, {18, 3}, {20, 63}};
 
+SONG_SMALL static unsigned mask(unsigned field)
+{
+    unsigned max = fields[field].max;
+    return max > 15 ? 63U : max > 7 ? 15U : max > 3 ? 7U : max > 1 ? 3U : 1U;
+}
 SONG_SMALL unsigned song_glitch_field(uint32_t word, unsigned field)
 {
-    unsigned bits = fields[field].max > 7 ? 15U : fields[field].max > 3 ? 7U : fields[field].max > 1 ? 3U : 1U;
-    return word >> fields[field].shift & bits;
+    return word >> fields[field].shift & mask(field);
 }
-SONG_SMALL int song_glitch_drift(uint32_t word)
+/* DRIFT and TUNE are two's complement, so 0 is none. */
+SONG_SMALL static int signed_field(uint32_t word, unsigned field)
 {
-    int raw = (int)song_glitch_field(word, GLITCH_DRIFT);
-    return raw > 7 ? raw - 16 : raw; /* 4-bit two's complement, so 0 is no drift */
+    int raw = (int)song_glitch_field(word, field), half = (int)(mask(field) + 1U) / 2;
+    return raw >= half ? raw - 2 * half : raw;
+}
+SONG_SMALL int song_glitch_drift(uint32_t word) { return signed_field(word, GLITCH_DRIFT); }
+SONG_SMALL int song_glitch_tune(uint32_t word)
+{
+    int tune = signed_field(word, GLITCH_TUNE);
+    return tune < -GLITCH_TUNE_MAX ? -GLITCH_TUNE_MAX : tune > GLITCH_TUNE_MAX ? GLITCH_TUNE_MAX : tune;
 }
 SONG_SMALL uint32_t song_glitch_turn(uint32_t word, unsigned field, int delta)
 {
-    unsigned bits = fields[field].max > 7 ? 15U : fields[field].max > 3 ? 7U : fields[field].max > 1 ? 3U : 1U;
-    int value = field == GLITCH_DRIFT ? song_glitch_drift(word) : (int)song_glitch_field(word, field);
-    int low = field == GLITCH_DRIFT ? -8 : 0, high = field == GLITCH_DRIFT ? 7 : fields[field].max;
+    unsigned bits = mask(field), tune = field == GLITCH_TUNE;
+    int value = field == GLITCH_DRIFT || tune ? signed_field(word, field) : (int)song_glitch_field(word, field);
+    int low = field == GLITCH_DRIFT ? -8 : tune ? -GLITCH_TUNE_MAX : 0;
+    int high = field == GLITCH_DRIFT ? 7 : tune ? GLITCH_TUNE_MAX : fields[field].max;
     value += delta;
     value = value < low ? low : value > high ? high : value;
     word &= ~(bits << fields[field].shift);

@@ -61,6 +61,7 @@ SONG_SMALL void song_file_write(struct pool_writer *w, const struct song *s, con
         if (s->clip_length[c]) { put8(w, c); put16(w, s->clip_length[c]); put_part(w, s, SONG_TRACKS + c); }
     pool_put(w, s->chord, sizeof s->chord); /* version 4: chord mode */
     pool_put(w, s->chord_type, sizeof s->chord_type);
+    pool_put(w, s->chromatic, sizeof s->chromatic); /* version 5: chromatic mode */
 }
 SONG_SMALL uint32_t song_file_bytes(const struct song *s, uint32_t sounds_bytes)
 {
@@ -222,6 +223,13 @@ SONG_SMALL static int parse(struct song *s, const uint8_t *data, uint32_t bytes,
             if (song_chord_setting(chord[t], chord[t] >> 1 & 3U, chord[t] >> 3 & 7U, chord[t] >> 6) != chord[t] ||
                 chord[SONG_TRACKS + t] >= CHORD_TYPES) r.bad = 1;
         if (apply) { memcpy(s->chord, chord, SONG_TRACKS); memcpy(s->chord_type, chord + SONG_TRACKS, SONG_TRACKS); }
+    }
+    if (version > 4) {
+        uint8_t chromatic[SONG_TRACKS];
+        copy(&r, chromatic, sizeof chromatic, 1);
+        for (unsigned t = 0; t < SONG_TRACKS; ++t)
+            if (chromatic[t] > (SONG_CHROMATIC_ON | 7U)) r.bad = 1;
+        if (apply) memcpy(s->chromatic, chromatic, SONG_TRACKS);
     }
     if (r.bad || r.left || total < 0) return -1;
     for (; apply && cell < SONG_CELLS; ++cell) s->first[SONG_TRACKS + cell] = (uint16_t)total;

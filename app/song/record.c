@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 /* Real-time recording. See record.h. */
 #include "record.h"
+#include "glitch.h"
 #include "song_config.h"
 #include <string.h>
 #if SONG_UI
@@ -47,6 +48,7 @@ SONG_SMALL void song_rec_start(struct song_recorder *r, struct song *s, unsigned
     r->mode = (uint8_t)mode;
     r->from = r->last = r->reach = from;
     r->taken = r->held_count = r->passes = 0;
+    r->tune = 0;
     r->active = 1;
 }
 SONG_SMALL int song_rec_quiet(const struct song_recorder *r, uint32_t *from, uint32_t *to)
@@ -84,7 +86,9 @@ SONG_SMALL static void commit(struct song_recorder *r, unsigned held, uint32_t o
     length = length < 1 ? 1 : length > 0xffff ? 0xffff : length;
     int same = at_pitch(s, r->track, at, r->held[held].pitch); /* the same note again replaces it */
     if (same >= 0) (void)song_remove(s, r->track, (unsigned)same);
-    const struct song_event e = {at | SONG_FRESH, r->held[held].pitch, r->held[held].velocity, (uint16_t)length};
+    int tune = r->held[held].tune ? song_glitch_intern(s, song_glitch_turn(0, GLITCH_TUNE, r->held[held].tune)) : 0;
+    const struct song_event e = {at | SONG_FRESH | (uint32_t)(tune > 0 ? tune : 0) << SONG_GLITCH_SHIFT, r->held[held].pitch,
+                                 r->held[held].velocity, (uint16_t)length};
     if (!song_add_event(s, r->track, &e) && r->taken < SONG_TAKE)
         r->take[r->taken++] = (struct song_take_note){on | lead << 24, at, (uint16_t)length, e.a, e.b};
     r->held[held] = r->held[--r->held_count];
@@ -105,6 +109,8 @@ SONG_SMALL void song_rec_drop(struct song_recorder *r, unsigned pitch)
 }
 SONG_SMALL void song_rec_lead(struct song_recorder *r, unsigned pitch, unsigned velocity, uint32_t clock, unsigned lead)
 {
+    int tune = r->tune;
+    r->tune = 0;
     if (!r->active || pitch > 127) return;
     const struct song *s = r->song;
     unsigned held = 0;
@@ -118,6 +124,7 @@ SONG_SMALL void song_rec_lead(struct song_recorder *r, unsigned pitch, unsigned 
         r->held[r->held_count].lead = (uint8_t)(lead < clock ? lead : clock);
         r->held[r->held_count].caught = (uint8_t)(r->mode == SONG_REC_LOOP && at_seam(s, clock - r->held[r->held_count].lead));
         r->held[r->held_count].pitch = (uint8_t)pitch;
+        r->held[r->held_count].tune = (int8_t)tune;
         r->held[r->held_count++].velocity = (uint8_t)velocity;
     }
     reach(r, clock);

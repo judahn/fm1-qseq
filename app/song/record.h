@@ -20,7 +20,9 @@
  * on the beat it was meant for (0.5.1): before a take's first beat (the
  * port's side), or in a loop take before the seam, the next pass's first
  * beat. It ends where it is let go, or let go before the beat, as long as
- * it was held. song_rec_window says how early. STEP is
+ * it was held. song_rec_window says how early. A note can carry TUNE
+ * (glitch.h, 0.6.6): set `tune` just before the call that starts it, and
+ * it lands with the note. Every such call takes `tune` and leaves 0. STEP is
  * step entry (SHIFT+REC), which a song never keeps as its mode (0.4.0): a
  * song's rec_mode is one of the four live modes, OVERDUB to begin with. */
 enum { SONG_REC_STEP, SONG_REC_REPLACE, SONG_REC_OVERDUB, SONG_REC_PUNCH, SONG_REC_LOOP, SONG_REC_MODES };
@@ -29,11 +31,12 @@ struct song_take_note { uint32_t raw, at; uint16_t length; uint8_t pitch, veloci
 struct song_recorder {
     struct song *song;
     struct song_take_note take[SONG_TAKE];
-    struct { uint32_t at; uint8_t pitch, velocity, lead, caught; } held[SONG_REC_HELD]; /* caught: for the next pass */
+    struct { uint32_t at; uint8_t pitch, velocity, lead, caught; int8_t tune; } held[SONG_REC_HELD]; /* caught: for the next pass */
     uint32_t from, last, reach; /* start of the take, latest clock, furthest clock */
     uint32_t seam_start, seam_end; /* a loop take's loop as it ended, for requantizing round it */
     uint16_t taken;
     uint8_t active, track, mode, held_count, passes;
+    int8_t tune; /* for the next note to start */
 };
 void song_rec_start(struct song_recorder *r, struct song *s, unsigned track, unsigned mode, uint32_t from);
 void song_rec_note(struct song_recorder *r, unsigned pitch, unsigned velocity, uint32_t clock);

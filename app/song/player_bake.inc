@@ -6,7 +6,14 @@
  * went out. Played back as plain notes they land on the same blocks: a
  * block sends what is due before its end, and nothing on a plain track
  * waits behind anything else. */
-struct bake { struct song_event *out; uint8_t *track; unsigned room, count, tracks, full; uint32_t clock; int16_t open[SONG_TRACKS][128]; };
+struct bake { struct song_event *out; uint8_t *track; unsigned room, count, tracks, full; uint32_t clock; int16_t open[SONG_TRACKS][128];
+               int tune; };
+/* A sampler note's TUNE goes with it, in its `at` above the clock (0.6.6). */
+SONG_SMALL static void baked_tune(void *context, unsigned t, unsigned pitch, int semitones)
+{
+    (void)t; (void)pitch;
+    ((struct bake *)context)->tune = semitones;
+}
 SONG_SMALL static void baked(void *context, unsigned t, unsigned pitch, unsigned velocity)
 {
     struct bake *b = context;
@@ -14,7 +21,9 @@ SONG_SMALL static void baked(void *context, unsigned t, unsigned pitch, unsigned
     if (velocity) {
         if (b->count == b->room) { b->full = 1; return; }
         b->open[t][pitch] = (int16_t)b->count;
-        b->out[b->count] = (struct song_event){b->clock, (uint8_t)pitch, (uint8_t)velocity, 1};
+        b->out[b->count] = (struct song_event){b->clock | ((uint32_t)b->tune & 63U) << SONG_GLITCH_SHIFT, (uint8_t)pitch,
+                                               (uint8_t)velocity, 1};
+        b->tune = 0;
         b->track[b->count++] = (uint8_t)t;
     } else if (b->open[t][pitch] >= 0) {
         struct song_event *e = &b->out[b->open[t][pitch]];
@@ -28,13 +37,14 @@ SONG_SMALL int song_player_bake(const struct song_player *live, struct song *s, 
 {
     static struct song_player p;
     static struct bake b;
-    const struct song_output output = {baked, &b, NULL};
+    const struct song_output output = {baked, &b, NULL, baked_tune};
     memset(&b, 0, sizeof b);
     memset(b.open, 0xff, sizeof b.open);
     b.out = out; b.track = track; b.room = room; b.tracks = tracks;
     song_player_init(&p, s, &output);
     memcpy(p.pad_count, live->pad_count, sizeof p.pad_count);
     memcpy(p.pads, live->pads, sizeof p.pads);
+    p.samplers = live->samplers;
     p.pass = live->pass; /* relocate counts it on, as the next start will */
     relocate(&p, 0, 0, 0);
     p.playing = 1;

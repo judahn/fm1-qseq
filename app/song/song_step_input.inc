@@ -10,14 +10,18 @@
  * (0.5.0, LFO until 0.5.6). ENV deletes the selected notes and LFO
  * back-deletes (0.5.6, SEL and ENV before). In chord mode the roots enter their chords, F4 to E5 pick the
  * type, and F5 to G5 enter the last chord again, an octave down and an
- * octave up (song_chord_keys). PLAY plays from the pointer's bar and stays
- * here, and while it plays the keys only sound. REC records a take here as
- * in the other views, a hold opens the record settings, and SHIFT+REC
- * leaves, as SEQ does (0.5.0). ALGO zooms the roll and ARP steps the glitch
- * pages. */
+ * octave up (song_chord_keys). In chromatic mode every key enters the
+ * chosen pad with the key's pitch as its TUNE, and on a sampler track
+ * SHIFT+K4 turns the selected notes' TUNE by semitones (0.6.6). PLAY plays
+ * from the pointer's bar and stays here, and while it plays the keys only
+ * sound. REC records a take here as in the other views, a hold opens the
+ * record settings, and SHIFT+REC leaves, as SEQ does (0.5.0). ALGO zooms
+ * the roll and ARP steps the glitch pages. */
 static uint32_t step_held; /* entry keys down for the chord being built */
 static uint8_t step_from; /* the page step entry was opened from (0.4.1) */
 static unsigned song_key_note(unsigned note);
+static unsigned song_chromatic(void); /* song_lights.inc */
+static int song_key_semitones(unsigned key);
 static void song_rec_down(uint32_t now); /* song_rec.inc */
 
 static void song_step_enter(void)
@@ -149,7 +153,12 @@ static int song_step_input(const struct fm1_controls *c, uint32_t *pressed, uint
         else if (shift) step_jump(st, c->encoders[6] > 0 ? 1 : -1);
         else step_move(st, c->encoders[6]);
     }
-    if (c->encoders[5]) { /* K4, the pitch knob (0.5.2): scale steps, octaves with SHIFT, pads on drums */
+    if (c->encoders[5] && shift && groove_source_type(track) == GROOVE_SAMPLE) { /* SHIFT+K4 on a sampler: TUNE (0.6.6) */
+        int r = step_set_glitch(st, GLITCH_TUNE, c->encoders[5]);
+        if (r == -1) { notice = "GLITCH TABLE FULL"; notice_until = now + 1500U; }
+        step_refused(r, now);
+        if (!r) step_preview(st);
+    } else if (c->encoders[5]) { /* K4, the pitch knob (0.5.2): scale steps, octaves with SHIFT, pads on drums */
         unsigned pads = groove_pad_count(track);
         uint8_t notes[GROOVE_PADS];
         for (unsigned i = 0; i < pads && i < GROOVE_PADS; ++i) notes[i] = (uint8_t)groove_pad_note(track, i);
@@ -171,7 +180,12 @@ static int song_step_input(const struct fm1_controls *c, uint32_t *pressed, uint
                 unsigned pitch = song_key_note(groove_key_note(track, key, octave));
                 if (pitch > 127) continue;
                 if (picking) step_pick(st, pitch);
-                else if (!playing) { step_key(st, pitch); step_held |= 1U << key; }
+                else if (!playing) {
+                    if (song_chromatic()) /* the entry is the pad at the key's pitch (0.6.6) */
+                        st->glitch = song_glitch_turn(st->glitch, GLITCH_TUNE, song_key_semitones(key) - song_glitch_tune(st->glitch));
+                    step_key(st, pitch);
+                    step_held |= 1U << key;
+                }
             }
     }
     if (playing) { step_held = 0; st->chord_count = 0; } /* playing, the keys only sound */

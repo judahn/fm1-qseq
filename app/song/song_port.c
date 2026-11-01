@@ -64,13 +64,22 @@ SONG_SMALL static void deliver_control(void *context, unsigned track, unsigned s
     capture(track, a, b, status);
 #endif
 }
-/* Each drum track's pads, for glitch's pad swap, as playing starts. */
+/* A sampler note's pad tuned as it goes, on Normal tracks, as notes go (0.6.6). */
+SONG_SMALL static void deliver_tune(void *context, unsigned track, unsigned pitch, int semitones)
+{
+    (void)context;
+    if (groove_track_role(track) == GROOVE_TRACK_NORMAL) song_tune_note(track, pitch, semitones);
+}
+/* Each drum track's pads, for glitch's pad swap, and the sampler tracks,
+ * for TUNE, as playing starts. */
 SONG_SMALL static void pads(void)
 {
+    player.samplers = 0;
     for (unsigned t = 0; t < SONG_TRACKS; ++t) {
         unsigned n = groove_pad_count(t);
         player.pad_count[t] = (uint8_t)(n < 16 ? n : 16);
         for (unsigned i = 0; i < player.pad_count[t]; ++i) player.pads[t][i] = (uint8_t)groove_pad_note(t, i);
+        if (groove_source_type(t) == GROOVE_SAMPLE) player.samplers |= (uint8_t)(1U << t);
     }
 }
 void song_port_ready_pads(void) { pads(); } /* Normalize rolls pad swaps as playing would */
@@ -81,7 +90,7 @@ SONG_SMALL static void ensure(void)
 {
     if (ready) return;
 #if SONG_UI
-    static const struct song_output output = {deliver, NULL, deliver_control};
+    static const struct song_output output = {deliver, NULL, deliver_control, deliver_tune};
 #else
     static const struct song_output output = {deliver, NULL};
 #endif
@@ -122,7 +131,7 @@ SONG_SMALL void song_port_poll(void)
     song_takes_poll();
     song_perf_poll();
     song_tempo_follow(0);
-    song_store_poll(fm1_millis());
+    if (!song_tune_settle()) song_store_poll(fm1_millis()); /* stopped, the pads back to the user's tune first */
 #endif
 }
 

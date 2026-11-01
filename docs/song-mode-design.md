@@ -287,6 +287,15 @@ probability, humanize (small random timing and velocity) and per-pad swing.
 
 **Time-stretching is out of scope** (Judah, 10/27). Samples are short one-shots, and the bank is small.
 
+**A pitch per sampler note (0.6.6).** The sampler engine is closed and takes no pitch with a note, only each
+pad's tune. A sampler voice takes its pitch as it starts, so the port sets the pad's tune to the user's
+setting plus the note's TUNE just before the note goes out, from the control loop, and only when the pad has
+something else. Stopped, the pads go back two blocks after the last note, and at once before a save, a load
+or a kit change. TUNE is a field of the glitch word (bits 20 to 25), since a note has no spare bits. Chromatic
+mode, a per-track setting, plays one pad across the keys with each key's semitones as TUNE. The cost: two hits
+of one pad in the same block share a tune, and each change is an engine edit, which marks the sound edited
+(song_tune.c keeps that out of the saved song while nothing else was edited).
+
 ## 8a. Settings, swing and scales
 
 **Where settings live.** GLO opens the song's settings, which are saved with the song. SHIFT plus GLO opens the

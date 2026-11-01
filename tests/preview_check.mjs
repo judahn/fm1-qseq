@@ -18,6 +18,7 @@
 //   buttons  SAVE and the undo combos, FX's tap to the effects page, the engine's tempo (preview_buttons.mjs)
 //   rec  0.4.0: REC tapped, SHIFT+REC, the record settings, SHIFT+SEL, playback following the view, blocks (preview_rec.mjs)
 //   8  chord mode: keys, strums, smooth voicing, recording, step entry (preview_8.mjs)
+//   tune  0.6.6: sampler notes' TUNE, chromatic mode, SHIFT+K4, pads put back (preview_tune.mjs)
 //   roll  0.5.0's step entry: PLAY and REC staying, zoom, grid lines, the glitch pages, a sweep (preview_roll.mjs)
 //   start  0.5.0: takes on the roll, ALGO zooming the views, the start point (preview_start.mjs)
 //   yes/no  OCT+ and OCT- on the edit jobs and the song list: asking, cancelling, renaming (preview_yesno.mjs)
@@ -48,6 +49,7 @@ import { phaseGridRec } from './preview_grid_rec.mjs';
 import { phaseButtons } from './preview_buttons.mjs';
 import { phaseRec } from './preview_rec.mjs';
 import { phase8 } from './preview_8.mjs';
+import { phaseTune } from './preview_tune.mjs';
 import { phaseRoll } from './preview_roll.mjs';
 import { phaseStart } from './preview_start.mjs';
 import { phaseYesNo } from './preview_yesno.mjs';
@@ -56,7 +58,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const phases = [['1', phase1], ['2', phase2], ['keys', phaseKeys], ['diagnostics', phaseDiag], ['panel', phasePanel], ['3', phase3],
-  ['4', phase4], ['4b', phase4b], ['5a', phase5a], ['5b', phase5b], ['6', phase6], ['7', phase7], ['7b', phase7b], ['grid rec', phaseGridRec], ['buttons', phaseButtons], ['rec', phaseRec], ['8', phase8], ['roll', phaseRoll], ['start', phaseStart],
+  ['4', phase4], ['4b', phase4b], ['5a', phase5a], ['5b', phase5b], ['6', phase6], ['7', phase7], ['7b', phase7b], ['grid rec', phaseGridRec], ['buttons', phaseButtons], ['rec', phaseRec], ['8', phase8], ['tune', phaseTune], ['roll', phaseRoll], ['start', phaseStart],
   ['yes/no', phaseYesNo]];
 const only = process.env.PREVIEW_PHASES ? process.env.PREVIEW_PHASES.split(',') : null;
 const browser = await chromium.launch();

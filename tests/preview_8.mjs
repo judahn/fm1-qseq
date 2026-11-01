@@ -136,7 +136,7 @@ export async function phase8(browser, root) {
     r.meter = false;
     o.drum = { chordNotes: heard().length, level: r.level() };
 
-    // 10. Saved: the song's payload, version 4, holds the settings.
+    // 10. Saved: the song's payload, version 4 on, holds the settings.
     const link = FM1SongWorkbench.link.simulator(async frames => r.core.command({ type: 'protocol', frames }));
     const id = await link.saveWorking(true), saved = FM1SongWorkbench.songFile.decode((await link.readSong(id)).bytes);
     o.saved = { version: saved.version, chords: Array.from(saved.chords), types: Array.from(saved.chordTypes) };
@@ -178,7 +178,7 @@ export async function phase8(browser, root) {
   t.eq('a type key on the 808 changes nothing', q.drumType, 0);
   t.eq('a key on the 808 plays no chord', q.drum.chordNotes, 0);
   t.over('it plays its pad', q.drum.level, 1e-4);
-  t.eq('the saved song is version 4', q.saved.version, 4);
+  t.eq('the saved song is version 5 (0.6.6, 4 before)', q.saved.version, 5);
   t.eq('with tracks 1 and 8\'s settings', [q.saved.chords[0] | q.saved.types[0] << 8, q.saved.chords[7] | q.saved.types[7] << 8], q.live);
   return { phase: '8', checks: t.list, out };
 }

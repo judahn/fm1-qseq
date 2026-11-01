@@ -46,12 +46,14 @@ SONG_SMALL static void fix_dots(struct song_step *st)
 {
     if (st->length == STEP_64TH && !st->triplet && st->dots == 2) st->dots = 1;
 }
+/* A sampler note sounds at its TUNE (0.6.6): the port tunes its pad. */
 SONG_SMALL void step_preview(struct song_step *st)
 {
     unsigned index[STEP_CHORD], n = step_selection(st, index);
     step_preview_stop(st);
     for (unsigned i = 0; i < n; ++i) {
         const struct song_event *e = &st->song->event[index[i]];
+        if (st->out.tune) st->out.tune(st->out.context, st->track, e->a, song_glitch_tune(song_glitch_word(st->song, e)));
         st->out.note(st->out.context, st->track, e->a, e->b);
         st->preview[st->preview_count++] = e->a;
     }

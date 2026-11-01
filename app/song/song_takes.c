@@ -22,7 +22,7 @@ static uint64_t first_frame; /* the take's first beat, after any count-in */
  * in a count-in (0.5.1). Those still within the catch as it starts go on
  * that beat, and one let go before it keeps the length it was held. */
 enum { EARLY = 8 };
-struct early_key { uint64_t on, off; uint8_t pitch, velocity, lead, channel; };
+struct early_key { uint64_t on, off; uint8_t pitch, velocity, lead, channel; int8_t tune; };
 static struct early_key early[EARLY];
 static uint8_t early_count;
 enum { ROOM = SONG_REC_HELD + 8 }; /* events kept for the keys still down and the knobs letting go */
@@ -55,7 +55,7 @@ SONG_SMALL int64_t song_port_live_clock(void)
 /* A key while a take waits: kept, the ones too old to be caught let go.
  * A key going up returns 1 plus the frames it was held, or 0 if it wasn't
  * kept. */
-SONG_SMALL static uint64_t keep_early(unsigned pitch, unsigned velocity, unsigned lead, unsigned channel)
+SONG_SMALL static uint64_t keep_early(unsigned pitch, unsigned velocity, unsigned lead, unsigned channel, int tune)
 {
     uint64_t now = frame_now(), window = catch_frames(song_rec_window(song_port_song(), 0));
     unsigned kept = 0;
@@ -69,7 +69,8 @@ SONG_SMALL static uint64_t keep_early(unsigned pitch, unsigned velocity, unsigne
                 return 1U + now - early[i].on;
             }
     } else if (early_count < EARLY)
-        early[early_count++] = (struct early_key){now, 0, (uint8_t)pitch, (uint8_t)velocity, (uint8_t)lead, (uint8_t)channel};
+        early[early_count++] = (struct early_key){now, 0, (uint8_t)pitch, (uint8_t)velocity, (uint8_t)lead, (uint8_t)channel,
+                                                  (int8_t)tune};
     return 0;
 }
 /* The take has begun: keys from just before go on its first beat. */
@@ -77,9 +78,11 @@ SONG_SMALL static void early_take(void)
 {
     uint64_t now = frame_now(), window = catch_frames(song_rec_window(song_port_song(), recorder.from));
     for (unsigned i = 0; i < early_count; ++i)
-        if (early[i].on + window >= now && early[i].channel == groove_midi_input_channel(recorder.track))
+        if (early[i].on + window >= now && early[i].channel == groove_midi_input_channel(recorder.track)) {
+            recorder.tune = early[i].tune;
             song_rec_early(&recorder, early[i].pitch, early[i].velocity, early[i].lead,
                            early[i].off ? held_clocks(early[i].off - early[i].on) + 1U : 0);
+        }
     early_count = 0;
 }
 static unsigned take_waits(void) { return !recorder.active && (clip_armed || (song_grid_rec_state() & 3U) == 1U); }
@@ -129,19 +132,21 @@ SONG_SMALL void song_port_chord_take(unsigned track, const uint8_t *pitch, const
     takes_now();
     int64_t clock = song_port_live_clock();
     for (unsigned i = 0; take_waits() && i < count; ++i)
-        keep_early(pitch[i], 100, offset[i], groove_midi_input_channel(track));
+        keep_early(pitch[i], 100, offset[i], groove_midi_input_channel(track), 0);
     for (unsigned i = 0; recorder.active && clock >= 0 && track == recorder.track && i < count; ++i)
         song_rec_lead(&recorder, pitch[i], 100, (uint32_t)clock + offset[i], offset[i]);
 }
 void song_port_chord_drop(unsigned track, unsigned pitch) { if (track == recorder.track) song_rec_drop(&recorder, pitch); }
 
-/* Live keys on the take track, at the clock playing now. */
+/* Live keys on the take track, at the clock playing now, a note with the
+ * semitones chromatic mode gave it (0.6.6). */
 SONG_SMALL void song_port_key(const uint8_t *m, size_t bytes)
 {
     if (bytes == 3 && (m[0] & 0xe0U) == 0x80U) takes_now(); /* a key at the top of the clip's next pass starts its take */
     int64_t clock = song_port_live_clock();
+    int tune = bytes == 3 && (m[0] & 0xf0U) == 0x90U && m[2] ? song_tune_taken() : 0;
     if (bytes == 3 && (m[0] & 0xe0U) == 0x80U && (take_waits() || (recorder.active && frame_now() < first_frame))) {
-        uint64_t held = keep_early(m[1], (m[0] & 0xf0U) == 0x90U ? m[2] : 0, 0, m[0] & 15U);
+        uint64_t held = keep_early(m[1], (m[0] & 0xf0U) == 0x90U ? m[2] : 0, 0, m[0] & 15U, tune);
         if (held && recorder.active && clock >= 0 && (m[0] & 15U) == groove_midi_input_channel(recorder.track)) {
             song_rec_let_go(&recorder, m[1], held_clocks(held) + 1U); /* let go before the first beat */
             return;
@@ -149,6 +154,7 @@ SONG_SMALL void song_port_key(const uint8_t *m, size_t bytes)
     }
     if (!recorder.active || bytes != 3 || (m[0] & 0xe0U) != 0x80U || clock < 0 ||
         (m[0] & 15U) != groove_midi_input_channel(recorder.track)) return;
+    recorder.tune = (int8_t)tune;
     song_rec_note(&recorder, m[1], (m[0] & 0xf0U) == 0x90U ? m[2] : 0, (uint32_t)clock);
 }
 /* From a stop. A take is one undo step. Loop recording starts at the loop

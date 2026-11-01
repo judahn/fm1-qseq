@@ -27,7 +27,7 @@ There are two device builds, and the browser preview:
 | Build | What's in it | App size |
 |---|---|---|
 | Default (`./build.sh`) | The hardware test build: FM1 Open V14 plus a diagnostics page that plays a built-in test song and measures its timing. To fit, it leaves out the 16 factory preset projects and the workbench's project, sample and voice transfers. Firmware updates still work | 453,608 bytes of 453,921 |
-| Full (`FM1_SONG_DEVICE_FULL=1`) | The whole song mode, without the diagnostics page. It leaves out the stock step and pattern pages (their sync and MIDI pages move to the device settings), the stock project pages, the demo projects, the factory sound sets and the built-in FM factory voices (the workbench can send those to the DX7 library) | 532,296 bytes of 548,129 |
+| Full (`FM1_SONG_DEVICE_FULL=1`) | The whole song mode, without the diagnostics page. It leaves out the stock step and pattern pages (their sync and MIDI pages move to the device settings), the stock project pages, the demo projects, the factory sound sets and the built-in FM factory voices (the workbench can send those to the DX7 library) | 534,632 bytes of 548,129 |
 | Browser preview | The whole song mode on FM1 Open's simulator, in one HTML file | |
 
 ### What installing the full build costs
@@ -38,8 +38,9 @@ slots and the first 8 sectors of the stock sample area. On the device that means
 - The settings sector moves, so the MIDI, clock and Bluetooth settings start from their defaults.
 - The stock projects are overwritten and the stock sample bank is lost. Kits come from the workbench, which
   can send FM1 Open's 8 built-in sounds as a kit.
-- The SDK's settings area (VM) takes the space between the code and the Bluetooth sector, 44 KB at the
-  current size (32 KB at least), and the Bluetooth sector moves. Neither has been tried on hardware.
+- The code area has one size in every release since 0.6.6, 565,248 bytes, padded with zeros past the code, so
+  the layout never changes and each release installs with Start update. The SDK's settings area (VM) after it
+  is 32 KB, its minimum, and the Bluetooth sector moves. The build stops if the code outgrows the area.
 - The DX7 voice banks and the tuning sector keep their places. Songs and kits share the remaining 101 sectors
   (404 KB).
 
@@ -82,6 +83,8 @@ The full build and the preview have all of these. The [user guide](docs/user-gui
 
 **Glitch**
 - Per-note repeats, pitch drift, fade, chance, octave jumps, accent, flam and pad swap.
+- A pitch per sampler note, up to 24 semitones either way, and a chromatic mode that plays one pad across the
+  keys.
 - Humanize per track.
 - Mangle: scramble 16ths, reverse, shuffle notes between tracks.
 
@@ -186,6 +189,8 @@ and the full build has been installed the same way since 0.1.0.
 5. Back up first, then tick the backup box. The page says which step comes next:
    - From stock V15 or other firmware: click **Enable force flash and reconnect**, then **Force flash**, and
      accept the warning.
+   - From FM1 QY or QSEQ before 0.6.6 to 0.6.6 or later (the full build): force flash the same way, once. 0.6.6
+     fixed the code area's size, which moves the settings area.
    - Otherwise: click **Start update**.
 6. Keep the cable in and the power on until it restarts. If it stops partway or stays in its update mode,
    keep the same page, reconnect and continue as the page says.

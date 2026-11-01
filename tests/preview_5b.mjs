@@ -191,8 +191,24 @@ export async function phase5b(browser, root) {
     const stock = { pads: pads(), kick: hit(36) };
     await link.useKit(newKit);
     const mine = { pads: pads(), kick: hit(36) };
+    /* A kit's pad settings apply as it goes on the pads (0.6.6: they never did). The engine's
+     * settings for the sampler's 8 pads, pad 1's tune 3 up, set on the kit; pad 1 moved off
+     * by hand; the kit used again puts it back. */
+    const tune = () => c.sim_song_info(60, 4, 0) & 255;
+    const params = new Uint8Array(48);
+    for (let pad = 0; pad < 8; pad++) {
+      const a = c.sim_song_info(63, 4, pad) >>> 0, b = c.sim_song_info(63, 4, 8 + pad) >>> 0;
+      params.set([a & 255, a >>> 8 & 255, a >>> 16 & 255, a >>> 24, b & 255, b >>> 8 & 255], pad * 6);
+    }
+    const base = tune();
+    params[1] = base + 3;
+    await link.setKit(newKit, (await link.kits()).find(k => k.id === newKit).name, params);
+    c.sim_song_tone(4, 0, 7);
+    const moved = tune();
+    await link.useKit(newKit);
+    const kitTune = { movedOff: moved !== base + 3, applied: tune() - base };
     return { stockPads: stock.pads, newPads: mine.pads, stockRms: stock.kick.rms, newRms: mine.kick.rms,
-      differs: stock.kick.sound.some((v, i) => Math.abs(v - mine.kick.sound[i]) > 1e-4) };
+      differs: stock.kick.sound.some((v, i) => Math.abs(v - mine.kick.sound[i]) > 1e-4), kitTune };
   }, out.kits.newKit);
 
   // 6. The stock sample loader (its "send to simulator") makes a kit in the
@@ -369,6 +385,7 @@ export async function phase5b(browser, root) {
   t.eq('the stock loader leaves the songs as they were', l.after.songs, l.before.songs);
   t.eq('the stock loader makes a kit', l.after.kits, l.before.kits + 1);
   t.eq('with one new sample', l.after.samples, l.before.samples + 1);
+  t.eq('a kit\'s pad settings apply as it goes on the pads (0.6.6): pad 1 moved off, then the kit\'s tune', p.kitTune, { movedOff: true, applied: 3 });
   t.eq('clear drops the songs', q.cleared.songs, 0);
   t.eq('clear keeps the kits', q.cleared.kits, l.after.kits);
   const bi = q.builtin, bc = q.builtinCounts;
