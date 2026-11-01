@@ -33,4 +33,8 @@ id_ed25519
 # Kits built from recordings the project doesn't own: only the recipe is kept (kits/README.md)
 /kits/amen/*
 !/kits/amen/kit.json
+/kits/think/*
+!/kits/think/kit.json
+/kits/funky/*
+!/kits/funky/kit.json
 /kits/*.png

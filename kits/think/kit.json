@@ -1,0 +1,51 @@
+{
+  "name": "THINK",
+  "source": "Lyn Collins, \"Think (About It)\" (1972): the break in Wikipedia's excerpt, https://en.wikipedia.org/wiki/File:Woo!_Yeah!_(Excerpt,_1972_Lyn_Collins-Think_(About_It)).ogg . The recording is under copyright, so the audio stays out of the repo: save that file here as think.ogg (git ignores it), then node tools/make-kit.mjs kits/think. The excerpt repeats one bar (about 113 BPM), so each pad is the take with the least voice on it. KICK is the hard kick with its hat, KICK 2 the softer one with the hat after it. WOO is the shout before each downbeat and YEAH the one mid-bar, with the drums under it.",
+  "defaults": {
+    "file": "think.ogg",
+    "normalize": true,
+    "fadeOut": 8
+  },
+  "pads": [
+    {
+      "name": "KICK",
+      "start": 8.4706,
+      "end": 8.608
+    },
+    {
+      "name": "SNARE",
+      "start": 13.2569,
+      "end": 13.476
+    },
+    {
+      "name": "HAT",
+      "start": 13.1325,
+      "end": 13.208
+    },
+    {
+      "name": "HAT 2",
+      "start": 12.9827,
+      "end": 13.092
+    },
+    {
+      "name": "SNARE 2",
+      "start": 14.3176,
+      "end": 14.4526
+    },
+    {
+      "name": "KICK 2",
+      "start": 8.6467,
+      "end": 8.844
+    },
+    {
+      "name": "WOO",
+      "start": 8.3302,
+      "end": 8.4626
+    },
+    {
+      "name": "YEAH",
+      "start": 9.4103,
+      "end": 9.672
+    }
+  ]
+}

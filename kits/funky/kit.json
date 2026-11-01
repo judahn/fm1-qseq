@@ -1,0 +1,51 @@
+{
+  "name": "FUNKY DRUMMER",
+  "source": "James Brown, \"Funky Drummer\" (1970), Clyde Stubblefield's break in Wikipedia's excerpt, https://en.wikipedia.org/wiki/File:Funky_Drummer_sample.ogg . The recording is under copyright, so the audio stays out of the repo: save that file here as funky.ogg (git ignores it), then node tools/make-kit.mjs kits/funky. The excerpt is 64 kbps, so the top end is dull, which suits boom bap. The break plays 16ths at about 101 BPM, so most pads run a 16th, from their attack to just before the next hit. KICK SNARE is one beat: the kick, a hat, then the snare.",
+  "defaults": {
+    "file": "funky.ogg",
+    "normalize": true,
+    "fadeOut": 8
+  },
+  "pads": [
+    {
+      "name": "KICK",
+      "start": 8.6576,
+      "end": 8.784
+    },
+    {
+      "name": "SNARE",
+      "start": 13.7241,
+      "end": 13.848
+    },
+    {
+      "name": "HAT",
+      "start": 9.2632,
+      "end": 9.384
+    },
+    {
+      "name": "HAT 2",
+      "start": 18.7912,
+      "end": 18.896
+    },
+    {
+      "name": "GHOST",
+      "start": 14.0226,
+      "end": 14.14
+    },
+    {
+      "name": "KICK 2",
+      "start": 6.2777,
+      "end": 6.408
+    },
+    {
+      "name": "SNARE 2",
+      "start": 8.9666,
+      "end": 9.092
+    },
+    {
+      "name": "KICK SNARE",
+      "start": 8.6576,
+      "end": 9.092
+    }
+  ]
+}

@@ -71,3 +71,5 @@ kits' pads (numpy, scipy and matplotlib), the same every time.
 | `boombap/` | Synthesized here, through 12-bit and saturation: fat kick, snare, hats, snap, rim, tambourine, horn stab |
 | `lofi/` | Synthesized here, through 11-bit, tape saturation and wobble: kick, snare, hat, shaker, rim, perc, crackle, keys |
 | `amen/` | The Winstons, "Amen, Brother" (1969): the recipe only. The audio is under copyright, for personal use |
+| `think/` | Lyn Collins, "Think (About It)" (1972), with the WOO and YEAH shouts: the recipe only, for personal use |
+| `funky/` | James Brown, "Funky Drummer" (1970), Clyde Stubblefield's break: the recipe only, for personal use |
