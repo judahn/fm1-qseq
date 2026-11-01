@@ -10,6 +10,7 @@
 #include "blocks.h"
 #include "record.h"
 #include "undo.h"
+static uint32_t song_snap(const struct song *s, uint32_t clock, int steps); /* song_view.inc */
 
 static const char *const song_rec_modes[SONG_REC_MODES] = {"STEP", "REPLACE", "OVERDUB", "PUNCH", "LOOP"};
 static uint8_t song_sel, song_sel_hand;
@@ -120,8 +121,8 @@ static void song_marker_key(uint32_t now)
     struct song_player *p = song_port_player();
     uint32_t at = p->playhead;
     if (p->playing) {
-        uint32_t clock = song_player_clock(p), down = song_snap_move(s, clock + 1U, song_zoom, -1);
-        uint32_t up = song_snap_move(s, down, song_zoom, 1);
+        uint32_t clock = song_player_clock(p), down = song_snap(s, clock + 1U, -1);
+        uint32_t up = song_snap(s, down, 1);
         at = up > clock && up - clock < clock - down ? up : down;
     }
     unsigned there = 0;

@@ -51,7 +51,7 @@ static void song_auto_row(const struct song *s, unsigned t)
     if (paint_rendering && (y >= paint_top + PAINT_ROWS || y + AUTO_ROW <= paint_top)) return;
     uint32_t sig = signature(song_window ^ (song_zoom << 28) ^ ((t == track && !song_auto_conductor) << 30) ^
                              (lane << 20) ^ (picked << 31), &s->revision, sizeof s->revision);
-    sig = signature(sig, &s->loop_start, 8) ^ s->loop_on;
+    sig = song_keyed(signature(sig, &s->loop_start, 8) ^ s->loop_on);
     if (sig == cache->row_cache[t]) return;
     cache->row_cache[t] = sig;
     paint_fill(0, y, 240, AUTO_ROW - 1, BACK);
@@ -64,10 +64,10 @@ static void song_auto_row(const struct song *s, unsigned t)
     if (picked && s->loop_end > song_window && s->loop_start < end)
         paint_fill(song_x(s->loop_start), y, song_x(s->loop_end) - song_x(s->loop_start), AUTO_ROW - 2,
                    s->loop_on ? SONG_LOOP : SONG_SELECT);
-    for (unsigned bar = song_bar_at(s, song_window, NULL, NULL); bar <= song_bars(s); ++bar) {
+    for (unsigned bar = song_bar_at(s, song_window, NULL, NULL), every = song_line_every(); bar <= song_bars(s); ++bar) {
         uint32_t at = song_bar_clock(s, bar);
         if (at >= end) break;
-        if (at >= song_window) paint_fill(song_x(at), y, 1, AUTO_ROW - 2, SONG_BAR_LINE);
+        if (at >= song_window && bar % every == 0) paint_fill(song_x(at), y, 1, AUTO_ROW - 2, SONG_BAR_LINE);
     }
     if (!s->open || t == song_editing(s)) /* a clip in the editor: only its row */
         song_auto_curve(s, t, lane, y + 1, AUTO_ROW - 3, frame_views[t].audible ? colors[t] : DIM);
@@ -77,8 +77,8 @@ static void song_auto_row(const struct song *s, unsigned t)
 static void song_auto_conductor_row(const struct song *s)
 {
     if (paint_rendering && (AUTO_C >= paint_top + PAINT_ROWS || AUTO_C + AUTO_CH <= paint_top)) return;
-    uint32_t sig = signature(song_window ^ (song_zoom << 27) ^ (song_auto_conductor << 29) ^ (song_auto_mode << 30),
-                             &s->revision, sizeof s->revision);
+    uint32_t sig = song_keyed(signature(song_window ^ (song_zoom << 27) ^ (song_auto_conductor << 29) ^ (song_auto_mode << 30),
+                                        &s->revision, sizeof s->revision));
     if (sig == cache->seq_cache) return;
     cache->seq_cache = sig;
     paint_fill(0, AUTO_C, 240, AUTO_CH + 1, BACK);

@@ -23,7 +23,7 @@ enum {
 };
 static const char *const song_snaps[SONG_ZOOMS] = {"1 BAR", "1/2 BAR", "BEAT", "1/8"};
 static const char *const song_spans[SONG_ZOOMS] = {"16 BARS", "8 BARS", "4 BARS", "2 BARS"};
-static unsigned song_zoom;
+static unsigned song_zoom, song_all; /* song_all: ALGO past 16 bars, the whole song, 16 bars at least (0.6.4) */
 static uint32_t song_window = ~0U, song_drawn_x = ~0U, song_ranged = ~0U;
 static uint8_t song_low[SONG_TRACKS], song_high[SONG_TRACKS];
 static struct {
@@ -78,7 +78,29 @@ static void song_hint_mode(const char *hint)
     text(234 - 6 * (unsigned)strlen(mode), 231, mode, 1, 0xf800, BACK);
 }
 
-static uint32_t song_span(void) { return (16U >> song_zoom) * (uint32_t)SONG_WHOLE; }
+static uint32_t song_span(void)
+{
+    if (!song_all) return (16U >> song_zoom) * (uint32_t)SONG_WHOLE;
+    uint32_t end = song_end(song_port_song());
+    return end > 16U * SONG_WHOLE ? end : 16U * SONG_WHOLE;
+}
+/* ALL's width in bars, as 4/4 ones. PRESETS steps a bar there, or more
+ * past 64 so a few turns still cross the song. Bar lines and numbers thin
+ * out to stay apart. */
+static unsigned song_all_bars(void) { return (unsigned)((song_span() + SONG_WHOLE - 1U) / SONG_WHOLE); }
+static unsigned song_all_snap(void) { unsigned k = 1; while (song_all_bars() > 64U * k) k *= 2; return k; }
+static unsigned song_line_every(void) { unsigned k = 1; while (song_all && k * SONG_W < 6U * song_all_bars()) k *= 2; return k; }
+static unsigned song_label_every(void) { unsigned k = 4; while (song_all_bars() > 8U * k) k *= 2; return k; }
+static uint32_t song_snap(const struct song *s, uint32_t clock, int steps)
+{
+    return song_all ? song_snap_move(s, clock, 0, steps * (int)song_all_snap()) : song_snap_move(s, clock, song_zoom, steps);
+}
+/* What the drawn caches key on besides the window: ALL, and how wide it is. */
+static uint32_t song_keyed(uint32_t sig)
+{
+    uint32_t key = song_all ? song_span() : 0;
+    return signature(sig, &key, sizeof key);
+}
 static unsigned song_x(uint32_t clock)
 {
     if (clock <= song_window) return SONG_X;
@@ -89,6 +111,7 @@ static int song_visible(uint32_t clock) { return clock >= song_window && clock -
 /* Page so the playhead stays on screen: 16 bars at a time when zoomed out. */
 static void song_follow(const struct song *s, uint32_t clock)
 {
+    if (song_all) { song_window = 0; return; } /* the whole song shows */
     if (song_visible(clock)) return;
     uint32_t start;
     unsigned bar = song_bar_at(s, clock, &start, NULL), bars = 16U >> song_zoom;
@@ -131,14 +154,14 @@ static void song_ranges(const struct song *s)
 static void song_ruler(const struct song *s)
 {
     if (paint_rendering && (paint_top >= SONG_ROWS || paint_top + PAINT_ROWS <= SONG_RULER)) return;
-    uint32_t sig = signature(song_window ^ (song_zoom << 28), &s->revision, sizeof s->revision);
+    uint32_t sig = song_keyed(signature(song_window ^ (song_zoom << 28), &s->revision, sizeof s->revision));
     unsigned start = song_now.start != song_now.clock && !song_now.jumping && song_visible(song_now.start);
     sig = signature(sig, &s->loop_start, 8) ^ s->loop_on ^ (song_now.jumping ? song_now.target << 1 : 0);
     sig = signature(sig, &song_now.start, start ? 4 : 0) ^ start << 30;
     if (sig == cache->title_cache) return;
     cache->title_cache = sig;
     paint_fill(0, SONG_RULER, 240, SONG_ROWS - SONG_RULER, BACK);
-    uint32_t end = song_window + song_span(), every = song_zoom < 2 ? 4U >> song_zoom : 1;
+    uint32_t end = song_window + song_span(), every = song_all ? song_label_every() : song_zoom < 2 ? 4U >> song_zoom : 1;
     for (unsigned bar = song_bar_at(s, song_window, NULL, NULL); bar < song_bars(s); ++bar) {
         uint32_t at = song_bar_clock(s, bar);
         if (at >= end) break;
@@ -188,7 +211,7 @@ static void song_row(const struct song *s, unsigned t)
     uint32_t sig = signature(song_window ^ (song_zoom << 28) ^ ((t == track) << 30) ^
                              ((uint32_t)frame_views[t].audible << 31), &s->revision, sizeof s->revision);
     unsigned picked = song_now.selected >> t & 1U, ghost = song_now.ghost_tracks >> t & 1U;
-    sig = signature(sig, &s->loop_start, 8) ^ s->loop_on ^ (picked << 1) ^ (ghost << 2);
+    sig = song_keyed(signature(sig, &s->loop_start, 8) ^ s->loop_on ^ (picked << 1) ^ (ghost << 2));
     if (ghost) sig = signature(sig, &song_now.ghost_from, 8);
     if (sig == cache->row_cache[t]) return;
     cache->row_cache[t] = sig;
@@ -201,10 +224,10 @@ static void song_row(const struct song *s, unsigned t)
     if (picked && s->loop_end > song_window && s->loop_start < end) /* the selection, brighter when looping */
         paint_fill(song_x(s->loop_start), y, song_x(s->loop_end) - song_x(s->loop_start), SONG_ROW - 2,
                    s->loop_on ? SONG_LOOP : SONG_SELECT);
-    for (unsigned bar = song_bar_at(s, song_window, NULL, NULL); bar <= song_bars(s); ++bar) {
+    for (unsigned bar = song_bar_at(s, song_window, NULL, NULL), every = song_line_every(); bar <= song_bars(s); ++bar) {
         uint32_t at = song_bar_clock(s, bar), beat = SONG_WHOLE / song_meter_at(s, bar)->unit;
         if (at >= end) break;
-        if (at >= song_window) paint_fill(song_x(at), y, 1, SONG_ROW - 2, SONG_BAR_LINE);
+        if (at >= song_window && bar % every == 0) paint_fill(song_x(at), y, 1, SONG_ROW - 2, SONG_BAR_LINE);
         if (song_zoom >= 2 && bar < song_bars(s))
             for (uint32_t b = at + beat; b < song_bar_clock(s, bar + 1) && b < end; b += beat)
                 if (b > song_window) paint_fill(song_x(b), y, 1, SONG_ROW - 2, SONG_BEAT_LINE);

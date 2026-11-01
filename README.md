@@ -27,7 +27,7 @@ There are two device builds, and the browser preview:
 | Build | What's in it | App size |
 |---|---|---|
 | Default (`./build.sh`) | The hardware test build: FM1 Open V14 plus a diagnostics page that plays a built-in test song and measures its timing. To fit, it leaves out the 16 factory preset projects and the workbench's project, sample and voice transfers. Firmware updates still work | 453,608 bytes of 453,921 |
-| Full (`FM1_SONG_DEVICE_FULL=1`) | The whole song mode, without the diagnostics page. It leaves out the stock step and pattern pages (their sync and MIDI pages move to the device settings), the stock project pages, the demo projects, the factory sound sets and the built-in FM factory voices (the workbench can send those to the DX7 library) | 531,368 bytes of 548,129 |
+| Full (`FM1_SONG_DEVICE_FULL=1`) | The whole song mode, without the diagnostics page. It leaves out the stock step and pattern pages (their sync and MIDI pages move to the device settings), the stock project pages, the demo projects, the factory sound sets and the built-in FM factory voices (the workbench can send those to the DX7 library) | 532,232 bytes of 548,129 |
 | Browser preview | The whole song mode on FM1 Open's simulator, in one HTML file | |
 
 ### What installing the full build costs
@@ -38,7 +38,7 @@ slots and the first 8 sectors of the stock sample area. On the device that means
 - The settings sector moves, so the MIDI, clock and Bluetooth settings start from their defaults.
 - The stock projects are overwritten and the stock sample bank is lost. Kits come from the workbench, which
   can send FM1 Open's 8 built-in sounds as a kit.
-- The SDK's settings area (VM) takes the space between the code and the Bluetooth sector, 48 KB at the
+- The SDK's settings area (VM) takes the space between the code and the Bluetooth sector, 44 KB at the
   current size (32 KB at least), and the Bluetooth sector moves. Neither has been tried on hardware.
 - The DX7 voice banks and the tuning sector keep their places. Songs and kits share the remaining 101 sectors
   (404 KB).

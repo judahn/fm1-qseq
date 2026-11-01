@@ -2,6 +2,15 @@
 
 The version is `QSEQ_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.6.4
+
+- K3 (LOOP IN) moves the whole loop, keeping its length, and stops at the song's end. K4 is the loop's LENGTH,
+  shown in bars, beats or 8ths, where it was LOOP OUT. In the automation view too. The clip editor keeps K3 as
+  the loop start and K4 as CLIP END.
+- ALGO zooms out one more step, past 16 bars, to ALL: the whole song, as large as it fits. A song of 16 bars or
+  fewer shows as at 16 bars. Bar lines and numbers thin out to stay apart, PRESETS steps a bar (more on songs past 64 bars), and the notice says the width, for
+  example `ZOOM ALL 48 BARS  SNAP 1 BAR`. The automation view has it too.
+
 ## 0.6.3
 
 - A loaded song is drawn as itself. Every load, and every new song, started the song's revision count afresh,

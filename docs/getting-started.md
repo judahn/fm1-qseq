@@ -135,7 +135,8 @@ a take on the current track. The song starts in OVERDUB, so new notes add to wha
 take and playing goes on. With the loop off (ENV), playing past the last bar keeps recording, and the song
 grows to fit. Turning K2, the input quantize, right after a take requantizes it.
 
-**7. Arrange.** The loop region is the selection. K3 and K4 set its bars. Hold SEL and tap F3 to F4 to pick
+**7. Arrange.** The loop region is the selection. K4 sets its length and K3 moves it along the song, its
+length kept. Hold SEL and tap F3 to F4 to pick
 tracks, or G4 for all of them. Then:
 
 | Keys | Action |

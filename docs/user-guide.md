@@ -102,13 +102,13 @@ everything on this screen.
 | Hold REC | The record settings |
 | PRESETS | Move the playhead one snap step, and the start point with it. While playing, a jump waits for the next bar line |
 | SHIFT+PRESETS | Marker to marker |
-| ALGO | Zoom: 16, 8, 4 or 2 bars across. The snap follows: a bar, half a bar, a beat or an 8th. The bottom line shows both for a moment, `ZOOM 8 BARS  SNAP 1/2 BAR`. During a take, the roll's zoom (see Recording) |
+| ALGO | Zoom: ALL, 16, 8, 4 or 2 bars across. The snap follows: a bar, half a bar, a beat or an 8th. ALL shows the whole song, as large as it fits (16 bars for a shorter song), snapping a bar, or more bars on a song past 64. The bottom line shows both for a moment, `ZOOM 8 BARS  SNAP 1/2 BAR`. During a take, the roll's zoom (see Recording) |
 | K1 | Tempo: the one the header shows, the starting tempo or the tempo change the playhead is past. Whole BPM, 20 to 300, heard at once while playing |
 | SHIFT+K1 | Tempo by half BPM |
 | K2 | Input quantize, as in the record settings: off, or 1/64 to 1/1, each with a triplet. After a take it requantizes the take (Recording) |
-| K3 | Loop start |
+| K3 | LOOP IN: move the whole loop a snap step, its length kept. It stops at the song's end |
 | SHIFT+K3 | Select the marker section around the playhead. Turning on adds the next sections |
-| K4 | Loop end |
+| K4 | LENGTH: the loop's length from its start, in snap steps, shown in bars, beats or 8ths |
 | ENV | Loop on or off |
 | SHIFT+ENV | Metronome: off, on, or only while recording |
 | LFO | Stopped: add a marker at the playhead, or remove the one already there. Playing: add one at the nearest snap step |
@@ -392,7 +392,7 @@ SHIFT+LFO in the song view. The conductor row sits above track 1. Turning SELECT
 | ALGO | Zoom, as in the song view, with or without SHIFT |
 | K1 | The lane shown: one of the track engine's parameters, or programs. On the conductor: tempo or time signature |
 | K2 | Stopped: set a change at the playhead. Tempo in whole BPM (SHIFT: half), the time signature from that bar, or a program change |
-| K3, K4 | Loop start and loop end, as in the song view. SHIFT+K3 selects the marker section |
+| K3, K4 | LOOP IN and LENGTH, as in the song view. SHIFT+K3 selects the marker section |
 | SEL | Delete the change at the playhead |
 | SHIFT+SEL | Clear the shown lanes in the selection |
 

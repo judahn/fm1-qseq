@@ -10,15 +10,28 @@
  * through here too, its own K1 and K2 first (song_auto.inc). */
 
 /* ALGO's zoom, and the span and snap in a notice, since the footer no
- * longer shows them (0.5.2). A take's footer is the recording knobs. */
+ * longer shows them (0.5.2). A take's footer is the recording knobs. Past
+ * 16 bars is ALL, the whole song (0.6.4). */
 static void song_zoom_turn(int delta, uint32_t now)
 {
-    static char line[32];
-    unsigned zoom = (unsigned)clamp((int)song_zoom + delta, 0, SONG_ZOOMS - 1);
-    if (zoom != song_zoom) { song_zoom = zoom; song_window = ~0U; }
+    static char line[40];
+    int level = clamp((song_all ? -1 : (int)song_zoom) + delta, -1, SONG_ZOOMS - 1);
+    if ((level < 0) != song_all || (level >= 0 && (unsigned)level != song_zoom)) {
+        song_all = level < 0;
+        song_zoom = level < 0 ? 0 : (unsigned)level;
+        song_window = ~0U;
+    }
     if (song_port_recorder()->active) return;
-    strcpy(line, "ZOOM "); strcat(line, song_spans[zoom]);
-    strcat(line, "  SNAP "); strcat(line, song_snaps[zoom]);
+    if (song_all) {
+        char n[12];
+        unsigned snap = song_all_snap();
+        strcpy(line, "ZOOM ALL "); decimal(n, (int)song_all_bars(), 1); strcat(line, n); strcat(line, " BARS  SNAP ");
+        if (snap == 1) strcat(line, "1 BAR");
+        else { decimal(n, (int)snap, 1); strcat(line, n); strcat(line, " BARS"); }
+    } else {
+        strcpy(line, "ZOOM "); strcat(line, song_spans[song_zoom]);
+        strcat(line, "  SNAP "); strcat(line, song_snaps[song_zoom]);
+    }
     notice = line;
     notice_until = now + 1500U;
 }
@@ -95,7 +108,7 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
         }
         if (found >= 0) song_port_jump(at);
     } else if (move && !shift)
-        song_port_jump(song_snap_move(s, song_player_target(p), song_zoom, move));
+        song_port_jump(song_snap(s, song_player_target(p), move));
     /* K1: the tempo the header shows, the starting tempo or the change the
      * playhead is past, where the song is with a clip open (song_tempo_now),
      * whole BPM or half with SHIFT, heard at once and the engine's following
@@ -112,12 +125,16 @@ static int song_view_input(const struct fm1_controls *c, uint32_t *pressed, uint
         if (song_rec_retake(quantize != s->quantize)) { notice = "REQUANTIZED THE LAST TAKE"; notice_until = now + 1500U; }
     }
     if (c->encoders[4] && shift) { if (!clip) song_sections(c->encoders[4]); }
-    else if (c->encoders[4]) {
-        uint32_t at = song_snap_move(s, s->loop_start, song_zoom, c->encoders[4]);
+    else if (c->encoders[4] && clip) { /* in the editor the loop's end is the clip's */
+        uint32_t at = song_snap(s, s->loop_start, c->encoders[4]);
         if (at < s->loop_end) s->loop_start = at;
+    } else if (c->encoders[4]) { /* LOOP IN moves the loop, its length kept, up to the song's end (0.6.4) */
+        uint32_t length = s->loop_end - s->loop_start, end = song_end(s), at = song_snap(s, s->loop_start, c->encoders[4]);
+        while (at + length > end && at > s->loop_start) at = song_snap(s, at, -1);
+        if (at + length <= end) { s->loop_start = at; s->loop_end = at + length; }
     }
-    if (c->encoders[5]) {
-        uint32_t at = song_snap_move(s, s->loop_end, song_zoom, c->encoders[5]);
+    if (c->encoders[5]) { /* LENGTH, from the loop's start (CLIP END in the editor) */
+        uint32_t at = song_snap(s, s->loop_end, c->encoders[5]);
         if (at > s->loop_start) s->loop_end = at;
     }
     uint32_t down = key_down & ~blocked_keys;

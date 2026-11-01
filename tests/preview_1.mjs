@@ -80,7 +80,7 @@ export async function phase1(browser, root) {
     controls.afterK1 = r.info(8);
     r.held(B.FX, () => r.turn(6, 1));               // SHIFT+PRESETS: next marker
     controls.afterShiftK1 = r.info(8);
-    r.turn(4, -1); r.turn(5, 2);                    // K3 and K4: loop edges by snap (0.5.2)
+    r.turn(4, -1); r.turn(5, 2);                    // K3 moves the loop (0.6.4), K4 its length, by snap
     controls.loopEdges = [r.info(14), r.info(15)];
     r.turn(1, -3);
     // A marker jump while playing waits for the bar line: start at bar 1, ask
@@ -166,7 +166,7 @@ export async function phase1(browser, root) {
     [[...g.added, nearest].sort((a, b) => a - b), 'M2']);
   t.eq('LFO while playing never removes', g.again, g.whilePlaying);
   t.eq('a SEL tap leaves the markers alone, since SEL selects (0.5.6)', g.selTap, g.again);
-  t.eq('K3 and K4 move the loop edges by snap', k.loopEdges, [loopStart - 240, loopEnd + 480]);
+  t.eq('K3 moves the loop by snap, its length kept, then K4 lengthens it', k.loopEdges, [loopStart - 240, loopEnd - 240 + 480]);
   t.yes('a jump asked for while playing waits', k.pendingAfterRequest);
   t.yes('the jump lands on the bar line', k.atBreak.length > 0 && JSON.stringify(k.inBlock) === JSON.stringify(k.atBreak),
     { atBreak: k.atBreak, inBlock: k.inBlock });

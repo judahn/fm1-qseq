@@ -128,20 +128,40 @@ static void song_knob_footer(unsigned t)
         knob(k, p ? p->name : "-", value, song_knob_held(k) ? AMBER : colors[k]);
     }
 }
+/* A loop's length (0.6.4): whole bars as bars, else beats when it starts
+ * on one, else 8ths. */
+static void song_length(const struct song *s, uint32_t from, uint32_t to, char out[24])
+{
+    uint32_t start, at = from;
+    unsigned first = song_bar_at(s, from, &start, NULL), n = 0;
+    const char *unit = "BAR";
+    if (start == from && song_bar_clock(s, song_bar_at(s, to, &start, NULL)) == to) { n = song_bar_at(s, to, NULL, NULL) - first; at = to; }
+    else if (song_snap_move(s, from + 1U, 2, -1) == from) {
+        while (at < to) { at = song_snap_move(s, at, 2, 1); ++n; }
+        unit = "BEAT";
+    }
+    if (at != to) { n = (to - from + SONG_PPQ / 4U) / (SONG_PPQ / 2U); unit = "8TH"; }
+    decimal(out, (int)n, 1);
+    strcat(out, " "); strcat(out, unit);
+    if (n != 1) strcat(out, "S");
+}
 /* The footer, or the recording knobs during a take. K1 and K2 are the
  * view's: tempo and quantize, or in the automation view the lane and its
- * value. K3 and K4 are the loop (0.5.2), with PRESETS moving the playhead
- * and ALGO zooming, so nothing here shows the snap or the zoom. */
+ * value. K3 and K4 are the loop (0.5.2): where it starts, which moves it
+ * whole, and its length (0.6.4, its end before), or CLIP END with a clip
+ * open. PRESETS moves the playhead and ALGO zooms, so nothing here shows
+ * the snap or the zoom. */
 static void song_footer(const struct song *s, const char *k1, const char *v1, const char *k2, const char *v2)
 {
     if (song_now.recording) { song_knob_footer(song_port_recorder()->track); return; }
     char start[24], end[24];
     song_position(s, s->loop_start, start, 0);
-    song_position(s, s->loop_end, end, 0);
+    if (s->open) song_position(s, s->loop_end, end, 0);
+    else song_length(s, s->loop_start, s->loop_end, end);
     knob(0, k1, v1, colors[0]);
     knob(1, k2, v2, colors[1]);
     knob(2, "LOOP IN", start, colors[2]);
-    knob(3, s->open ? "CLIP END" : "LOOP OUT", end, colors[3]);
+    knob(3, s->open ? "CLIP END" : "LENGTH", end, colors[3]);
 }
 /* Memory, compact: flash (songs, then kits) and the song's RAM pool. */
 static void song_memory_bars(void)

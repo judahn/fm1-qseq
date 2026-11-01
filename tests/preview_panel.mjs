@@ -232,11 +232,23 @@ function knobRun() {
   n.turn(2, 1); v.k1 = [clock(), tempo()]; n.turn(2, -1);
   n.turn(6, 1); v.presets = clock();
   const end = info(15); n.turn(5, 1); v.k4 = [zoom(), info(15) - end]; n.turn(5, -1);
+  /* K3 moves the whole loop, its length kept, and stops at the song's end (0.6.4) */
+  const ls = info(14), le = info(15);
+  n.turn(4, 1); v.k3 = [info(14) - ls, info(15) - le];
+  n.turn(4, 20); v.k3end = [info(15) - info(11), info(15) - info(14) - (le - ls)];
+  n.turn(4, -40); n.turn(4, ls / 1920); v.k3back = [info(14) - ls, info(15) - le];
   v.hint = hintEnd();
   n.turn(1, 1); v.algo = [zoom(), hintEnd()];       /* ZOOM 8 BARS  SNAP 1/2 BAR: 25 letters */
+  n.turn(5, 1); v.lengths = [knobs()[3]]; n.turn(5, -1);              /* half a bar on: in beats */
+  n.turn(1, 2); n.turn(5, 1); v.lengths.push(knobs()[3]); n.turn(5, -1); n.turn(1, -2); /* an 8th on */
   n.render(600); v.noticeGone = hintEnd();
   n.held(B.FX, () => n.turn(6, 1)); v.marker = clock();
   n.turn(1, -1); n.render(600);
+  /* ALL (0.6.4): ALGO past 16 bars shows the whole song, 16 bars at least, PRESETS stepping a bar */
+  const a0 = clock(); n.turn(1, -1); v.all = { on: info(58, 0, 8), notice: hintEnd() };
+  n.turn(6, 1); v.all.step = clock() - a0; n.turn(6, -1);
+  n.turn(1, -3); v.all.further = info(58, 0, 8) & 1;
+  n.turn(1, 1); v.all.back = [info(58, 0, 8) & 1, zoom()]; n.render(600);
   c.sim_control(0, B.HOME, 1); n.turn(6, 2); c.sim_control(0, B.HOME, 0); /* the stock HOME+PRESETS */
   v.home = [clock(), n.page()];
   n.tap(B.HOME); n.tap(B.SEQ); n.render(4);
@@ -365,10 +377,19 @@ function knobRun() {
 }
 function knobChecks(t, k) {
   const v = k.view, tp = k.tempo, qz = k.quantize, cl = k.clip, au = k.auto, st = k.step;
-  t.eq('song view footer: TEMPO, QUANTIZE, LOOP IN, LOOP OUT', v.footer, ['TEMPO 120', 'QUANTIZE OFF', 'LOOP IN 3.1', 'LOOP OUT 7.1']);
+  t.eq('song view footer: TEMPO, QUANTIZE, LOOP IN, LENGTH (0.6.4)', v.footer, ['TEMPO 120', 'QUANTIZE OFF', 'LOOP IN 3.1', 'LENGTH 4 BARS']);
   t.eq('K1 changes the tempo, not the playhead', v.k1, [0, 12100]);
   t.eq('PRESETS moves the playhead a snap step', v.presets, 1920);
-  t.eq('K4 moves the loop\'s end, not the zoom', v.k4, [0, 1920]);
+  t.eq('K4 lengthens the loop, not the zoom', v.k4, [0, 1920]);
+  t.eq('K3 moves the whole loop a snap step, its length kept', v.k3, [1920, 1920]);
+  t.eq('and stops with the loop at the song\'s end, its length still kept', v.k3end, [0, 0]);
+  t.eq('and back', v.k3back, [0, 0]);
+  t.eq('LENGTH in beats, then 8ths, when it isn\'t whole bars', v.lengths, ['LENGTH 18 BEATS', 'LENGTH 33 8THS']);
+  t.eq('ALGO past 16 bars: ALL, the whole song from its start', v.all.on, 1);
+  t.eq('with ZOOM ALL 16 BARS  SNAP 1 BAR on the bottom line (a 12-bar song)', v.all.notice, 6 + 27 * 6 + 4);
+  t.eq('PRESETS steps a bar there', v.all.step, 1920);
+  t.eq('ALL is the widest', v.all.further, 1);
+  t.eq('ALGO back in: 16 bars', v.all.back, [0, 0]);
   t.eq('ALGO zooms, with ZOOM 8 BARS  SNAP 1/2 BAR on the bottom line', v.algo, [1, 6 + 24 * 6 + 4]);
   t.eq('and the notice runs out', v.noticeGone, v.hint);
   t.eq('SHIFT+PRESETS goes to the next marker', v.marker, 3840);
@@ -404,7 +425,7 @@ function knobChecks(t, k) {
   t.yes('K2 there requantizes it', cl.requantized.length === 2 && cl.requantized.every(at => at % 120 === 0), cl.requantized);
   t.eq('with the song past a tempo change, the clip editor\'s K1 shows and turns that one', cl.songTempo, ['TEMPO 133', 13400, 12000]);
   t.eq('the automation view', au.page, 24);
-  t.eq('automation footer: LANE, VALUE, LOOP IN, LOOP OUT', au.footer, ['LANE VOLUME', 'VALUE -', 'LOOP IN 3.1', 'LOOP OUT 7.1']);
+  t.eq('automation footer: LANE, VALUE, LOOP IN, LENGTH', au.footer, ['LANE VOLUME', 'VALUE -', 'LOOP IN 3.1', 'LENGTH 4 BARS']);
   t.eq('K1 picks the lane: programs last', au.program, ['LANE PROGRAM', 'VALUE -']);
   t.eq('K2 sets a program change at the playhead, its value in the footer', au.set, ['VALUE 4', [[0, 3]]]);
   t.eq('on the conductor K1 shows the tempo lane', au.conductor, ['LANE TEMPO', 'VALUE 120']);
