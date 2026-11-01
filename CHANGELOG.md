@@ -2,6 +2,12 @@
 
 The version is `QSEQ_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.6.5
+
+- SHIFT+B3 pastes and moves on: it pastes over at the playhead, as SHIFT+A3 does, then moves the playhead and
+  the start point to the end of what it pasted, so taps lay copies end to end, the paste outline showing where
+  the next one lands. SHIFT+A3 still leaves the playhead where it was. While playing, B3 pastes as A3 does.
+
 ## 0.6.4
 
 - K3 (LOOP IN) moves the whole loop, keeping its length, and stops at the song's end. K4 is the loop's LENGTH,

@@ -143,6 +143,7 @@ tracks, or G4 for all of them. Then:
 |---|---|
 | SHIFT+F3 | Copy |
 | SHIFT+A3 | Paste at the playhead |
+| SHIFT+B3 | Paste, then move the playhead on to its end, ready for the next |
 | SHIFT+C4 | Duplicate right after the selection |
 | SHIFT+E4 | Delete what's selected |
 | SHIFT+D4 | Insert empty bars |
@@ -242,6 +243,7 @@ keyboard's octave.
 | Marker to marker | SHIFT+PRESETS |
 | Pick tracks | Hold SEL, tap F3 to F4 (G4 for all) |
 | Copy, cut, paste | SHIFT+F3, SHIFT+G3, SHIFT+A3 |
+| Paste and move on | SHIFT+B3 |
 | Duplicate, delete, insert bars | SHIFT+C4, SHIFT+E4, SHIFT+D4 |
 | Automation view | SHIFT+LFO |
 | Edit jobs | SHIFT+EDIT |

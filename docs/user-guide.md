@@ -148,7 +148,8 @@ SHIFT plus a key:
 |---|---|
 | F3 | Copy the selection |
 | G3 | Cut |
-| A3, B3 | Paste at the playhead, over what's there. Nothing after it moves |
+| A3 | Paste at the playhead, over what's there. Nothing after it moves |
+| B3 | Paste the same way, then move the playhead (and the start point) on to the end of what was pasted, so taps lay copies end to end. Stopped only: while playing, B3 pastes as A3 does |
 | C4 | Duplicate: paste right after the selection, over what's there, and move the selection onto the copy |
 | D4 | Insert empty bars the length of the selection |
 | E4 | Delete the selection: the notes, clip blocks and automation that start in it, on the selected tracks only. Nothing moves, and the other tracks are left alone |

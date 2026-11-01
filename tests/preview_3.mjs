@@ -55,6 +55,7 @@ export async function phase3(browser, root) {
       loop: [pasted.loop, want.loop], first: pasted.tracks.map((list, tr) => list.findIndex((n, i) => !same(n, want.tracks[tr][i])))
         .map((i, tr) => i < 0 ? null : [tr, pasted.tracks[tr][i], want.tracks[tr][i]]).filter(Boolean).slice(0, 3) };
     a.levelsAfterPaste = state(9);
+    a.playheadAfterA3 = info(8) - a.playhead;     // A3 leaves the playhead where it was
     // 2. Undo and redo, then delete those bars again and take that back.
     undoKey(0);
     a.undoPage = r.page();
@@ -185,6 +186,30 @@ export async function phase3(browser, root) {
     r.tap(B.PLAY);
     l.after = [state(0), info(16) & 1, state(2)];
     l.added = notesOf(6).filter(n => n.clock >= from && n.clock < to).length - before;
+    // SHIFT+B3 pastes and moves on (0.6.5), on a fresh simulator: two bars
+    // of track 1 copied, B3 at bar 9 lands them and moves the playhead and
+    // start point to bar 11, A3 there pastes and stays, and B3 again moves on
+    // to bar 13. Each copy is the source's notes.
+    const g = previewRig(), gi = g.info, mo = out.moveOn = {};
+    const notes1 = (from, to) => Array.from({ length: gi(0, 0) }, (_, i) => i).filter(i => gi(30, 0, i) === 0)
+      .map(i => ({ clock: gi(1, 0, i), pitch: gi(2, 0, i) })).filter(n => n.clock >= from && n.clock < to)
+      .map(n => ({ clock: n.clock - from, pitch: n.pitch })).sort((x, y) => x.clock - y.clock || x.pitch - y.pitch);
+    g.render(32);
+    g.tap(B.SEQ);
+    g.turn(5, -2);                                 // the loop: bars 3 and 4
+    const [s0, s1] = [gi(14), gi(15)], len = s1 - s0, source = notes1(s0, s1);
+    g.held(B.FX, () => g.key(0));                  // SHIFT+F3: copy
+    g.turn(6, 8);                                  // bar 9
+    const at = gi(8);
+    g.held(B.FX, () => g.key(6));                  // SHIFT+B3
+    mo.first = [gi(8) - at, gi(59, 0, 0) - at];
+    g.held(B.FX, () => g.key(4));                  // SHIFT+A3: pastes, stays
+    mo.a3 = gi(8) - at;
+    g.held(B.FX, () => g.key(6));
+    mo.second = gi(8) - at;
+    mo.len = len;
+    mo.copies = [notes1(at, at + len), notes1(at + len, at + 2 * len)].map(c => JSON.stringify(c) === JSON.stringify(source));
+    mo.sourceNotes = source.length;
     return out;
   });
   savePng(root, 'phase3-select', out.arrange, 'selectPng');
@@ -196,6 +221,12 @@ export async function phase3(browser, root) {
   k.eq('SHIFT+F3 copies the selection on two tracks', a.clip, [3840, 3]);
   k.eq('PRESETS moves the playhead to bar 5', a.playhead, 7680);
   k.yes('SHIFT+A3 pastes over at bar 5, nothing later moving', a.pasteOk, a.pasteDiff);
+  k.eq('SHIFT+A3 leaves the playhead where it was', a.playheadAfterA3, 0);
+  const mo = out.moveOn;
+  k.eq('SHIFT+B3 moves the playhead and start point on to the end of what it pasted', mo.first, [mo.len, mo.len]);
+  k.eq('SHIFT+A3 there pastes and stays', mo.a3, mo.len);
+  k.eq('SHIFT+B3 again moves on another copy\'s length', mo.second, 2 * mo.len);
+  k.yes('each copy is the source\'s notes', mo.sourceNotes > 0 && mo.copies.every(Boolean), mo);
   k.eq('the paste is one undo step', a.levelsAfterPaste, 1);
   k.eq('still on the song view after the edits', a.stillOnSong, 19);
   k.eq('undo stays on the song view', a.undoPage, 19);

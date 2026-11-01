@@ -3,7 +3,8 @@
  * loop region is the selection. It covers the current track and follows it,
  * until tracks are picked by hand: hold SEL and tap F3 to F4 for tracks 1
  * to 8, G4 for all (again for just the current one). SHIFT plus the lower
- * white keys copy, cut, paste (A3 and B3 both, over what's there),
+ * white keys copy, cut, paste (A3 and B3 both, over what's there, B3 moving
+ * the playhead on to its end, 0.6.5),
  * duplicate, insert bars and delete the selection, and SHIFT+D#4 clears
  * the clipboard. */
 #include "arrange.h"
@@ -31,7 +32,7 @@ static void song_pick_tracks(uint32_t down)
 }
 static void song_action(unsigned which, uint32_t now)
 {
-    static const char *const done[7] = {"COPIED", "CUT", "PASTED", "PASTED", "DUPLICATED", "BARS INSERTED", "DELETED"};
+    static const char *const done[7] = {"COPIED", "CUT", "PASTED", "PASTED, MOVED ON", "DUPLICATED", "BARS INSERTED", "DELETED"};
     struct song *s = song_port_song();
     const struct song_player *p = song_port_player();
     struct song_clip *c = song_port_clip();
@@ -59,6 +60,10 @@ static void song_action(unsigned which, uint32_t now)
     else if (which == 5) r = song_insert_time(s, s->loop_start, s->loop_end - s->loop_start);
     else r = song_erase(s, song_selected(), s->loop_start, s->loop_end);
     song_player_resume(song_port_player(), &place);
+    if (!r && which == 3 && !p->playing) { /* B3 moves on to the end of what it pasted, for the next (0.6.5) */
+        uint32_t next = at + c->length, limit = s->open ? s->loop_end : song_end(s);
+        song_port_jump(next < limit ? next : limit);
+    }
     notice = !r ? done[which] : which >= 2 && which <= 3 && !c->length ? "COPY SOMETHING FIRST"
         : r == -2 ? "THAT CLIP IS IN ANOTHER SONG" : which == 6 ? "NOTHING TO DELETE" : "DOESN'T FIT";
     notice_until = now + 1500U;
