@@ -402,7 +402,8 @@ The footer shows the lane on K1 and its value at the playhead on K2, or a dash w
 yet. Everything else works as in the song view, REC included, but SHIFT+SEL clears lanes here, and the bottom
 line doesn't show REC's mode. A take here stays in this view instead of showing the roll, and controller
 lanes are recorded with K1 to K4 during it, K1 and K2 recording rather than picking the lane or setting a
-change. Tempo runs 20 to 300 BPM, set in whole BPM, with SHIFT for half (Song view). Time signatures run 1/4
+change. To clear every lane at once rather than the shown one, use the ERASE job with EVENTS on CCS (Edit
+jobs). Tempo runs 20 to 300 BPM, set in whole BPM, with SHIFT for half (Song view). Time signatures run 1/4
 to 8/4, 1/8 to 16/8 and 1/16 to 16/16.
 
 ## Glitch
@@ -450,6 +451,9 @@ pick tracks, as in the song view. RANGE is the selection or the whole song.
 Jobs: QUANTIZE, VELOCITY, CRESCENDO, GATE TIME, TRANSPOSE, FIT TO SCALE, SHIFT CLOCK, CHORD SORT, STRUM,
 PASTE N TIMES, ERASE, EXTRACT, RAMP, THIN OUT, TIME STRETCH, COPY TRACK, MERGE TRACKS, CLEAR TRACK, NORMALIZE
 and EXPAND CLIPS. With a clip open, the jobs that reach other tracks or the song's time are refused.
+
+ERASE's K3, EVENTS, picks what goes: NOTES, CCS (the automation lanes), PROGRAMS or ALL. It starts on ALL, so
+for automation only, set it to CCS.
 
 ## Song list
 

@@ -154,6 +154,31 @@ K2 changes it, and YES keeps the name.
 
 <img src="phase5a-song-list.png" width="300" alt="The song list with two songs">
 
+## Recording automation
+
+1. In the song view, stopped, pick the track with SELECT and tap REC.
+2. After the count-in the knob labels change to that track's parameters: CUTOFF, RESONANCE, ENV MOD and DECAY
+   on the 303. Turn K1 to K4 as it records.
+3. A knob you turn latches. It keeps writing until the take ends, and when you stop turning, its value holds.
+   In a LOOP take each pass replaces the one before, so your last pass is what stays.
+4. REC or PLAY ends the take.
+
+Turns during the count-in sound but aren't recorded. Which parameter each knob records is set per track on
+settings page 3 (GLO, then ALGO twice).
+
+<img src="phase4-recording.png" width="300" alt="A take on the 303, its cutoff, resonance, env mod and decay on the knobs"> <img src="phase4-automation.png" width="300" alt="The automation view">
+
+To see what's recorded, SHIFT+LFO opens the automation view, and K1 picks the lane. To delete it:
+
+| To delete | Do this |
+|---|---|
+| One lane in the selection | In the automation view, K1 to the lane, then SHIFT+SEL |
+| One change | In the automation view, SHIFT+PRESETS to it (it jumps change to change), then SEL |
+| Every lane on some tracks | The ERASE job (SHIFT+EDIT, K1 to ERASE) with K3, EVENTS, on CCS. It starts on ALL, which takes the notes too |
+| The last take | Undo, HOME+SAVE. Its notes go with it |
+
+SHIFT+E4 in the song view deletes the automation in the selection along with the notes.
+
 ## Good to know
 
 **The song view and the grid play different things.** The song view plays only the song, and the grid plays
@@ -219,5 +244,6 @@ keyboard's octave.
 | Duplicate, delete, insert bars | SHIFT+C4, SHIFT+E4, SHIFT+D4 |
 | Automation view | SHIFT+LFO |
 | Edit jobs | SHIFT+EDIT |
+| Delete a lane's automation in the selection | SHIFT+SEL in the automation view |
 | Change a track's instrument | Hold HOME, turn PRESETS |
 | Stop everything, go to the stock overview | HOME+PLAY |

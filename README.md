@@ -75,7 +75,8 @@ The full build and the preview have all of these. The [user guide](docs/user-gui
 - Up to 64 levels of undo and redo.
 
 **Automation**
-- K1 to K4 each record a parameter while recording, chosen per track.
+- K1 to K4 each record a parameter while recording, chosen per track. A turned knob latches until the take
+  ends, so in a loop the last pass is what stays.
 - An automation view for tempo, time signature, program changes and controller lanes, with chase on every
   start and jump.
 
