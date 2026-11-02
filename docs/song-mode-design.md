@@ -112,16 +112,29 @@ moves the pointer, since K1 changes the selected notes' lengths too.
 
 **MOVE and NUDGE (0.6.7).** With the glitch layer off, SHIFT+K1 moves the selection by the length (triplets
 and dots count) and SHIFT+K2 by 5 clocks a detent, whole notes with their length, velocity and glitch word,
-on the track's notes only. The pointer is the selection, so it moves with the notes, and a sweep's anchor
-too. The pick narrows to the moved pitches (picks already made stay), and a turn that would bring a note
-that stays, of a picked pitch, into the selection is refused: `NOTE IN THE WAY`. Without that, a note
-nudged onto another of its pitch would take it along on the next detent. A note can't go before the start or,
-in a clip, outside its length. On the song it goes as far as a note entered at the pointer could, the end,
-and the song grows a bar as it does for that note. A sweep too big to undo is refused as its other edits are.
-A run of MOVE and NUDGE turns with no other control between is one undo step (section 9). Playing, they edit
-as the other knobs do, and a note moved on past the playhead, which has sounded this pass, stays quiet where
-it lands until the next pass, so it never sounds twice in one. Its note-off comes when it was due, as after
-any edit.
+on the track's notes only. The pointer moves with the notes, and a sweep's anchor too. A note can't go before
+the start or, in a clip, outside its length. On the song it goes as far as a note entered at the pointer
+could, the end, and the song grows a bar as it does for that note. A run of MOVE and NUDGE turns with no other
+control between is one undo step (section 9). Playing, they edit as the other knobs do, and a note moved on
+past the playhead, which has sounded this pass, stays quiet where it lands until the next pass, so it never
+sounds twice in one. Its note-off comes when it was due, as after any edit.
+
+**The moved notes are the selection (0.6.8).** In 0.6.7 the selection stayed positional, the notes in the band
+at the picked pitches, so the pick narrowed to the moved pitches and a turn that would bring another note of
+them into the band was refused, `NOTE IN THE WAY`. On the device that refused moves where nothing overlapped: a
+sweep of drum hits could not pass a hit of the same pad after it. Now step entry remembers the notes a turn
+moved, by start and pitch, and they are the selection, whatever the band holds, until something makes the
+selection again (PRESETS, SEL picks or a sweep, an entry, rest, tie or repeat, ENV or LFO, leaving, another
+track, undo or redo, a take). The knobs, the pitch knob, TUNE, the glitch layer and ENV act on exactly them,
+the pitch knob keeping the memory in step. A moved note landing where a note of its pitch starts (the row the
+roll draws, TUNE aside) replaces it, so start and pitch name the moved notes alone, and moved notes sharing
+them (a pad at two TUNEs, or the same note twice) are all selected anyway. Within a run a replaced note waits
+in a list of 64 and comes back once the moved notes leave its place, so a run can pass over notes. Where the
+run stops it stays replaced. Past 64 at once a replacement is for good, though undo still brings it back. The
+selection holds as many notes as undo could take back in one step (the edit jobs' reckoning, about 630 on the
+device, 4 bytes each), and a turn whose notes and the notes it lands on are more than that is refused as too
+big. While playing, a note replaced or put back ends or starts as any edited note does: a note put back behind
+the playhead plays from the next pass.
 
 **Editing what's there.** The pointer is the selection. When it lands on existing notes, they're selected
 (the whole chord by default), and K1, K2 and K3 change their length, velocity and gate in place. On an empty
@@ -723,7 +736,10 @@ the panel says when a turn goes on a run, and the journal opens the run's step a
 step, undo or redo has come since. In the step opened again a note's change rewrites the record that put it
 where it was, rather than adding a pair, so the step holds each note's first and last state, and the maps
 from before the run once. Ten clicks of NUDGE are one of the 64 levels, and the step never outgrows one
-turn, which is what the "too big to undo" reckoning measures.
+turn, which is what the "too big to undo" reckoning measures. Since 0.6.8 a run also lands on notes and puts
+them back: a note put back takes out the DEL that removed it, and one removed again the ADD that put it back,
+so a run passing back and forth over notes keeps its step the same size, and undo brings back every note it
+replaced.
 
 ## 10. Phases
 

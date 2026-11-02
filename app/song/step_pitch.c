@@ -50,6 +50,7 @@ SONG_SMALL static unsigned move(struct song_step *st, unsigned *index, unsigned 
                 st->pick[e.a / 32U] &= ~(1U << (e.a % 32U));
                 st->pick[to / 32] |= 1U << (to % 32);
             }
+            if (st->ids) step_repitch(st, clock, e.a, (unsigned)to); /* a moved note stays selected (0.6.8) */
             e.a = (uint8_t)to;
             step_change(st, at, &e);
             ++moved;

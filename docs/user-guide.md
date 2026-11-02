@@ -302,17 +302,23 @@ pointer is, as before, so an entry chain comes out the same.
 **Moving notes.** SHIFT+K1 (MOVE) moves the selected notes by the current length, triplets and dots
 included, and SHIFT+K2 (NUDGE) by 5 clocks a detent (a quarter is 480). The selection is the notes at the
 pointer, narrowed by any SEL picks, or a sweep's, and each note moves whole: its length, velocity and glitch,
-TUNE included. The pointer moves with them, and a sweep's band too, so they stay selected: the selection
-narrows to their pitches, as if picked with SEL (picks already made stay). Other notes where they land don't
-join them, and a detent that would bring one in, a note of a picked pitch that isn't moving, at the new spot
-or anywhere in the moved band, is refused with `NOTE IN THE WAY`, and nothing moves. A detent that would take
-a note before the start, or in a clip outside its length, is refused too. At the song's end a note goes as far
-as one entered there could, and the song grows to hold it. On an empty spot they do nothing. A run of MOVE and
-NUDGE turns with nothing else in between is one undo step, however many detents it took. They work while
-playing, so you can nudge by ear: a note moved on past the playhead has sounded this pass, and plays from its
-new spot on the next. In the glitch layer SHIFT+K1 to K3 stay as they were.
+TUNE included. The pointer moves with them, and a sweep's band too. From the first detent the moved notes
+themselves are the selection, so they pass over and among other notes without picking them up: the SEL line
+counts just them, the roll shows just them white, and K1 to K3, the pitch knob, SHIFT+K4's TUNE, the glitch
+layer and ENV act on exactly them. That lasts until the selection changes: PRESETS in any form, SEL picks or a
+new sweep, entering a note, a rest, tie or repeat, ENV or LFO, leaving step entry, another track, undo or redo,
+or a take.
 
-<img src="step-nudge.png" width="300" alt="NUDGE: E4 picked from a chord and nudged 15 clocks, the footer MOVE 1/4 and NUDGE +15">
+A moved note that lands where a note of its pitch starts replaces it (on a drum or sampler track, the same pad,
+whatever its TUNE). If the run moves on, the note comes back. Only where the run stops is it replaced for good.
+A run is MOVE and NUDGE turns with nothing else in between, and it is one undo step however many detents it
+took: undo brings back every note it moved and every note it replaced. A detent that would take a note before
+the start, or in a clip outside its length, is refused with a notice and nothing moves. At the song's end a
+note goes as far as one entered there could, and the song grows to hold it. On an empty spot they do nothing.
+They work while playing, so you can nudge by ear: a note moved on past the playhead has sounded this pass, and
+plays from its new spot on the next. In the glitch layer SHIFT+K1 to K3 stay as they were.
+
+<img src="step-nudge.png" width="300" alt="A sweep of three drum notes moved three 16ths and nudged 5 clocks past another note of the lower pad, which stays unselected: SEL 3 NOTES, the footer MOVE 1/16 and NUDGE +5">
 
 **Zoom.** ALGO zooms the roll to 4 bars, 2 bars, 1 bar or half a bar across. It starts at 1 bar and keeps the
 zoom while the FM-1 is on. The roll shows a span that starts on a bar line, the spans counted from the start of

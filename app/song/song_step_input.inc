@@ -15,7 +15,8 @@
  * SHIFT+K4 turns the selected notes' TUNE by semitones (0.6.6). SHIFT+K1
  * moves the selected notes by the length and SHIFT+K2 nudges them by 5
  * clocks (0.6.7, step_move.c), playing or not, a run of those turns with
- * nothing else between being one undo step. PLAY plays
+ * nothing else between being one undo step, and the notes they replace
+ * along the way coming back as the run moves on (0.6.8). PLAY plays
  * from the pointer's bar and stays here, and while it plays the keys only
  * sound. REC records a take here as in the other views, a hold opens the
  * record settings, and SHIFT+REC leaves, as SEQ does (0.5.0). ALGO zooms
@@ -46,6 +47,7 @@ static void song_step_leave(void)
     struct song_step *st = song_port_step();
     step_preview_stop(st);
     st->ranged = st->picked = step_moving = 0;
+    step_forget(st);
     if (step_from == SONG_GRID && st->song->open) {
         song_port_clip_launched();
         song_port_clip_close();
@@ -105,15 +107,18 @@ static void step_shift_key(struct song_step *st, unsigned name, unsigned playing
     if (wrong) { notice = wrong; notice_until = now + 1500U; }
 }
 /* MOVE and NUDGE (0.6.7): detent by detent, `clocks` each, stopping at the
- * first one refused, which says why. Playing, the player hears of each. */
-static void step_nudged(struct song_step *st, int detents, uint32_t clocks, uint32_t now)
+ * first one refused, which says why. Playing, the player hears of each.
+ * `more`: the run goes on, as it does from the first detent on. */
+static void step_nudged(struct song_step *st, int detents, uint32_t clocks, unsigned *more, uint32_t now)
 {
-    static const char *const why[3] = {"NOTE IN THE WAY", "CAN'T MOVE BEFORE THE START", "CAN'T MOVE PAST THE END"};
-    for (int k = detents < 0 ? -detents : detents; k-- > 0;) {
-        int r = step_nudge(st, detents < 0 ? -(int32_t)clocks : (int32_t)clocks, song_port_player());
+    for (int k = detents < 0 ? -detents : detents; k-- > 0; *more = 1) {
+        int r = step_nudge(st, detents < 0 ? -(int32_t)clocks : (int32_t)clocks, *more, song_port_player());
         if (!r) continue;
-        if (r <= STEP_IN_THE_WAY) { notice = why[STEP_IN_THE_WAY - r]; notice_until = now + 1500U; }
-        else step_refused(r, now);
+        if (r == STEP_START || r == STEP_END) {
+            notice = r == STEP_START ? "CAN'T MOVE BEFORE THE START" : "CAN'T MOVE PAST THE END";
+            notice_until = now + 1500U;
+        } else step_refused(r, now);
+        *more = 1;
         return;
     }
 }
@@ -140,6 +145,7 @@ static int song_step_input(const struct fm1_controls *c, uint32_t *pressed, uint
         playing = song_port_player()->playing;
     }
     if (taking) { /* the pointer is hidden: K1 to K4 record their lanes, ALGO zooms, PRESETS does nothing */
+        step_forget(st); /* a take changes the notes: moved ones are selected no more (0.6.8) */
         *pressed &= ~(BUTTON(PLAY) | BUTTON(FX) | BUTTON(SCL) | BUTTON(ENV) | BUTTON(LFO) | BUTTON(ARP));
         if (*pressed & (BUTTON(HOME) | BUTTON(EDIT) | BUTTON(GLO) | BUTTON(SAVE))) return 0;
         octave = clamp(octave + !!(*pressed & BUTTON(OCT_UP)) - !!(*pressed & BUTTON(OCT_DOWN)), -2, 2);
@@ -166,10 +172,11 @@ static int song_step_input(const struct fm1_controls *c, uint32_t *pressed, uint
             step_refused(r, now);
         }
     } else if (moving) { /* the run's undo step goes on, or one starts */
-        song_undo_run(song_port_undo(), step_moving);
+        unsigned more = step_moving;
+        song_undo_run(song_port_undo(), more);
         step_moving = !other;
-        step_nudged(st, c->encoders[2], step_clocks(st), now);
-        step_nudged(st, c->encoders[3], STEP_NUDGE, now);
+        step_nudged(st, c->encoders[2], step_clocks(st), &more, now);
+        step_nudged(st, c->encoders[3], STEP_NUDGE, &more, now);
         if (c->encoders[4]) step_refused(step_set_gate(st, c->encoders[4]), now);
     } else {
         if (c->encoders[2]) step_refused(step_set_length(st, -c->encoders[2]), now); /* right halves it, as F to E (0.5.1) */

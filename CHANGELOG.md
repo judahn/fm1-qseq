@@ -2,6 +2,23 @@
 
 The version is `QSEQ_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.6.8
+
+- MOVE and NUDGE no longer say `NOTE IN THE WAY`. A sweep of drum hits refused to pass a hit of the same pad
+  after it, though nothing overlapped, because the band reaching that hit would have selected it. Now the
+  notes a turn moves are the selection themselves, so they pass over and among other notes without picking
+  them up, and 0.6.7's narrowing of the pick to their pitches is gone (SEL picks still choose what the first
+  turn takes). The SEL line counts just them and the roll shows just them white.
+- They stay the selection until it changes: PRESETS in any form, SEL picks or a new sweep, entering a note, a
+  rest, tie or repeat, ENV or LFO, leaving step entry, another track, undo or redo, or a take. Until then K1 to
+  K3, the pitch knob, SHIFT+K4's TUNE, the glitch layer and ENV act on exactly them.
+- A moved note that lands where a note of its pitch starts replaces it, whatever that note's TUNE. If the run
+  moves on, the note comes back. Where the run stops it stays replaced. Undo brings back every note a run
+  replaced, in the same one step, and a run back and forth over notes keeps that step the size it was.
+- Moves past the start or outside a clip are still refused, and so is a selection too big to undo. Playing, a
+  note replaced or put back never hangs or sounds twice, and one put back behind the playhead plays from the
+  next pass.
+
 ## 0.6.7
 
 - Step entry moves notes in time. SHIFT+K1 (MOVE) moves the selected notes by the current length, triplets and

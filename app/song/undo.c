@@ -116,14 +116,6 @@ SONG_SMALL static void append(struct song_undo *u, unsigned op, unsigned track, 
     put16(p + 2 + bytes, bytes + 4U);
     u->used += bytes + 4U;
 }
-SONG_SMALL void song_undo_record(struct song_undo *u, unsigned op, unsigned track, const struct song_event *e,
-                                 uint32_t extra)
-{
-    if (op == SONG_UNDO_SHIFT) {
-        uint32_t shift[2] = {e ? e->at : 0, extra}; /* from, then delta */
-        append(u, op, 0, shift, sizeof shift);
-    } else append(u, op, track, e, sizeof *e);
-}
 SONG_SMALL void song_undo_step(struct song_undo *u) { if (u->depth) u->step = 1; }
 SONG_SMALL void song_undo_run(struct song_undo *u, unsigned more) { if (u->depth) u->run = (uint8_t)(more ? RUN_MORE : RUN); }
 /* A record of the open transaction with this op and track byte (a maps
@@ -155,6 +147,29 @@ SONG_SMALL void song_undo_change(struct song_undo *u, unsigned track, const stru
         append(u, SONG_UNDO_DEL, track, was, sizeof *was);
         append(u, SONG_UNDO_ADD, track, now, sizeof *now);
     }
+}
+/* In a run (0.6.8) a note put back takes out the DEL that took it, and one
+ * taken again the ADD that put it there, so a run passing back and forth
+ * over notes it lands on keeps its step the size it was. */
+SONG_SMALL static int cancel(struct song_undo *u, unsigned op, unsigned track, const struct song_event *e)
+{
+    uint8_t *r;
+    if (!u->run || !u->depth || u->paused || u->lost || open_transaction(u) ||
+        !(r = find(u, op == SONG_UNDO_ADD ? SONG_UNDO_DEL : SONG_UNDO_ADD, track, e)))
+        return 0;
+    uint32_t at = (uint32_t)(r - u->data), size = sizeof *e + 4U;
+    memmove(r, r + size, u->used - at - size);
+    u->used -= size;
+    if (u->hint > at - u->open_at) u->hint -= size; /* the records after it moved down */
+    return 1;
+}
+SONG_SMALL void song_undo_record(struct song_undo *u, unsigned op, unsigned track, const struct song_event *e,
+                                 uint32_t extra)
+{
+    if (op == SONG_UNDO_SHIFT) {
+        uint32_t shift[2] = {e ? e->at : 0, extra}; /* from, then delta */
+        append(u, op, 0, shift, sizeof shift);
+    } else if ((op != SONG_UNDO_ADD && op != SONG_UNDO_DEL) || !cancel(u, op, track, e)) append(u, op, track, e, sizeof *e);
 }
 SONG_SMALL void song_undo_sound(struct song_undo *u, unsigned track, const uint8_t *before, const uint8_t *after)
 {

@@ -22,7 +22,9 @@ SONG_SMALL int step_range(const struct song_step *st, uint32_t *from, uint32_t *
 }
 SONG_SMALL int step_chosen(const struct song_step *st, const struct song_event *e)
 {
-    return song_is_note(e) && (!st->picked || (st->pick[e->a / 32U] >> (e->a % 32U) & 1U));
+    if (!song_is_note(e)) return 0;
+    if (st->ids) return step_has_id(st, step_id_of(song_event_start(e), e->a)); /* the moved notes (0.6.8) */
+    return !st->picked || (st->pick[e->a / 32U] >> (e->a % 32U) & 1U);
 }
 /* The swept events, as pool indices [*first, return). */
 SONG_SMALL static unsigned swept(const struct song_step *st, unsigned *first)
@@ -52,6 +54,7 @@ SONG_SMALL int step_range_delete(struct song_step *st)
     for (end = swept(st, &first); end-- > first;)
         if (step_chosen(st, &st->song->event[end])) (void)song_remove(st->song, st->track, end - st->song->first[st->track]);
     st->tie_ok = 0;
+    step_forget(st);
     return 0;
 }
 /* The knobs show the first note's velocity afterwards, as at the pointer. */

@@ -27,6 +27,7 @@ SONG_SMALL void step_begin(struct song_step *st, unsigned track, uint32_t pointe
     st->track = (uint8_t)(track < SONG_TRACKS ? track : 0);
     st->pointer = pointer;
     st->chord_count = st->last_count = st->tie_ok = st->picked = st->ranged = 0;
+    step_forget(st);
 }
 SONG_SMALL uint32_t step_clocks(const struct song_step *st)
 {
@@ -59,11 +60,8 @@ SONG_SMALL static int find_note(const struct song_step *st, uint32_t clock, unsi
 SONG_SMALL unsigned step_selection(const struct song_step *st, unsigned index[STEP_CHORD])
 {
     unsigned end, n = 0, i = at_clock(st, st->pointer, &end), first = st->song->first[st->track];
-    for (; i < end && n < STEP_CHORD; ++i) {
-        unsigned pitch = st->song->event[first + i].a;
-        if (!song_is_note(&st->song->event[first + i])) continue;
-        if (!st->picked || (st->pick[pitch / 32U] >> (pitch % 32U) & 1U)) index[n++] = first + i;
-    }
+    for (; i < end && n < STEP_CHORD; ++i)
+        if (step_chosen(st, &st->song->event[first + i])) index[n++] = first + i; /* picked, or moved (0.6.8) */
     return n;
 }
 
@@ -82,6 +80,7 @@ static void advance(struct song_step *st, uint32_t clocks)
     struct song *s = st->song;
     st->pointer += clocks;
     st->picked = st->ranged = 0;
+    step_forget(st);
     /* Entering past the end makes the song longer. */
     while (st->pointer >= song_end(s) && s->bars < SONG_MAX_BARS) ++s->bars;
     if (st->pointer > song_end(s)) st->pointer = song_end(s);
@@ -93,6 +92,7 @@ SONG_SMALL static int enter(struct song_step *st, const uint8_t *pitches, const 
     struct song *s = st->song;
     uint32_t step = step_clocks(st), gate = step_gate_clocks(st, step);
     unsigned fresh = 0;
+    step_forget(st); /* even refused, an entry ends a moved selection (0.6.8) */
     for (unsigned i = 0; i < count; ++i) fresh += find_note(st, st->pointer + offsets[i], pitches[i]) < 0;
     if (s->events + fresh > SONG_EVENTS) return -1;
     int glitch = song_glitch_intern(s, st->glitch); /* entered notes get the entry glitch */
@@ -144,6 +144,7 @@ SONG_SMALL int step_commit(struct song_step *st)
 }
 SONG_SMALL int step_repeat(struct song_step *st)
 {
+    step_forget(st);
     return st->last_count ? enter(st, st->last, st->last_strum, st->last_count) : -1;
 }
 SONG_SMALL int step_rest(struct song_step *st)
@@ -156,6 +157,7 @@ SONG_SMALL int step_rest(struct song_step *st)
  * length: it sounds through to the new step and ends with its gate. */
 SONG_SMALL int step_tie(struct song_step *st)
 {
+    step_forget(st);
     if (!st->tie_ok || !st->last_count) return -1;
     uint32_t step = step_clocks(st), span = st->pointer - st->last_at + step_gate_clocks(st, step);
     for (unsigned i = 0; i < st->last_count; ++i) {
@@ -173,6 +175,7 @@ SONG_SMALL int step_delete(struct song_step *st)
     unsigned index[STEP_CHORD], n = step_selection(st, index);
     while (n--) (void)song_remove(st->song, st->track, index[n] - st->song->first[st->track]);
     st->tie_ok = st->picked = 0;
+    step_forget(st);
     return 0;
 }
 /* Back one step, deleting the notes that start in the step backed over. */
@@ -184,6 +187,7 @@ SONG_SMALL int step_back_delete(struct song_step *st)
         if (song_is_note(&st->song->event[st->song->first[st->track] + end])) (void)song_remove(st->song, st->track, end);
     st->pointer = to;
     st->tie_ok = st->picked = st->ranged = 0;
+    step_forget(st);
     return 0;
 }
 /* The pointer line to line on the step grid (0.6.7, step_move.c), or note
@@ -204,12 +208,14 @@ SONG_SMALL static void slide(struct song_step *st, int steps, unsigned jump)
 SONG_SMALL void step_move(struct song_step *st, int steps)
 {
     st->ranged = 0;
+    step_forget(st);
     slide(st, steps, 0);
     step_land(st);
 }
 SONG_SMALL void step_jump(struct song_step *st, int direction)
 {
     st->ranged = 0;
+    step_forget(st);
     slide(st, direction, 1);
     step_land(st);
 }
@@ -218,6 +224,7 @@ SONG_SMALL void step_jump(struct song_step *st, int direction)
 SONG_SMALL void step_sweep(struct song_step *st, int steps, unsigned jump)
 {
     if (!st->ranged) { st->ranged = 1; st->anchor = st->pointer; st->picked = 0; }
+    step_forget(st);
     step_preview_stop(st);
     slide(st, steps, jump);
     st->tie_ok = 0;

@@ -2,6 +2,7 @@
 #ifndef FM1_SONG_STEP_H
 #define FM1_SONG_STEP_H
 #include "player.h"
+#include "undo.h"
 
 /* Step entry (design section 4). The pointer is the selection: the notes on
  * the track that start exactly at the pointer, all of them unless narrowed
@@ -11,6 +12,10 @@
  * previews go out through `out`. */
 enum { STEP_64TH, STEP_32ND, STEP_16TH, STEP_8TH, STEP_QUARTER, STEP_HALF, STEP_WHOLE, STEP_LENGTHS };
 enum { STEP_GATES = 4, STEP_RANDOMS = 4, STEP_CHORD = 16 };
+/* The notes MOVE and NUDGE took (0.6.8, step_ids.c): as many as undo could
+ * take back in one step, the edit jobs' reckoning, and the notes a run of
+ * them covers, put back as it leaves. */
+enum { STEP_IDS = (SONG_UNDO_BYTES - 512 - (int)sizeof(struct song_maps)) / 24, STEP_COVERS = 64 };
 struct song_step {
     struct song *song;
     struct song_output out;       /* previews of the notes the pointer lands on */
@@ -24,10 +29,17 @@ struct song_step {
     uint8_t preview[STEP_CHORD], preview_count, preview_track;
     uint32_t glitch;              /* the entry glitch word (glitch.h) */
     uint32_t anchor;              /* where a sweep began, while ranged (step_range.c) */
+    /* Since a turn of MOVE or NUDGE (0.6.8): the notes it moved, by start
+     * and pitch (start << 8 | pitch), sorted, are the selection until it
+     * changes, and the notes its run has covered wait to be put back. */
+    uint16_t ids, covers;
+    uint32_t id[STEP_IDS];
+    struct song_event cover[STEP_COVERS];
 };
 
 /* step.c: entering, rests, ties, deleting and moving. Entering calls return
- * 0, or -1 when the song has no room (nothing changes) or nothing applies. */
+ * 0, or -1 when the song has no room (nothing changes) or nothing applies.
+ * Each of them, and step_begin, ends a selection by identity (step_ids.c). */
 void step_init(struct song_step *st, struct song *s, const struct song_output *out);
 void step_begin(struct song_step *st, unsigned track, uint32_t pointer);
 uint32_t step_clocks(const struct song_step *st);  /* current step length */
@@ -85,7 +97,9 @@ int step_transpose_pads(struct song_step *st, const uint8_t *pads, unsigned coun
 int step_range(const struct song_step *st, uint32_t *from, uint32_t *to);
 unsigned step_count(const struct song_step *st);
 int step_too_big(const struct song_step *st);
-int step_chosen(const struct song_step *st, const struct song_event *e); /* a note the pick lets in */
+/* A note the selection holds: the moved notes while there are some
+ * (0.6.8), else every one or the picked pitches. */
+int step_chosen(const struct song_step *st, const struct song_event *e);
 /* The swept selection's edits, for step.c and step_edit.c. */
 int step_range_delete(struct song_step *st);
 void step_range_velocity(struct song_step *st, int delta);
@@ -97,17 +111,29 @@ int step_range_glitch(struct song_step *st, unsigned field, int delta);
  * from line to line, `steps` of them, and step_offset is how far the
  * pointer sits from its nearest line, in clocks, after it positive.
  * step_nudge moves the selected notes whole by `clocks`, the pointer with
- * them and a sweep's anchor too, and narrows the selection to their
- * pitches as picking them would. Playing, the player hears of each note
- * (song_player_moved). It returns 0, -1 with nothing selected, or a
- * refusal, and then nothing moved: STEP_TOO_BIG, STEP_IN_THE_WAY when a
- * note that stays, of a selected pitch, would join the selection there,
- * STEP_START before clock 0, or STEP_END past a clip's end or past where
- * entering a note could reach. */
-enum { STEP_NUDGE = 5, STEP_IN_THE_WAY = -3, STEP_START = -4, STEP_END = -5 };
+ * them and a sweep's anchor too, and from then on they are the selection
+ * by identity (0.6.8), passing over other notes without taking them in. A
+ * note landed on, of a moved note's pitch at its clock, is replaced, and
+ * within a run (`more`, the turn before being one of it) put back once the
+ * moved notes leave its place. Playing, the player hears of each moved
+ * note (song_player_moved). It returns 0, -1 with nothing selected, or a
+ * refusal, and then nothing moved: STEP_TOO_BIG (undo's reckoning, the
+ * notes replaced counted in), STEP_START before clock 0, or STEP_END past
+ * a clip's end or past where entering a note could reach. */
+enum { STEP_NUDGE = 5, STEP_START = -4, STEP_END = -5 };
 uint32_t step_grid_move(const struct song_step *st, uint32_t clock, int steps);
 int step_offset(const struct song_step *st);
-int step_nudge(struct song_step *st, int32_t clocks, struct song_player *p);
+int step_nudge(struct song_step *st, int32_t clocks, unsigned more, struct song_player *p);
+/* step_ids.c (0.6.8): the selection by identity. step_forget ends it and
+ * the run's covered notes with it, and step_repitch keeps it in step when
+ * a moved note's pitch changes at `clock`. */
+uint32_t step_id_of(uint32_t start, unsigned pitch);
+int step_has_id(const struct song_step *st, uint32_t id);
+void step_forget(struct song_step *st);
+void step_repitch(struct song_step *st, uint32_t clock, unsigned from, unsigned to);
+unsigned step_take(struct song_step *st, uint32_t from, uint32_t to, int32_t clocks);
+void step_cover(struct song_step *st, unsigned index);
+void step_uncover(struct song_step *st);
 unsigned step_entry_velocity(struct song_step *st); /* draws a random one for R1..R4 */
 const char *step_velocity_name(unsigned velocity);
 void step_length_name(const struct song_step *st, char out[8]);

@@ -189,6 +189,7 @@ SONG_SMALL void step_pick(struct song_step *st, unsigned pitch)
 {
     uint32_t from, to, bit = 1U << (pitch % 32U);
     if (pitch > 127) return;
+    step_forget(st); /* picking makes the selection again (0.6.8) */
     if (!st->picked) memset(st->pick, 0, sizeof st->pick);
     if (st->picked && step_range(st, &from, &to)) st->pick[pitch / 32U] ^= bit; /* in a sweep a key toggles its pitch */
     else st->pick[pitch / 32U] |= bit;

@@ -19,7 +19,7 @@ static const char *const step_spans[4] = {"4 BARS", "2 BARS", "1 BAR", "1/2 BAR"
 static uint8_t step_zoom = 2; /* 1 bar, kept while the FM-1 is on */
 static struct {
     uint32_t start, length, pointer, from, to, band, revision, pick[4]; /* pointer ~0U: not shown, band: the sweep's end shown */
-    uint16_t cell;                                                 /* a dash's clocks */
+    uint16_t cell, moved;                                          /* a dash's clocks, and how many moved notes are selected (0.6.8) */
     uint8_t part, track, low, high, zoom, take, picked, audible, key;
 } step_now;
 static uint32_t step_clock = ~0U, step_drawn_x = ~0U; /* the playhead, ~0U when none */
@@ -87,6 +87,7 @@ static void step_read(const struct song_step *st)
     step_now.cell = (uint16_t)cell;
     step_now.revision = s->revision;
     step_now.picked = st->picked;
+    step_now.moved = st->ids;
     memcpy(step_now.pick, st->pick, sizeof st->pick);
     step_now.audible = frame_views[step_now.track].audible;
     step_now.key = (uint8_t)(s->key_root | s->key_scale << 4);

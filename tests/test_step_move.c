@@ -49,17 +49,20 @@ static void fresh(unsigned bars)
     step_init(&st, &song, &quiet);
     step_begin(&st, 0, 0);
 }
-static void land(uint32_t pointer) { st.pointer = pointer; st.ranged = 0; step_land(&st); }
+/* The pointer put on a clock, as PRESETS would: a moved selection ends. */
+static void land(uint32_t pointer) { st.pointer = pointer; st.ranged = 0; step_forget(&st); step_land(&st); }
 static uint32_t moves(int steps) { step_move(&st, steps); return st.pointer; }
 static uint32_t sweeps(int steps) { step_sweep(&st, steps, 0); return st.pointer; }
 static int picked(unsigned pitch) { return st.picked && (st.pick[pitch / 32U] >> (pitch % 32U) & 1U); }
+/* A turn with no undo, the run going on. */
+static int nudge(int32_t clocks) { return step_nudge(&st, clocks, 1, NULL); }
 /* One poll with a MOVE or NUDGE turn, as the panel makes it: its own
  * transaction, going on with the run when `more`. */
 static int turn(int32_t clocks, unsigned more)
 {
     song_undo_begin(&undo, &song);
     song_undo_run(&undo, more);
-    int r = step_nudge(&st, clocks, NULL);
+    int r = step_nudge(&st, clocks, more, NULL);
     song_undo_end(&undo, &song);
     return r;
 }
@@ -153,7 +156,7 @@ static void test_grid(void)
 }
 
 /* At the pointer: picked or not, the notes move whole and the pointer
- * with them, and the pitches that moved are the pick after. */
+ * with them, and they are the selection after, by identity (0.6.8). */
 static void test_pointer(void)
 {
     uint32_t word = song_glitch_turn(song_glitch_turn(0, GLITCH_TUNE, 3), GLITCH_REPEATS, 2);
@@ -166,64 +169,70 @@ static void test_pointer(void)
     song_add_note(&song, 0, 965, 62, 100, 100);
     land(480);
     step_pick(&st, 64);                           /* E alone */
-    CHECK_EQ(step_nudge(&st, STEP_NUDGE, NULL), 0);
+    CHECK_EQ(nudge(STEP_NUDGE), 0);
     CHECK_EQ(where(0, 64, 0), 485);
     CHECK_EQ(where(0, 60, 0), 480); CHECK_EQ(where(0, 67, 0), 480);
     CHECK_EQ(st.pointer, 485);
     CHECK_EQ(step_count(&st), 1);
-    CHECK_EQ(step_nudge(&st, STEP_NUDGE, NULL), 0);
-    CHECK_EQ(step_nudge(&st, (int32_t)step_clocks(&st), NULL), 0); /* MOVE: a 16th */
+    CHECK_EQ(nudge(STEP_NUDGE), 0);
+    CHECK_EQ(nudge((int32_t)step_clocks(&st)), 0); /* MOVE: a 16th */
     CHECK_EQ(where(0, 64, 0), 610);
     CHECK_EQ(st.pointer, 610);
     CHECK(picked(64) && !picked(60) && !picked(67));
     CHECK_EQ(note_of(0, 64, 0)->b, 80); CHECK_EQ(note_of(0, 64, 0)->length, 110);
-    /* No pick: the two left at 480 go, and they are the pick after. */
+    /* No pick: the two left at 480 go, and stay the selection with no pick
+     * made, as 0.6.7 did. */
     land(480);
     CHECK_EQ(step_count(&st), 2);
-    CHECK_EQ(step_nudge(&st, -STEP_NUDGE, NULL), 0);
+    CHECK_EQ(nudge(-STEP_NUDGE), 0);
     CHECK_EQ(where(0, 60, 0), 475); CHECK_EQ(where(0, 67, 0), 475);
     CHECK_EQ(st.pointer, 475);
-    CHECK(picked(60) && picked(67) && !picked(64));
-    /* In the way: the C at 960 stays, so the C here can't land on it. */
-    uint32_t revision = song.revision;
-    CHECK_EQ(step_nudge(&st, 485, NULL), STEP_IN_THE_WAY);
+    CHECK(!st.picked);
+    CHECK_EQ(st.ids, 2); CHECK_EQ(step_count(&st), 2);
+    /* Onto the C at 960: it is replaced, and back when they move on. */
+    CHECK_EQ(nudge(485), 0);
+    CHECK_EQ(where(0, 60, 0), 960); CHECK_EQ(where(0, 60, 961), ~0U); CHECK_EQ(where(0, 67, 0), 960);
+    CHECK_EQ(st.covers, 1); CHECK_EQ(step_count(&st), 2);
+    CHECK_EQ(nudge(STEP_NUDGE), 0);
+    CHECK_EQ(where(0, 60, 0), 960); CHECK_EQ(where(0, 60, 961), 965); CHECK_EQ(st.covers, 0);
+    CHECK_EQ(nudge(-490), 0);
     CHECK_EQ(where(0, 60, 0), 475); CHECK_EQ(where(0, 67, 0), 475); CHECK_EQ(where(0, 60, 476), 960);
-    CHECK_EQ(st.pointer, 475);
-    CHECK_EQ(song.revision, revision);
+    uint32_t revision;
     /* Another pitch there doesn't join: E onto the D at 965, and on alone. */
     land(610);
-    CHECK_EQ(step_nudge(&st, 355, NULL), 0);
+    CHECK_EQ(nudge(355), 0);
     CHECK_EQ(where(0, 64, 0), 965);
     CHECK_EQ(step_count(&st), 1);
-    CHECK_EQ(step_nudge(&st, STEP_NUDGE, NULL), 0);
+    CHECK_EQ(nudge(STEP_NUDGE), 0);
     CHECK_EQ(where(0, 62, 0), 965); CHECK_EQ(where(0, 64, 0), 970);
-    /* Picks already made are kept, and a picked pitch with no note here
-     * still can't take one in from where the notes go. */
+    /* Picks choose what the first turn takes and stay as they were. A
+     * picked pitch with no note here takes none in where the notes go. */
     land(475);
     step_pick(&st, 60); step_pick(&st, 62);
     CHECK_EQ(step_count(&st), 1);
-    CHECK_EQ(step_nudge(&st, 490, NULL), STEP_IN_THE_WAY); /* the D at 965 */
-    CHECK_EQ(step_nudge(&st, 5, NULL), 0);
+    CHECK_EQ(nudge(490), 0);                      /* onto the D at 965 */
+    CHECK_EQ(step_count(&st), 1);
     CHECK(picked(60) && picked(62) && !picked(67));
-    CHECK_EQ(where(0, 60, 0), 480); CHECK_EQ(where(0, 67, 0), 475);
+    CHECK_EQ(where(0, 60, 0), 960); CHECK_EQ(where(0, 60, 961), 965); CHECK_EQ(where(0, 62, 0), 965);
+    CHECK_EQ(where(0, 67, 0), 475);
     /* An empty spot: nothing. */
     land(1500);
     revision = song.revision;
-    CHECK_EQ(step_nudge(&st, STEP_NUDGE, NULL), -1);
+    CHECK_EQ(nudge(STEP_NUDGE), -1);
     CHECK_EQ(st.pointer, 1500); CHECK_EQ(song.revision, revision); CHECK(!st.picked);
     /* Not before clock 0. */
     song_add_note(&song, 0, 20, 70, 100, 10);
     land(20);
-    CHECK_EQ(step_nudge(&st, -25, NULL), STEP_START);
+    CHECK_EQ(nudge(-25), STEP_START);
     CHECK_EQ(where(0, 70, 0), 20); CHECK_EQ(st.pointer, 20); CHECK(!st.picked);
-    CHECK_EQ(step_nudge(&st, -20, NULL), 0);
+    CHECK_EQ(nudge(-20), 0);
     CHECK_EQ(where(0, 70, 0), 0);
     /* The glitch word goes with the note, TUNE and all. */
     int g = song_glitch_intern(&song, word);
     const struct song_event tuned = {2000 | (uint32_t)g << SONG_GLITCH_SHIFT, 72, 33, 77};
     CHECK(g > 0 && !song_add_event(&song, 0, &tuned));
     land(2000);
-    CHECK_EQ(step_nudge(&st, 120, NULL), 0);
+    CHECK_EQ(nudge(120), 0);
     const struct song_event *e = note_of(0, 72, 0);
     CHECK_EQ(song_event_start(e), 2120); CHECK_EQ(e->b, 33); CHECK_EQ(e->length, 77);
     CHECK_EQ(song_glitch_word(&song, e), word);
@@ -238,19 +247,19 @@ static void test_edges(void)
     fresh(4);
     song_add_note(&song, 0, 7200, 60, 100, 100);
     land(7200);
-    CHECK_EQ(step_nudge(&st, 480, NULL), 0);      /* onto the end: a bar more */
+    CHECK_EQ(nudge(480), 0);      /* onto the end: a bar more */
     CHECK_EQ(where(0, 60, 0), 7680); CHECK_EQ(song.bars, 5); CHECK_EQ(st.pointer, 7680);
-    CHECK_EQ(step_nudge(&st, 1920, NULL), 0);
+    CHECK_EQ(nudge(1920), 0);
     CHECK_EQ(where(0, 60, 0), 9600); CHECK_EQ(song.bars, 6);
-    CHECK_EQ(step_nudge(&st, 1925, NULL), STEP_END);
+    CHECK_EQ(nudge(1925), STEP_END);
     CHECK_EQ(where(0, 60, 0), 9600); CHECK_EQ(song.bars, 6); CHECK_EQ(st.pointer, 9600);
     fresh(SONG_MAX_BARS);
     uint32_t end = song_end(&song);
     song_add_note(&song, 0, end - 5, 60, 100, 100);
     land(end - 5);
-    CHECK_EQ(step_nudge(&st, 5, NULL), 0);
+    CHECK_EQ(nudge(5), 0);
     CHECK_EQ(where(0, 60, 0), end); CHECK_EQ(song.bars, SONG_MAX_BARS); CHECK_EQ(st.pointer, end);
-    CHECK_EQ(step_nudge(&st, 5, NULL), STEP_END);
+    CHECK_EQ(nudge(5), STEP_END);
     CHECK_EQ(where(0, 60, 0), end);
     /* A clip a bar long, in the editor. */
     fresh(4);
@@ -259,13 +268,13 @@ static void test_edges(void)
     song_add_note(&song, 0, 1910, 60, 100, 10);
     song_add_note(&song, 0, 0, 62, 100, 10);
     land(1910);
-    CHECK_EQ(step_nudge(&st, 5, NULL), 0);
+    CHECK_EQ(nudge(5), 0);
     CHECK_EQ(where(0, 60, 0), 1915);
-    CHECK_EQ(step_nudge(&st, 5, NULL), STEP_END);
+    CHECK_EQ(nudge(5), STEP_END);
     CHECK_EQ(where(0, 60, 0), 1915); CHECK_EQ(st.pointer, 1915);
     land(0);
-    CHECK_EQ(step_nudge(&st, -5, NULL), STEP_START);
-    CHECK_EQ(step_nudge(&st, 5, NULL), 0);
+    CHECK_EQ(nudge(-5), STEP_START);
+    CHECK_EQ(nudge(5), 0);
     CHECK_EQ(where(0, 62, 0), 5);
     st.length = STEP_HALF; st.triplet = st.dots = 0; /* its bars count from its start */
     st.pointer = 90;
@@ -283,8 +292,8 @@ static void kit(void)
     step_begin(&st, 7, 0);
     st.length = STEP_16TH;
 }
-/* A sweep: the band goes with its notes, other pitches in it stay out of
- * the selection, and a note that stays can't come into it. */
+/* A sweep: the band goes with its notes, and other notes in it stay out of
+ * the selection, those of its pitches it comes to too (0.6.8). */
 static void test_sweep(void)
 {
     uint32_t from, to;
@@ -292,24 +301,27 @@ static void test_sweep(void)
     CHECK_EQ(sweeps(4), 480);
     step_pick(&st, 42);
     CHECK_EQ(step_count(&st), 5);
-    CHECK_EQ(step_nudge(&st, STEP_NUDGE, NULL), 0);
+    CHECK_EQ(nudge(STEP_NUDGE), 0);
     CHECK_EQ(st.anchor, 5); CHECK_EQ(st.pointer, 485);
     CHECK(step_range(&st, &from, &to)); CHECK_EQ(from, 5); CHECK_EQ(to, 486);
     CHECK_EQ(step_count(&st), 5);
     CHECK_EQ(where(7, 42, 0), 5); CHECK_EQ(where(7, 42, 6), 125); CHECK_EQ(where(7, 42, 486), 600);
     CHECK_EQ(where(7, 36, 0), 0); CHECK_EQ(where(7, 38, 0), 480);
-    /* The hat at 600 stays, and a 16th more would bring it into the band. */
-    CHECK_EQ(step_nudge(&st, 120, NULL), STEP_IN_THE_WAY);
-    CHECK_EQ(st.pointer, 485); CHECK_EQ(where(7, 42, 0), 5);
-    CHECK_EQ(step_nudge(&st, -STEP_NUDGE, NULL), 0);
+    /* A 16th more brings the hat at 600 into the band, not the selection. */
+    CHECK_EQ(nudge(120), 0);
+    CHECK_EQ(st.pointer, 605); CHECK_EQ(step_count(&st), 5);
+    CHECK_EQ(where(7, 42, 486), 600); CHECK_EQ(where(7, 42, 601), 605);
+    CHECK_EQ(nudge(-120), 0);
+    CHECK_EQ(nudge(-STEP_NUDGE), 0);
     CHECK_EQ(step_count(&st), 5);                 /* the kick and snare in the band stay out */
-    /* No pick: every pitch in the band goes, each picked after. */
+    /* No pick: every note in the band goes, and stays the selection with
+     * nothing picked. */
     kit();
     sweeps(4);
     CHECK_EQ(step_count(&st), 7);
-    CHECK_EQ(step_nudge(&st, -STEP_NUDGE, NULL), STEP_START); /* the notes at 0 */
-    CHECK_EQ(step_nudge(&st, 60, NULL), 0);
-    CHECK(picked(36) && picked(38) && picked(42) && !picked(46));
+    CHECK_EQ(nudge(-STEP_NUDGE), STEP_START); /* the notes at 0 */
+    CHECK_EQ(nudge(60), 0);
+    CHECK(!st.picked);
     CHECK_EQ(step_count(&st), 7);
     CHECK_EQ(where(7, 36, 0), 60); CHECK_EQ(where(7, 38, 0), 540); CHECK_EQ(where(7, 36, 61), 960);
     /* Backwards from the anchor too. */
@@ -318,7 +330,7 @@ static void test_sweep(void)
     sweeps(-4);
     step_pick(&st, 38);
     CHECK_EQ(step_count(&st), 1);                 /* 960 to 1440: the snare at 1440 */
-    CHECK_EQ(step_nudge(&st, 30, NULL), 0);
+    CHECK_EQ(nudge(30), 0);
     CHECK_EQ(st.anchor, 1470); CHECK_EQ(st.pointer, 990);
     CHECK_EQ(where(7, 38, 481), 1470);
     /* The anchor stops at 0 with the notes inside: the snare at 480 back to 0. */
@@ -326,7 +338,7 @@ static void test_sweep(void)
     sweeps(4);
     step_pick(&st, 38);
     CHECK_EQ(step_count(&st), 1);
-    CHECK_EQ(step_nudge(&st, -480, NULL), 0);
+    CHECK_EQ(nudge(-480), 0);
     CHECK_EQ(where(7, 38, 0), 0); CHECK_EQ(st.pointer, 0); CHECK_EQ(st.anchor, 0);
     CHECK_EQ(step_count(&st), 1);                 /* the kick at 0 stays out */
 }
@@ -461,7 +473,6 @@ static void test_too_big(void)
     CHECK(!step_too_big(&st));
     CHECK_EQ(turn(STEP_NUDGE, 0), 0);
     for (unsigned i = 0; i < 4; ++i) CHECK_EQ(turn(STEP_NUDGE, 1), 0);
-    CHECK_EQ(turn(STEP_NUDGE, 1), STEP_IN_THE_WAY); /* the note left out, 30 after the band */
     for (unsigned i = 0; i < room; ++i) moved += song_event_start(at(0, i)) == 145U + i * 30U;
     CHECK_EQ(moved, room);
     CHECK_EQ(song_event_start(at(0, room)), 120U + room * 30U);
@@ -487,6 +498,30 @@ static unsigned sorted(unsigned track, struct song_event *out)
         }
     return n;
 }
+/* One note to a pitch and clock: a moved note replaces the one it lands on. */
+static int unique(unsigned track)
+{
+    for (unsigned i = 0; i < count(track); ++i)
+        for (unsigned j = i + 1; j < count(track) && song_event_start(at(track, j)) == song_event_start(at(track, i)); ++j)
+            if (at(track, j)->a == at(track, i)->a) return 0;
+    return 1;
+}
+/* The moved notes the selection holds are on the track, as many as it
+ * names, and all inside the sweep or at the pointer. */
+static int held_exactly(void)
+{
+    uint32_t from, to;
+    unsigned n = 0;
+    if (!st.ids) return 1;
+    if (!step_range(&st, &from, &to)) { from = st.pointer; to = from + 1U; }
+    for (unsigned i = 0; i < count(st.track); ++i)
+        if (step_chosen(&st, at(st.track, i))) {
+            uint32_t a = song_event_start(at(st.track, i));
+            if (a < from || a >= to) return 0;
+            ++n;
+        }
+    return n == st.ids;
+}
 static int same(const struct song_event *a, unsigned na, uint16_t bars)
 {
     static struct song_event b[256];
@@ -495,7 +530,7 @@ static int same(const struct song_event *a, unsigned na, uint16_t bars)
 static void test_random(void)
 {
     static struct song_event first[256], last[256];
-    unsigned bad = 0, unsound = 0;
+    unsigned bad = 0, unsound = 0, covered = 0;
     for (uint32_t seed = 1; seed <= 40; ++seed) {
         uint32_t x = seed * 2654435761U;
         kit();
@@ -509,7 +544,7 @@ static void test_random(void)
             song_undo_begin(&undo, &song);
             if (op < 5) {
                 song_undo_run(&undo, more);
-                (void)step_nudge(&st, op < 3 ? (arg & 1 ? 5 : -5) : (arg & 1 ? 1 : -1) * (int32_t)(30U << (arg >> 1) % 5U), NULL);
+                (void)step_nudge(&st, op < 3 ? (arg & 1 ? 5 : -5) : (arg & 1 ? 1 : -1) * (int32_t)(30U << (arg >> 1) % 5U), more, NULL);
             } else if (op == 5) step_move(&st, (int)(arg % 5) - 2);
             else if (op == 6) step_sweep(&st, (int)(arg % 7) - 3, 0);
             else if (op == 7) step_pick(&st, (arg & 1) ? 42 : (arg & 2) ? 36 : 38);
@@ -519,6 +554,8 @@ static void test_random(void)
             more = op < 5;
             steps += song_undo_count(&undo, 0) != before;
             for (unsigned i = 1; i < count(7); ++i) unsound += song_event_start(at(7, i)) < song_event_start(at(7, i - 1));
+            unsound += !unique(7) || !held_exactly();
+            covered += st.covers;
         }
         unsigned n1 = sorted(7, last);
         uint16_t bars1 = song.bars;
@@ -529,6 +566,7 @@ static void test_random(void)
     }
     CHECK_EQ(bad, 0);
     CHECK_EQ(unsound, 0);
+    CHECK(covered > 0);                           /* notes were landed on, and put back */
 }
 
 /* Playing: a note moved on past the playhead sounded already, so it waits
@@ -557,14 +595,14 @@ static void test_playing(void)
     song_player_start(&player, 0);
     while (player.next < 700) run_blocks(&player, b++, 1);
     land(240);
-    CHECK_EQ(step_nudge(&st, 600, &player), 0);   /* C on past the playhead, to 840 */
-    CHECK_EQ(step_nudge(&st, STEP_NUDGE, &player), 0); /* and 845 */
+    CHECK_EQ(step_nudge(&st, 600, 1, &player), 0);   /* C on past the playhead, to 840 */
+    CHECK_EQ(step_nudge(&st, STEP_NUDGE, 1, &player), 0); /* and 845 */
     land(1200);
-    CHECK_EQ(step_nudge(&st, -600, &player), 0);  /* D back past it, to 600 */
+    CHECK_EQ(step_nudge(&st, -600, 1, &player), 0);  /* D back past it, to 600 */
     land(1500);
-    CHECK_EQ(step_nudge(&st, 120, &player), 0);   /* E ahead of it, to 1620 */
+    CHECK_EQ(step_nudge(&st, 120, 1, &player), 0);   /* E ahead of it, to 1620 */
     land(0);
-    CHECK_EQ(step_nudge(&st, STEP_NUDGE, &player), 0); /* the low C, sounding */
+    CHECK_EQ(step_nudge(&st, STEP_NUDGE, 1, &player), 0); /* the low C, sounding */
     uint32_t pass = player.pass;
     while (player.pass == pass) run_blocks(&player, b++, 1);
     unsigned first = heard_count;
@@ -593,7 +631,7 @@ static void test_playing(void)
     song_player_start(&player, 0);
     while (player.next < 700) run_blocks(&player, b++, 1);
     land(240);
-    CHECK_EQ(step_nudge(&st, 600, &player), 0);
+    CHECK_EQ(step_nudge(&st, 600, 1, &player), 0);
     while (player.next < 2 * 1920) run_blocks(&player, b++, 1);
     CHECK_EQ(ons_of(60, 0, heard_count, &c), 2);
     CHECK_EQ(c, exact_block(&song, 0, 0, 240));
