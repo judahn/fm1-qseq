@@ -27,7 +27,7 @@ There are two device builds, and the browser preview:
 | Build | What's in it | App size |
 |---|---|---|
 | Default (`./build.sh`) | The hardware test build: FM1 Open V14 plus a diagnostics page that plays a built-in test song and measures its timing. To fit, it leaves out the 16 factory preset projects and the workbench's project, sample and voice transfers. Firmware updates still work | 453,608 bytes of 453,921 |
-| Full (`FM1_SONG_DEVICE_FULL=1`) | The whole song mode, without the diagnostics page. It leaves out the stock step and pattern pages (their sync and MIDI pages move to the device settings), the stock project pages, the demo projects, the factory sound sets and the built-in FM factory voices (the workbench can send those to the DX7 library) | 534,632 bytes of 548,129 |
+| Full (`FM1_SONG_DEVICE_FULL=1`) | The whole song mode, without the diagnostics page. It leaves out the stock step and pattern pages (their sync and MIDI pages move to the device settings), the stock project pages, the demo projects, the factory sound sets and the built-in FM factory voices (the workbench can send those to the DX7 library) | 538,024 bytes of 548,129 |
 | Browser preview | The whole song mode on FM1 Open's simulator, in one HTML file | |
 
 ### What installing the full build costs
@@ -67,6 +67,8 @@ The full build and the preview have all of these. The [user guide](docs/user-gui
   hears it without leaving, and REC records a take there.
 - A swept selection across bars, narrowed to pitches (every hi-hat, say), to delete, change velocity, length,
   gate or glitch, or transpose.
+- Moving the selected notes by the current length or nudging them 5 clocks at a time, passing over other
+  notes, and replacing a note of the same pitch only where the move stops.
 
 **Real-time recording and arranging**
 - Replace, overdub, punch and loop recording, count-in, metronome, and input quantize with a strength that
@@ -165,7 +167,7 @@ FM1_SONG_DEVICE_FULL=1 FM1_SOURCE_URL=https://github.com/judahn/fm1-qseq/archive
 ```
 
 A firmware build prints its size and checks it fits. A package build also prints the flash layout, for example
-`Offline package fits 1 MiB: image 548864, VM 49152, user 442368 bytes`.
+`Offline package fits 1 MiB: image 565248, VM 32768, user 442368 bytes`.
 
 Every firmware build of a kind (default or full) first clears that kind's update image and replaces its
 workbench page with a "Build incomplete" stub. So after a plain `./build.sh`, run `--package` again before

@@ -248,6 +248,7 @@ keyboard's octave.
 | Automation view | SHIFT+LFO |
 | Edit jobs | SHIFT+EDIT |
 | Delete a lane's automation in the selection | SHIFT+SEL in the automation view |
+| Move notes in step entry, by the length or by 5 clocks | SHIFT+K1, SHIFT+K2 |
 | Tune a sampler note in step entry | SHIFT+K4 |
 | Play one sampler pad across the keys | GLO, page 5 on the sampler track (chromatic mode) |
 | Change a track's instrument | Hold HOME, turn PRESETS |
