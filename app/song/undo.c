@@ -78,12 +78,28 @@ SONG_SMALL static int room(struct song_undo *u, uint32_t bytes)
     }
     return 0;
 }
+/* A record's size, from its op. */
+SONG_SMALL static uint32_t size_of(const uint8_t *r)
+{
+    return 4U + (r[0] == SONG_UNDO_MAPS ? (uint32_t)sizeof(struct song_maps) : r[0] == SONG_UNDO_SOUND ? 2U * SONG_SOUND_BYTES : 8U);
+}
+enum { RUN = 1, RUN_MORE }; /* song_undo_run */
 /* The first record of a transaction drops what could have been redone and
- * opens the transaction, so empty polls cost nothing and keep redo. */
+ * opens the transaction, so empty polls cost nothing and keep redo. A run's
+ * turn opens the run's step again instead (0.6.7), as long as it is the
+ * last step and nothing waits to be redone. */
 SONG_SMALL static int open_transaction(struct song_undo *u)
 {
     if (!u->pending) return 0;
     u->pending = 0;
+    u->hint = 0;
+    u->joined = u->run == RUN_MORE && u->ran && u->used == u->done && u->levels;
+    if (u->joined) { /* its closing length off, and its records open for more */
+        u->used = u->done - 2U;
+        u->done = u->open_at = u->used - 2U - get16(u->data + u->used);
+        --u->levels;
+        return 0;
+    }
     u->used = u->open_at = u->done;
     if (room(u, 2)) return -1;
     u->open_at = u->used;
@@ -109,6 +125,37 @@ SONG_SMALL void song_undo_record(struct song_undo *u, unsigned op, unsigned trac
     } else append(u, op, track, e, sizeof *e);
 }
 SONG_SMALL void song_undo_step(struct song_undo *u) { if (u->depth) u->step = 1; }
+SONG_SMALL void song_undo_run(struct song_undo *u, unsigned more) { if (u->depth) u->run = (uint8_t)(more ? RUN_MORE : RUN); }
+/* A record of the open transaction with this op and track byte (a maps
+ * record keeps its mask there), and holding `e` when given. A run's turn
+ * meets its notes in the order the turn before did, so the search starts
+ * where the last one was found (0.6.7). The hint counts from the
+ * transaction's start, which room() moves with its records. */
+SONG_SMALL static uint8_t *find(struct song_undo *u, unsigned op, unsigned track, const struct song_event *e)
+{
+    uint32_t start = u->open_at + 2U, at = u->open_at + u->hint;
+    if (at <= start || at >= u->used) at = start;
+    for (unsigned lap = 0; lap < 2; ++lap, at = start)
+        for (; at < u->used; at += size_of(u->data + at)) {
+            uint8_t *r = u->data + at;
+            if (r[0] == op && r[1] == track && (!e || !memcmp(r + 2, e, sizeof *e))) { u->hint = at - u->open_at; return r; }
+        }
+    return NULL;
+}
+/* In a run's step opened again, the ADD that put the note where it was
+ * now puts it where it is, so the step keeps each note's first state and
+ * its last (0.6.7). Otherwise, and for a note the run hasn't moved yet, a
+ * DEL and an ADD. */
+SONG_SMALL void song_undo_change(struct song_undo *u, unsigned track, const struct song_event *was, const struct song_event *now)
+{
+    uint8_t *r;
+    if (u->depth && !u->paused && !u->lost && !open_transaction(u) && u->joined && (r = find(u, SONG_UNDO_ADD, track, was)))
+        memcpy(r + 2, now, sizeof *now);
+    else {
+        append(u, SONG_UNDO_DEL, track, was, sizeof *was);
+        append(u, SONG_UNDO_ADD, track, now, sizeof *now);
+    }
+}
 SONG_SMALL void song_undo_sound(struct song_undo *u, unsigned track, const uint8_t *before, const uint8_t *after)
 {
     uint8_t both[2 * SONG_SOUND_BYTES];
@@ -143,10 +190,12 @@ SONG_SMALL int song_undo_end(struct song_undo *u, const struct song *s)
      * turned over many polls is one step. */
     if (u->pending && (mask == MAP_LOOP || (mask && !u->step && same_kind(u, mask)))) mask = 0;
     u->step = 0;
-    if (mask) append(u, SONG_UNDO_MAPS, mask, &u->before, sizeof u->before);
-    u->depth = 0;
+    /* A run's step keeps the maps from before its first turn (0.6.7). */
+    if (mask && !(u->joined && find(u, SONG_UNDO_MAPS, mask, NULL))) append(u, SONG_UNDO_MAPS, mask, &u->before, sizeof u->before);
+    unsigned run = u->run;
+    u->depth = u->run = u->joined = 0;
     if (u->pending && !u->lost) { u->pending = 0; return 0; } /* nothing changed */
-    if (u->lost || room(u, 2)) { u->used = u->done = 0; u->levels = 0; u->lost = 0; return -1; }
+    if (u->lost || room(u, 2)) { u->used = u->done = 0; u->levels = u->lost = u->ran = 0; return -1; }
     uint32_t length = u->used - u->open_at - 2U;
     if (!length) { u->used = u->open_at; return 0; }
     put16(u->data + u->open_at, length);
@@ -154,6 +203,7 @@ SONG_SMALL int song_undo_end(struct song_undo *u, const struct song *s)
     u->used += 2;
     u->done = u->used;
     ++u->levels;
+    u->ran = run != 0; /* a run's turn: the next may join it */
     while (u->levels > SONG_UNDO_LEVELS) {
         uint32_t oldest = get16(u->data) + 4U;
         memmove(u->data, u->data + oldest, u->used - oldest);
@@ -204,6 +254,7 @@ SONG_SMALL static void apply(struct song *s, uint8_t *record, unsigned forward)
 SONG_SMALL int song_undo(struct song_undo *u, struct song *s)
 {
     if (u->depth || u->done < 4U) return -1;
+    u->ran = 0;
     uint32_t length = get16(u->data + u->done - 2U), start = u->done - 2U - length, end = u->done - 2U;
     u->paused = 1;
     u_sound = u->sound;
@@ -220,12 +271,12 @@ SONG_SMALL int song_undo(struct song_undo *u, struct song *s)
 SONG_SMALL int song_redo(struct song_undo *u, struct song *s)
 {
     if (u->depth || u->done + 4U > u->used) return -1;
+    u->ran = 0;
     uint32_t length = get16(u->data + u->done), at = u->done + 2U, end = at + length;
     u->paused = 1;
     u_sound = u->sound;
     while (at < end) {
-        uint32_t size = get16(u->data + at + 2U + (u->data[at] == SONG_UNDO_MAPS ? sizeof(struct song_maps)
-                                                    : u->data[at] == SONG_UNDO_SOUND ? 2U * SONG_SOUND_BYTES : 8U));
+        uint32_t size = size_of(u->data + at);
         apply(s, u->data + at, 1);
         at += size;
     }

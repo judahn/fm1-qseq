@@ -37,6 +37,12 @@ struct song_undo {
     uint32_t used, done, open_at;
     uint8_t depth, paused, lost, levels, pending; /* pending: nothing written yet, redo still kept */
     uint8_t step; /* this transaction stands alone, never joined to the one before (song_undo_step) */
+    /* A run (0.6.7, song_undo_run): the open transaction's part in one, the
+     * last step being a run's that may take the next turn in, the open
+     * transaction being that step opened again, and where the last record
+     * folded into was found, counted from the transaction's start. */
+    uint8_t run, ran, joined;
+    uint32_t hint;
     void (*sound)(unsigned track, const uint8_t *setup); /* puts a sound setup back, set by the port */
 };
 void song_undo_init(struct song_undo *u);
@@ -49,6 +55,16 @@ int song_undo_end(struct song_undo *u, const struct song *s);
 /* The open transaction is a step of its own, even if it only changes the
  * maps like the one before (a job, not a knob turned over many polls). */
 void song_undo_step(struct song_undo *u);
+/* A run of turns as one step (0.6.7, step entry's MOVE and NUDGE): the open
+ * transaction is a turn of a run, and with `more` it goes into the step
+ * before when that was the run's last turn and no step has come since,
+ * nor an undo or redo. The caller says when its run goes on: anything
+ * else in between starts a new one. In the step opened again, a note's
+ * change folds into the record of where the run put it, so the step holds
+ * each note's first and last state and stays the size of one turn. */
+void song_undo_run(struct song_undo *u, unsigned more);
+/* An event changed where it sits (song_retouch): what it was and is now. */
+void song_undo_change(struct song_undo *u, unsigned track, const struct song_event *was, const struct song_event *now);
 /* A track's sound setup before and after a change, so undo can swap it. */
 void song_undo_sound(struct song_undo *u, unsigned track, const uint8_t *before, const uint8_t *after);
 int song_undo(struct song_undo *u, struct song *s);  /* 0, or -1 when there is nothing */

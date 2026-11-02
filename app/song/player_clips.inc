@@ -66,6 +66,7 @@ SONG_SMALL static void emit_loop(struct song_player *p, unsigned t, unsigned cel
         *base = stop;
         p->cursor[t] = 0;
         p->late_count[t] = 0;
+        moved_pass(p, t); /* a new pass: moved notes play again (0.6.7) */
     }
 }
 /* A clip's pass holding `at` (base's clocks), and the cursor there. */

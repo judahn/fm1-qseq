@@ -2,6 +2,30 @@
 
 The version is `QSEQ_VERSION` in `app/version.h` (semver), and each release is tagged `v<version>`.
 
+## 0.6.7
+
+- Step entry moves notes in time. SHIFT+K1 (MOVE) moves the selected notes by the current length, triplets and
+  dots included, and SHIFT+K2 (NUDGE) by 5 clocks a detent. The footer says MOVE and the length, and NUDGE and
+  how far the pointer sits from the nearest line of the length's grid, for example `+15`. The selection is the
+  notes at the pointer, narrowed by SEL picks, or a sweep's, and each note moves whole: length, velocity and
+  glitch, TUNE included. In the glitch layer SHIFT+K1 to K3 are as before.
+- The pointer moves with the notes, and a sweep's band too, and the selection narrows to their pitches as if
+  picked with SEL, so a note of another pitch where they land doesn't join them. A detent that would bring in
+  one that stays, of a picked pitch, is refused with `NOTE IN THE WAY`, and nothing moves. So is one past the
+  start, or outside a clip's length. At the song's end a note goes as far as one entered there could, and the
+  song grows to hold it.
+- A run of MOVE and NUDGE turns with nothing else in between is one undo step, so ten clicks of NUDGE use one
+  of the 64 levels. The step keeps each note's first and last place, so a long run takes no more room than one
+  turn.
+- MOVE and NUDGE work while playing, for nudging by ear. A note moved on past the playhead has sounded that
+  pass, so it waits for the next one rather than sounding twice, and a note still sounding ends when it was
+  due.
+- PRESETS steps along the grid of the current length, counted from each bar line, plus the bar lines: a walk
+  at 1/64 and a switch to 1/2 lands on the half bar, where it used to keep the 64ths' offset. Off the grid,
+  the first detent lands on the nearest line that way. In 7/8 a 1/2 stops on the bar line and 960 clocks in,
+  and 1/1 only on bar lines. SEL+PRESETS sweeps the same way. SHIFT+PRESETS, entering, rests, ties and repeats
+  are as before, and changing the length never moves the pointer.
+
 ## 0.6.6
 
 - A sampler note can play its pad at its own pitch, up to 24 semitones up or down. In step entry on a sampler

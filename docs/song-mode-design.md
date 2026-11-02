@@ -96,10 +96,32 @@ kept the top three keys for rest, repeat and tie, and put the lengths on the low
 With SHIFT held no key enters a note or strikes a chord. K1 runs the same way as the keys, 1/1 at the left, halving
 turning right (0.5.1).
 
-**Knobs (step mode):** K1 length, K2 velocity, K3 gate, K4 pitch. PRESETS moves the pointer by the current
-length, and SHIFT plus PRESETS jumps from note to note (0.5.2, K4 moved the pointer and PRESETS was pitch).
+**Knobs (step mode):** K1 length, K2 velocity, K3 gate, K4 pitch. PRESETS moves the pointer to the next line
+of the current length's grid, and SHIFT plus PRESETS jumps from note to note (0.5.2, K4 moved the pointer and
+PRESETS was pitch). SHIFT+K1 moves the selected notes by the length and SHIFT+K2 nudges them (0.6.7, below).
 SELECT picks the track. Landing on a note plays it, as on the QY70. ALGO zooms the roll and ARP steps the
 glitch layer's pages (0.5.0, below).
+
+**The step grid (0.6.7).** The grid of a length is its multiples counted from each bar line, plus the bar
+lines, so in 7/8 a half note stops on the bar line and 960 clocks in, and a whole note only on bar lines. In
+a clip the bars count from its start. Each PRESETS detent goes to the next line that way, and off the grid the
+first one lands on the nearest line. Until 0.6.7 PRESETS moved by the length from wherever the pointer was, so
+a walk at 1/64 and a switch to 1/2 kept the 64ths' offset for good. Entering, rests, ties and repeats still go
+on by the length from where the pointer is, so an entry chain is as before, and changing the length never
+moves the pointer, since K1 changes the selected notes' lengths too.
+
+**MOVE and NUDGE (0.6.7).** With the glitch layer off, SHIFT+K1 moves the selection by the length (triplets
+and dots count) and SHIFT+K2 by 5 clocks a detent, whole notes with their length, velocity and glitch word,
+on the track's notes only. The pointer is the selection, so it moves with the notes, and a sweep's anchor
+too. The pick narrows to the moved pitches (picks already made stay), and a turn that would bring a note
+that stays, of a picked pitch, into the selection is refused: `NOTE IN THE WAY`. Without that, a note
+nudged onto another of its pitch would take it along on the next detent. A note can't go before the start or,
+in a clip, outside its length. On the song it goes as far as a note entered at the pointer could, the end,
+and the song grows a bar as it does for that note. A sweep too big to undo is refused as its other edits are.
+A run of MOVE and NUDGE turns with no other control between is one undo step (section 9). Playing, they edit
+as the other knobs do, and a note moved on past the playhead, which has sounded this pass, stays quiet where
+it lands until the next pass, so it never sounds twice in one. Its note-off comes when it was due, as after
+any edit.
 
 **Editing what's there.** The pointer is the selection. When it lands on existing notes, they're selected
 (the whole chord by default), and K1, K2 and K3 change their length, velocity and gate in place. On an empty
@@ -694,6 +716,14 @@ strum waits as well as while the song plays, and a strum's first notes go out as
 
 Several levels, stored as what each edit added and removed rather than as whole copies of the song, so it
 costs little memory. HOME plus SAVE stays undo, as in the stock firmware.
+
+**A run as one step (0.6.7).** Each control poll is a transaction, and a knob that only changes the maps
+joins the step before (a tempo turned over many polls is one step). Step entry's MOVE and NUDGE go further:
+the panel says when a turn goes on a run, and the journal opens the run's step again for it, as long as no
+step, undo or redo has come since. In the step opened again a note's change rewrites the record that put it
+where it was, rather than adding a pair, so the step holds each note's first and last state, and the maps
+from before the run once. Ten clicks of NUDGE are one of the 64 levels, and the step never outgrows one
+turn, which is what the "too big to undo" reckoning measures.
 
 ## 10. Phases
 

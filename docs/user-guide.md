@@ -272,8 +272,10 @@ time signature and, at the right, the span ALGO has zoomed to.
 | K2 | Velocity, 1 to 127, named by the nearest of PPP to FFFF. Past the top: random R1 to R4 |
 | K3 | Gate: 50, 90, 99 or 100% |
 | K4 | Pitch: move the selected notes by scale step, by octave with SHIFT. On drum tracks, from pad to pad. The footer says PITCH, OCTAVE or PAD |
+| SHIFT+K1 | MOVE: move the selected notes by the current length, the pointer with them (Moving notes, below). The footer says MOVE and the length |
+| SHIFT+K2 | NUDGE: move the selected notes 5 clocks a detent. The footer says NUDGE and how far the pointer is from the nearest line of the length's grid, for example `+15` |
 | SHIFT+K4 | On a sampler track: the selected notes' TUNE, a semitone at a time (below). The footer says TUNE and the value |
-| PRESETS | Move the pointer one step. SHIFT+PRESETS jumps note to note |
+| PRESETS | Move the pointer to the next line of the current length's grid: the length counted from each bar line, and the bar lines. Off the grid, the first detent lands on the nearest line that way. SHIFT+PRESETS jumps note to note |
 | Hold SEL, turn PRESETS | Sweep a selection (below) |
 | ENV | Delete the selected notes |
 | LFO | Back-delete: move back one step and delete there |
@@ -291,6 +293,27 @@ enters no note.
 When the pointer lands on notes they're selected and play, and K1 to K3 change them in place. On an empty spot
 the knobs set the next entry.
 
+**The step grid.** PRESETS steps along the grid of the current length, counted from each bar line, so after
+walking at 1/64 and switching to 1/2 the next detent lands on the half bar. In 7/8 a 1/2 stops on the bar line
+and 960 clocks in, and 1/1 only on bar lines. In a clip the bars count from its start. Changing the length
+never moves the pointer. Entering a note, a rest, a tie or a repeat moves on by the length from wherever the
+pointer is, as before, so an entry chain comes out the same.
+
+**Moving notes.** SHIFT+K1 (MOVE) moves the selected notes by the current length, triplets and dots
+included, and SHIFT+K2 (NUDGE) by 5 clocks a detent (a quarter is 480). The selection is the notes at the
+pointer, narrowed by any SEL picks, or a sweep's, and each note moves whole: its length, velocity and glitch,
+TUNE included. The pointer moves with them, and a sweep's band too, so they stay selected: the selection
+narrows to their pitches, as if picked with SEL (picks already made stay). Other notes where they land don't
+join them, and a detent that would bring one in, a note of a picked pitch that isn't moving, at the new spot
+or anywhere in the moved band, is refused with `NOTE IN THE WAY`, and nothing moves. A detent that would take
+a note before the start, or in a clip outside its length, is refused too. At the song's end a note goes as far
+as one entered there could, and the song grows to hold it. On an empty spot they do nothing. A run of MOVE and
+NUDGE turns with nothing else in between is one undo step, however many detents it took. They work while
+playing, so you can nudge by ear: a note moved on past the playhead has sounded this pass, and plays from its
+new spot on the next. In the glitch layer SHIFT+K1 to K3 stay as they were.
+
+<img src="step-nudge.png" width="300" alt="NUDGE: E4 picked from a chord and nudged 15 clocks, the footer MOVE 1/4 and NUDGE +15">
+
 **Zoom.** ALGO zooms the roll to 4 bars, 2 bars, 1 bar or half a bar across. It starts at 1 bar and keeps the
 zoom while the FM-1 is on. The roll shows a span that starts on a bar line, the spans counted from the start of
 the song or the clip, and at half a bar the half holding the pointer. The pitch range comes from the notes in
@@ -305,7 +328,7 @@ short, so two in a row on one pitch read as two.
 the clip with the grid's launched clips, as the clip editor plays it. A green playhead runs across the roll,
 which turns its pages to follow it, and the header says PLAY. While it plays the keys only sound: nothing is
 entered, SHIFT still sets the length, triplet and dots, and rest, tie and repeat wait for a stop. ENV, the
-knobs and the pitch knob still edit. PLAY again stops, back at the pointer's bar, the start point (Song view),
+knobs, MOVE and NUDGE and the pitch knob still edit. PLAY again stops, back at the pointer's bar, the start point (Song view),
 with the pointer where it was.
 
 **Recording here.** A tap of REC records a take on the track, as a tap does in the song view, in the song's
@@ -331,6 +354,7 @@ a drum track that picks one pad, every hi-hat in two bars, say. Then:
 | K1, K3 | Length and gate: each note's length scales as the entry's does, 1/16 to 1/8 doubling them |
 | Glitch layer K1 to K3 | That field on every note |
 | K4 | Move every note, by scale step, octave or pad. A note whose new pitch is taken at its clock stays |
+| SHIFT+K1, SHIFT+K2 | MOVE and NUDGE every note, the band going with them |
 | SHIFT+K4 | On a sampler track, TUNE on every note |
 
 Each is one undo step. A change undo couldn't hold (about 630 notes on the device) is refused with a notice,

@@ -91,10 +91,11 @@ SONG_SMALL static void note_on(struct song_player *p, unsigned t, const struct s
 }
 #if SONG_UI
 #include "player_glitch.inc" /* chance, repeats, flams and the rest, per note */
+#include "player_moved.inc"  /* notes moved past the playhead wait a pass (0.6.7) */
 SONG_SMALL static void play(struct song_player *p, unsigned t, const struct song_event *e, uint32_t at)
 {
     if (song_is_lane(e)) lane_out(p, t, song_event_lane(e), song_event_value(e), 0);
-    else if (song_is_note(e) && !QUIET(p, t, e)) glitch_note(p, t, e, at);
+    else if (song_is_note(e) && !QUIET(p, t, e) && !moved_out(p, t, e)) glitch_note(p, t, e, at);
 }
 #endif
 SONG_SMALL static uint32_t onset(const struct song_player *p, unsigned t, const struct song_event *e)
@@ -165,6 +166,7 @@ SONG_SMALL static void relocate(struct song_player *p, uint32_t clock, uint64_t 
 #if SONG_UI
     p->shift += p->next - clock; /* the transport runs on */
     ++p->pass; /* each pass rolls its own chances */
+    p->moved_count = 0; /* and moved notes wait no more (0.6.7) */
 #endif
     p->next = clock;
     p->revision = s->revision;

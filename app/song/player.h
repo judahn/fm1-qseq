@@ -23,7 +23,7 @@ struct song_output {
 enum { SONG_HELD = 16 }; /* sounding notes tracked per track */
 struct song_held { uint32_t end; uint8_t pitch; };
 /* A glitched note's repeats still to come (player_glitch.inc). */
-enum { SONG_HITS = 4 };
+enum { SONG_HITS = 4, SONG_MOVED = 8 };
 struct song_hit { uint32_t start; uint16_t length; uint8_t pitch, velocity, repeats, next, fade, scale; int8_t drift, tune; };
 struct song_player {
     struct song *song;
@@ -55,6 +55,11 @@ struct song_player {
     struct song_hit hit[SONG_TRACKS][SONG_HITS];
     uint8_t hits[SONG_TRACKS], pad_count[SONG_TRACKS], pads[SONG_TRACKS][16], samplers;
     uint32_t pass;
+    /* Notes moved on past the playhead this pass (0.6.7, song_player_moved):
+     * each stays quiet at its new clock until playing gets there, or the
+     * pass ends. */
+    struct song_moved { uint32_t at; uint8_t track, pitch; } moved[SONG_MOVED];
+    uint8_t moved_count;
     /* Clips (design 8f, player_clips.inc): what each track plays, a row of
      * the grid, SONG_FROM_SONG or SONG_FROM_STOP, a launch waiting for its
      * clock, and where the clip's pass began. Those are transport clocks:
@@ -162,6 +167,13 @@ uint32_t song_player_transport(const struct song_player *p);
 void song_player_edit(struct song_player *p, unsigned track, unsigned opening);
 /* A track's notes, repeats and waiting swung notes end now. */
 void song_player_cut(struct song_player *p, unsigned track);
+/* A note on the track moved while playing (0.6.7, step entry's MOVE and
+ * NUDGE), from clock `from` to `to` in the track's own clocks (the open
+ * clip's on its track). Moved on past the playhead it has sounded this
+ * pass already, so it waits for the next, and moved again it keeps
+ * waiting. A note held sounding ends when it was due to, as after any
+ * edit, and one moved back past the playhead plays from the next pass. */
+void song_player_moved(struct song_player *p, unsigned track, unsigned pitch, uint32_t from, uint32_t to);
 /* Stopped: the playhead back at the start point, kept inside the song (or
  * the open clip's timeline). Playing to the song's end does it too. */
 void song_player_rewind(struct song_player *p);

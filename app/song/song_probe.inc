@@ -108,6 +108,7 @@ SONG_EXPORT("sim_song_info") uint32_t sim_song_info(unsigned what, unsigned trac
     }
     case 61: return song.chromatic[track & 7U]; /* chromatic mode (0.6.6) */
     case 62: return step.glitch; /* step entry's entry word */
+    case 64: return step.pick[index & 3U]; /* step entry's picked pitches, 32 to a word, index 0 to 3 (0.6.7) */
 #endif
     case 18: return index < count ? e[index].b : 0;
     case 19: return song.swing | (uint32_t)song.swing_grid << 8 | (uint32_t)song.swing_tracks << 16;

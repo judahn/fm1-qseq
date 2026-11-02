@@ -148,8 +148,12 @@ static void song_step_draw(void)
             knob(k, song_glitch_names[field], value, AMBER);
         }
     else {
-        knob(0, "LENGTH", length, colors[0]);
-        knob(1, "VELOCITY", velocity, colors[1]);
+        /* SHIFT: MOVE by the length, and NUDGE showing how far the pointer
+         * sits from the nearest line of the length's grid (0.6.7). */
+        char offset[12] = "+";
+        if (shift) { int off = step_offset(st); decimal(offset + (off > 0), off, 1); }
+        knob(0, shift ? "MOVE" : "LENGTH", length, colors[0]);
+        knob(1, shift ? "NUDGE" : "VELOCITY", shift ? offset : velocity, colors[1]);
         knob(2, "GATE", gate, colors[2]);
     }
     char tune[12] = "< >";

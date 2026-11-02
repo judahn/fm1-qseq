@@ -43,7 +43,7 @@ int step_repeat(struct song_step *st);
 int step_tie(struct song_step *st);
 int step_delete(struct song_step *st);
 int step_back_delete(struct song_step *st);
-void step_move(struct song_step *st, int steps);    /* by the step length */
+void step_move(struct song_step *st, int steps);    /* line to line on the step grid (0.6.7) */
 void step_jump(struct song_step *st, int direction); /* note to note */
 /* PRESETS with SEL held (0.5.0, K4 until 0.5.2, LFO until 0.5.6): the pointer moves, by
  * steps or note to note, and the selection runs from where the sweep began
@@ -91,6 +91,23 @@ int step_range_delete(struct song_step *st);
 void step_range_velocity(struct song_step *st, int delta);
 void step_range_scale(struct song_step *st, uint32_t before, uint32_t after); /* lengths times after / before */
 int step_range_glitch(struct song_step *st, unsigned field, int delta);
+/* step_move.c (0.6.7): the step grid, MOVE and NUDGE. The grid is the
+ * multiples of the step length counted from each bar line, and the bar
+ * lines themselves (a clip's bars count from its start). step_grid_move goes
+ * from line to line, `steps` of them, and step_offset is how far the
+ * pointer sits from its nearest line, in clocks, after it positive.
+ * step_nudge moves the selected notes whole by `clocks`, the pointer with
+ * them and a sweep's anchor too, and narrows the selection to their
+ * pitches as picking them would. Playing, the player hears of each note
+ * (song_player_moved). It returns 0, -1 with nothing selected, or a
+ * refusal, and then nothing moved: STEP_TOO_BIG, STEP_IN_THE_WAY when a
+ * note that stays, of a selected pitch, would join the selection there,
+ * STEP_START before clock 0, or STEP_END past a clip's end or past where
+ * entering a note could reach. */
+enum { STEP_NUDGE = 5, STEP_IN_THE_WAY = -3, STEP_START = -4, STEP_END = -5 };
+uint32_t step_grid_move(const struct song_step *st, uint32_t clock, int steps);
+int step_offset(const struct song_step *st);
+int step_nudge(struct song_step *st, int32_t clocks, struct song_player *p);
 unsigned step_entry_velocity(struct song_step *st); /* draws a random one for R1..R4 */
 const char *step_velocity_name(unsigned velocity);
 void step_length_name(const struct song_step *st, char out[8]);

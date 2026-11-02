@@ -12,13 +12,17 @@
  * type, and F5 to G5 enter the last chord again, an octave down and an
  * octave up (song_chord_keys). In chromatic mode every key enters the
  * chosen pad with the key's pitch as its TUNE, and on a sampler track
- * SHIFT+K4 turns the selected notes' TUNE by semitones (0.6.6). PLAY plays
+ * SHIFT+K4 turns the selected notes' TUNE by semitones (0.6.6). SHIFT+K1
+ * moves the selected notes by the length and SHIFT+K2 nudges them by 5
+ * clocks (0.6.7, step_move.c), playing or not, a run of those turns with
+ * nothing else between being one undo step. PLAY plays
  * from the pointer's bar and stays here, and while it plays the keys only
  * sound. REC records a take here as in the other views, a hold opens the
  * record settings, and SHIFT+REC leaves, as SEQ does (0.5.0). ALGO zooms
  * the roll and ARP steps the glitch pages. */
 static uint32_t step_held; /* entry keys down for the chord being built */
 static uint8_t step_from; /* the page step entry was opened from (0.4.1) */
+static uint8_t step_moving; /* the last control was MOVE or NUDGE, so the next turn joins its undo step (0.6.7) */
 static unsigned song_key_note(unsigned note);
 static unsigned song_chromatic(void); /* song_lights.inc */
 static int song_key_semitones(unsigned key);
@@ -28,7 +32,7 @@ static void song_step_enter(void)
 {
     struct song_step *st = song_port_step();
     step_begin(st, track, song_port_player()->playhead);
-    step_held = 0;
+    step_held = step_moving = 0;
     step_from = (uint8_t)page;
     page = music_page = SONG_STEP;
     cache->shown_page = ~0U;
@@ -41,7 +45,7 @@ static void song_step_leave(void)
 {
     struct song_step *st = song_port_step();
     step_preview_stop(st);
-    st->ranged = st->picked = 0;
+    st->ranged = st->picked = step_moving = 0;
     if (step_from == SONG_GRID && st->song->open) {
         song_port_clip_launched();
         song_port_clip_close();
@@ -100,12 +104,30 @@ static void step_shift_key(struct song_step *st, unsigned name, unsigned playing
     }
     if (wrong) { notice = wrong; notice_until = now + 1500U; }
 }
+/* MOVE and NUDGE (0.6.7): detent by detent, `clocks` each, stopping at the
+ * first one refused, which says why. Playing, the player hears of each. */
+static void step_nudged(struct song_step *st, int detents, uint32_t clocks, uint32_t now)
+{
+    static const char *const why[3] = {"NOTE IN THE WAY", "CAN'T MOVE BEFORE THE START", "CAN'T MOVE PAST THE END"};
+    for (int k = detents < 0 ? -detents : detents; k-- > 0;) {
+        int r = step_nudge(st, detents < 0 ? -(int32_t)clocks : (int32_t)clocks, song_port_player());
+        if (!r) continue;
+        if (r <= STEP_IN_THE_WAY) { notice = why[STEP_IN_THE_WAY - r]; notice_until = now + 1500U; }
+        else step_refused(r, now);
+        return;
+    }
+}
 static int song_step_input(const struct fm1_controls *c, uint32_t *pressed, uint32_t key_down, uint32_t now)
 {
     struct song_step *st = song_port_step();
     unsigned shift = (c->buttons & BUTTON(FX)) != 0, picking = (c->buttons & BUTTON(SCL)) != 0;
     unsigned playing = song_port_player()->playing, taking = song_port_recording() != 0;
-    if (st->track != track && !taking) { step_begin(st, track, st->pointer); step_held = 0; } /* the record settings' SELECT */
+    /* MOVE and NUDGE, SHIFT+K1 and SHIFT+K2 with the glitch layer off (0.6.7). Any other control ends their run. */
+    unsigned moving = shift && !song_glitch_layer && (c->encoders[2] || c->encoders[3]);
+    unsigned other = key_down || (*pressed & ~(BUTTON(FX) | BUTTON(SCL))) || c->encoders[0] || c->encoders[1] ||
+                     c->encoders[4] || c->encoders[5] || c->encoders[6] || (!moving && (c->encoders[2] || c->encoders[3]));
+    if (other || taking) step_moving = 0;
+    if (st->track != track && !taking) { step_begin(st, track, st->pointer); step_held = step_moving = 0; } /* the record settings' SELECT */
     if (*pressed & BUTTON(REC)) { /* a take ends as REC goes down, SHIFT+REC leaves, a tap records (song_rec_held) */
         *pressed &= ~BUTTON(REC);
         if (taking) { song_port_record_end(1); return 1; }
@@ -143,6 +165,12 @@ static int song_step_input(const struct fm1_controls *c, uint32_t *pressed, uint
             if (r == -1) { notice = "GLITCH TABLE FULL"; notice_until = now + 1500U; }
             step_refused(r, now);
         }
+    } else if (moving) { /* the run's undo step goes on, or one starts */
+        song_undo_run(song_port_undo(), step_moving);
+        step_moving = !other;
+        step_nudged(st, c->encoders[2], step_clocks(st), now);
+        step_nudged(st, c->encoders[3], STEP_NUDGE, now);
+        if (c->encoders[4]) step_refused(step_set_gate(st, c->encoders[4]), now);
     } else {
         if (c->encoders[2]) step_refused(step_set_length(st, -c->encoders[2]), now); /* right halves it, as F to E (0.5.1) */
         if (c->encoders[3]) step_refused(step_set_velocity(st, c->encoders[3]), now);

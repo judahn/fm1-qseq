@@ -25,14 +25,14 @@ SONG_SMALL int song_set_event(struct song *s, unsigned track, unsigned index, co
 }
 
 /* Phase 6 jobs: an event changed where it sits, journaled, and the track
- * put back in order afterwards. Equal starts keep their order. */
+ * put back in order afterwards. Equal starts keep their order. Step
+ * entry's MOVE and NUDGE use it too (0.6.7), their runs folding in undo. */
 SONG_SMALL void song_retouch(struct song *s, unsigned track, unsigned index, const struct song_event *e)
 {
     struct song_event *at = &s->event[s->first[track] + index];
     if (!memcmp(at, e, sizeof *e)) return;
-    if (s->undo) song_undo_record(s->undo, SONG_UNDO_DEL, song_owner(s, track), at, 0);
+    if (s->undo) song_undo_change(s->undo, song_owner(s, track), at, e);
     *at = *e;
-    if (s->undo) song_undo_record(s->undo, SONG_UNDO_ADD, song_owner(s, track), e, 0);
     ++s->revision;
 }
 SONG_SMALL void song_sort_track(struct song *s, unsigned track)

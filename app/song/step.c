@@ -186,16 +186,14 @@ SONG_SMALL int step_back_delete(struct song_step *st)
     st->tie_ok = st->picked = st->ranged = 0;
     return 0;
 }
-/* The pointer by steps, or note to note (`jump`, by the direction). */
+/* The pointer line to line on the step grid (0.6.7, step_move.c), or note
+ * to note (`jump`, by the direction). */
 SONG_SMALL static void slide(struct song_step *st, int steps, unsigned jump)
 {
     unsigned count, i;
     const struct song_event *e = song_track(st->song, st->track, &count);
-    if (!jump) {
-        int64_t to = (int64_t)st->pointer + (int64_t)steps * step_clocks(st);
-        uint32_t end = song_end(st->song);
-        st->pointer = to < 0 ? 0 : to > end ? end : (uint32_t)to;
-    } else if (steps > 0)
+    if (!jump) st->pointer = step_grid_move(st, st->pointer, steps);
+    else if (steps > 0)
         for (i = song_find(st->song, st->track, st->pointer + 1); i < count; ++i) {
             if (song_is_note(&e[i])) { st->pointer = song_event_start(&e[i]); break; }
         }
