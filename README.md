@@ -156,14 +156,14 @@ Then:
 | `./build.sh --help` | Prints this list | |
 
 `--package` and `--web` need `FM1_SOURCE_URL`, the HTTPS URL of the matching source archive, which the page
-links to. Upstream's README notes that a moving GitHub `tree/main` page doesn't count. This repo is private,
-so a build given to anyone else needs a source archive they can reach.
+links to. Upstream's README notes that a moving GitHub `tree/main` page doesn't count, so a release build
+links to its tag's archive.
 
 For the full build, set `FM1_SONG_DEVICE_FULL=1`. Its outputs go to `build/dx7-songfull/` and
-`build/official-web-songfull/`. With `COMMIT` as the commit you built:
+`build/official-web-songfull/`. With `vX.Y.Z` as the release's tag:
 
 ```sh
-FM1_SONG_DEVICE_FULL=1 FM1_SOURCE_URL=https://github.com/judahn/fm1-qseq/archive/COMMIT.tar.gz ./build.sh --package
+FM1_SONG_DEVICE_FULL=1 FM1_SOURCE_URL=https://github.com/judahn/fm1-qseq/archive/refs/tags/vX.Y.Z.tar.gz ./build.sh --package
 ```
 
 A firmware build prints its size and checks it fits. A package build also prints the flash layout, for example
@@ -184,8 +184,10 @@ still here. We haven't tried it with our changes.
 This is how FM1 Open's workbench installs firmware. The default build went onto an FM-1 for the timing test,
 and the full build has been installed the same way since 0.1.0.
 
-1. Build the page: `./build.sh --package`, or the full build command above.
-2. Open `build/official-web/FM1-Official-Open-Source.html` (or the `-songfull` one) in desktop Chrome or Edge.
+1. Get the install page. Each [release](https://github.com/judahn/fm1-qseq/releases/latest) has the full
+   build's page attached as `QSEQ-x.y.z.html`, with its SHA-256 and the synthesized kits. Or build it with the
+   full build command above, which writes `build/official-web-songfull/FM1-Official-Open-Source.html`.
+2. Open the page in desktop Chrome or Edge.
 3. Plug the FM-1 in over USB, switch it on and close other MIDI apps.
 4. Open the **Device update** tab and click **Connect device**. Allow MIDI and SysEx.
 5. Back up first, then tick the backup box. The page says which step comes next:
